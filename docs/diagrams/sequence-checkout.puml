@@ -1,0 +1,123 @@
+@startuml sequence-checkout
+autonumber
+skinparam BoxPadding 10
+skinparam ParticipantPadding 15
+skinparam ResponseMessageBelowArrow true
+skinparam RoundCorner 8
+
+title BrewLite – Sequence Diagram: Đặt và Thanh toán Đơn hàng
+
+actor "Customer\n(Khách hàng)" as Customer
+participant "Next.js UI\n(Frontend)" as UI
+participant "NestJS API\n(Backend)" as API
+database "PostgreSQL\n(Database)" as DB
+participant "Mock Payment Service\n(Wallet/Card)" as Payment
+
+== 1. Khởi tạo yêu cầu Đặt hàng ==
+Customer -> UI: Chọn sản phẩm, size, topping, số lượng
+Customer -> UI: Bấm "Đặt hàng"
+activate UI
+UI -> API: POST /orders/checkout\n(cart, paymentMethod, idempotencyKey) + JWT
+activate API
+
+== 2. Xác thực JWT & Kiểm tra Idempotency khi Đặt hàng ==
+alt JWT không hợp lệ / hết hạn
+    API --> UI: 401 Unauthorized
+    UI --> Customer: Thông báo yêu cầu đăng nhập lại
+else JWT hợp lệ
+    API -> API: Validate token nội bộ & validate DTO giỏ hàng
+    API -> DB: Kiểm tra Idempotency-Key (order key)
+    activate DB
+    DB --> API: Kết quả kiểm tra key
+    deactivate DB
+
+    alt Idempotency-Key đã tồn tại (Yêu cầu gửi trùng lặp)
+        API --> UI: 409 Conflict / Trả về thông tin đơn đã tạo trước đó
+        UI --> Customer: Cảnh báo: "Yêu cầu đang xử lý, vui lòng không gửi lại"
+    else Idempotency-Key hợp lệ (Yêu cầu mới)
+        == 3. Database Transaction: Kiểm tra Tồn kho & Tạo Đơn ==
+        API -> DB: Bắt đầu Transaction ($transaction)
+        activate DB
+
+        loop Duyệt từng sản phẩm trong giỏ hàng (Cart Items)
+            API -> DB: SELECT stock FROM Product WHERE id = item.productId FOR UPDATE
+            DB --> API: Số lượng tồn kho thực tế
+            
+            break Không đủ tồn kho (stock < quantity)
+                API -> DB: ROLLBACK Transaction
+                DB --> API: Rollback hoàn tất, hủy toàn bộ thay đổi
+                deactivate DB
+                API --> UI: 400 Bad Request (Sản phẩm không đủ số lượng trong kho)
+                UI --> Customer: Báo lỗi hết hàng, dừng tạo đơn & gợi ý cập nhật giỏ
+            end
+            
+            API -> DB: UPDATE Product SET stock = stock - quantity
+            DB --> API: Trừ tồn kho tạm thời thành công
+        end
+
+        API -> DB: INSERT INTO "Order" (status: PENDING) & "OrderItem"
+        DB --> API: Bản ghi đơn hàng tạo thành công
+        API -> DB: COMMIT Transaction
+        DB --> API: Commit thành công
+        deactivate DB
+
+        API --> UI: 201 Created (orderId, orderCode, total, status: PENDING)
+        deactivate API
+        UI --> Customer: Hiển thị đơn hàng & chọn phương thức thanh toán
+
+        == 4. Xử lý thanh toán (Mock Payment) & Idempotency ==
+        Customer -> UI: Chọn phương thức (Ví/Thẻ) & bấm "Xác nhận thanh toán"
+        UI -> API: POST /payments\n(orderId, method, amount, paymentKey) + JWT
+        activate API
+
+        API -> DB: INSERT INTO "PaymentTransaction" (key, status: 'PROCESSING')\n[Unique Constraint trên key]
+        activate DB
+        DB --> API: Kết quả ghi nhận key
+        deactivate DB
+
+        alt paymentKey đã tồn tại (Request trùng lặp / Double-click)
+            API -> DB: SELECT status, result FROM "PaymentTransaction" WHERE key = paymentKey
+            activate DB
+            DB --> API: Trả về trạng thái giao dịch hiện tại
+            deactivate DB
+
+            alt Trạng thái == 'PROCESSING' (Đang xử lý)
+                API --> UI: 409 Conflict / 202 Accepted ("Giao dịch đang xử lý, vui lòng đợi")
+                UI --> Customer: Hiển thị loading: "Giao dịch đang được tiến hành..."
+            else Trạng thái in ['SUCCESS', 'FAILED'] (Đã kết thúc)
+                API --> UI: 200 OK (Trả lại kết quả thanh toán đã lưu trước đó)
+                UI --> Customer: Hiển thị lại kết quả giao dịch tương ứng
+            end
+        else paymentKey mới hợp lệ (Đã lock PROCESSING, tránh gọi kép)
+            API -> Payment: processPayment(orderId, amount, method, paymentKey)
+            activate Payment
+            Payment --> API: paymentResult (SUCCESS / FAILED)
+            deactivate Payment
+
+            alt paymentResult == SUCCESS (Thanh toán thành công)
+                API -> DB: $transaction: UPDATE "Order" SET status = 'PAID'\nvà UPDATE "PaymentTransaction" SET status = 'SUCCESS'
+                activate DB
+                DB --> API: Cập nhật thành công
+                deactivate DB
+                API --> UI: 200 OK (status: PAID, paymentInfo)
+                UI --> Customer: Thông báo: "Đặt hàng & Thanh toán thành công!"
+            else paymentResult == FAILED (Thanh toán thất bại)
+                API -> DB: $transaction: UPDATE "Order" SET status = 'PAYMENT_FAILED'\nvà UPDATE "PaymentTransaction" SET status = 'FAILED'
+                activate DB
+                note right of DB
+                    Giữ nguyên số lượng kho (chưa hoàn kho)
+                    để cho phép khách bấm "Thử thanh toán lại".
+                    Chỉ hoàn kho khi quá hạn Timeout hoặc khách ấn "Hủy đơn".
+                end note
+                DB --> API: Cập nhật thất bại
+                deactivate DB
+                API --> UI: 402 Payment Failed (Giao dịch bị từ chối)
+                deactivate API
+                UI --> Customer: Báo lỗi thanh toán, cho phép chọn ví/thẻ khác để thử lại
+            end
+        end
+    end
+end
+deactivate UI
+
+@enduml
