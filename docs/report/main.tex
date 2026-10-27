@@ -1,0 +1,1491 @@
+% !TeX program = xelatex
+\documentclass[a4paper]{article}
+
+% ==================== TIẾNG VIỆT VÀ FONT ====================
+\usepackage{fontspec}
+\setmainfont{Latin Modern Roman}
+\setmonofont{Latin Modern Mono}
+
+% ==================== BỐ CỤC ====================
+\usepackage{a4wide}
+\usepackage{setspace}
+
+% ==================== TOÁN HỌC ====================
+\usepackage{amsmath,amssymb,latexsym}
+
+% ==================== BẢNG ====================
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{hhline}
+\usepackage{caption}
+\usepackage{float}
+
+% ==================== HÌNH ẢNH ====================
+\usepackage{graphicx}
+\usepackage{multicol}
+\usepackage{rotating}
+\usepackage{tikz}
+\usetikzlibrary{arrows,snakes,backgrounds}
+
+% ==================== THUẬT TOÁN VÀ MÃ NGUỒN ====================
+\IfFileExists{algorithm2e.sty}{\usepackage[lined,boxed,commentsnumbered]{algorithm2e}}{}
+\usepackage{enumerate}
+\usepackage{xcolor}
+\usepackage[framemethod=tikz]{mdframed}
+\usepackage{listings}
+
+% ==================== HEADER VÀ FOOTER ====================
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+
+% ==================== LIÊN KẾT ====================
+\usepackage[unicode]{hyperref}
+\hypersetup{
+    pdftitle={BrewLite – Assignment 2},
+    colorlinks=true,
+    urlcolor=blue,
+    linkcolor=black,
+    citecolor=black,
+    pageanchor=false
+}
+
+% ==================== TÊN MỤC ====================
+\renewcommand{\contentsname}{Mục lục}
+\renewcommand{\refname}{Tài liệu tham khảo}
+\renewcommand{\figurename}{Hình}
+\renewcommand{\tablename}{Bảng}
+
+% ==================== ĐỊNH LÝ ====================
+\newtheorem{theorem}{Định lý}
+\newtheorem{property}{Tính chất}
+\newtheorem{proposition}{Mệnh đề}
+\newtheorem{corollary}[proposition]{Hệ quả}
+\newtheorem{lemma}[proposition]{Bổ đề}
+
+\everymath{\color{blue}}
+
+% ==================== CẤU HÌNH HEADER ====================
+\setlength{\headheight}{40pt}
+\pagestyle{fancy}
+
+\fancyhead{}
+\fancyhead[L]{%
+    \begin{tabular}{@{}rl@{}}
+        \begin{picture}(25,15)(0,0)
+            \put(0,-8){%
+                \IfFileExists{assets/logo-khoa.png}{\includegraphics[
+                    width=8mm,
+                    height=8mm,
+                    keepaspectratio
+                ]{assets/logo-khoa.png}}{\rule{0pt}{8mm}}%
+            }
+        \end{picture}
+        &
+        \begin{tabular}{@{}l@{}}
+            \textbf{\ttfamily Trường Đại học Sài Gòn}\\
+            \textbf{\ttfamily Khoa Công Nghệ Thông Tin}
+        \end{tabular}
+    \end{tabular}%
+}
+
+\fancyhead[R]{}
+
+% ==================== CẤU HÌNH FOOTER ====================
+\fancyfoot{}
+
+\fancyfoot[L]{%
+    \scriptsize\ttfamily
+    Bài tập lớn môn Công nghệ Phần mềm - Năm học 2026–2027
+}
+
+\fancyfoot[R]{%
+    \scriptsize\ttfamily
+    Trang \thepage/\pageref{LastPage}
+}
+
+\renewcommand{\headrulewidth}{0.3pt}
+\renewcommand{\footrulewidth}{0.3pt}
+
+% ==================== CẤP ĐỘ TIÊU ĐỀ ====================
+\setcounter{secnumdepth}{4}
+\setcounter{tocdepth}{3}
+
+\makeatletter
+\newcounter{subsubsubsection}[subsubsection]
+
+\renewcommand{\thesubsubsubsection}{%
+    \thesubsubsection.\@alph\c@subsubsubsection
+}
+
+\newcommand{\subsubsubsection}{%
+    \@startsection{subsubsubsection}{4}{\z@}%
+    {-3.25ex\@plus -1ex\@minus -.2ex}%
+    {1.5ex\@plus .2ex}%
+    {\normalfont\normalsize\bfseries}%
+}
+
+\newcommand*{\l@subsubsubsection}{%
+    \@dottedtocline{4}{10.0em}{4.1em}%
+}
+
+\newcommand*{\subsubsubsectionmark}[1]{}
+\makeatother
+
+% ==================== ĐỊNH DẠNG MÃ NGUỒN ====================
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\lstset{
+    frame=tb,
+    language=Matlab,
+    aboveskip=3mm,
+    belowskip=3mm,
+    showstringspaces=false,
+    columns=flexible,
+    basicstyle=\small\ttfamily,
+    numberstyle=\tiny\color{gray},
+    keywordstyle=\color{blue},
+    commentstyle=\color{dkgreen},
+    stringstyle=\color{mauve},
+    breaklines=true,
+    breakatwhitespace=true,
+    tabsize=3,
+    numbers=left,
+    stepnumber=1,
+    numbersep=1pt,
+    firstnumber=1,
+    numberfirstline=true
+}
+
+
+% Hiển thị khung chờ nếu hình chưa được upload.
+\newcommand{\reportimage}[2][]{%
+    \IfFileExists{#2}{\includegraphics[#1]{#2}}{%
+        \fbox{\parbox[c][18mm][c]{0.75\linewidth}{\centering
+        Chưa có hình: \texttt{\detokenize{#2}}}}}%
+}
+
+\begin{document}
+
+% ============================================================
+%                         TRANG BÌA
+% ============================================================
+\begin{titlepage}
+    \thispagestyle{empty}
+    \centering
+
+    % Tên trường và khoa
+    {\normalsize
+        TRƯỜNG ĐẠI HỌC SÀI GÒN\par
+        \vspace{2mm}
+        KHOA CÔNG NGHỆ THÔNG TIN\par
+    }
+
+    \vspace{1.4cm}
+
+    % Logo
+    \reportimage[width=3cm]{assets/logo-khoa.png}\par
+
+    \vspace{1.5cm}
+
+    % Tên môn học
+    {\Large\bfseries CÔNG NGHỆ PHẦN MỀM\par}
+
+    \vspace{5mm}
+
+    % Khối tiêu đề căn giữa
+    \begin{minipage}{0.88\textwidth}
+        \centering
+
+        \rule{\linewidth}{0.4pt}\par
+
+        \vspace{5mm}
+
+        {\Large\bfseries Bài tập lớn:\par}
+
+        \vspace{5mm}
+
+        {\Huge\bfseries BrewLite – Assignment 2\par}
+
+        \vspace{5mm}
+
+        {\Large\bfseries REQUIREMENTS TO DEPLOYMENT\par}
+
+        \vspace{4mm}
+
+        {\bfseries VER 1.0\par}
+
+        \vspace{5mm}
+
+        \rule{\linewidth}{0.4pt}\par
+    \end{minipage}\par
+
+    \vspace{1.2cm}
+
+    % Bảng thông tin đặt giữa trang
+    \begin{tabular}{@{}ll@{}}
+        Môn học:
+            & Công nghệ Phần mềm\\[6pt]
+        Công nghệ:
+            & Next.js, NestJS, PostgreSQL và Docker\\[6pt]
+        Học kỳ:
+            & I – Năm học 2026–2027\\
+    \end{tabular}\par
+
+    \vspace{1.5cm}
+
+    % Bảng giảng viên và sinh viên đặt giữa trang
+    \begin{tabular}{@{}ll@{}}
+        \textbf{GVHD:}
+            & ThS. Từ Lãng Phiêu\\[8pt]
+        \textbf{Sinh viên thực hiện:}
+            & \begin{tabular}[t]{@{}lll@{}}
+                Kiệt & (Nhóm trưởng) & -- MSSV \\
+                Luân & (Thành viên)  & -- MSSV \\
+                Hùng & (Thành viên)  & -- MSSV \\
+                Triệu & (Thành viên) & -- MSSV \\
+                Lượng & (Thành viên) & -- MSSV \\
+                Kha & (Thành viên)   & -- MSSV \\
+              \end{tabular}
+    \end{tabular}\par
+
+    \vfill
+
+    {\footnotesize TP. HỒ CHÍ MINH, NĂM 2026\par}
+
+    \vspace{5mm}
+\end{titlepage}
+
+% ============================================================
+%                          MỤC LỤC
+% ============================================================
+\pagenumbering{arabic}
+\hypersetup{pageanchor=true}
+
+\tableofcontents
+\clearpage
+
+% ============================================================
+%                         NỘI DUNG
+% ============================================================
+
+\section{Tổng quan Assignment 2}
+
+Assignment~2 tiếp tục phát triển đề tài \textbf{BrewLite} -- ứng dụng đặt nước không tiền mặt -- đã được khảo sát ở Assignment~1.
+Nhóm thực hiện toàn bộ chuỗi công việc từ khai thác yêu cầu, mô hình hóa, thiết kế kiến trúc đến hiện thực qua hai Sprint, thiết lập CI/CD và triển khai hệ thống lên môi trường production có thể truy cập được.
+
+Báo cáo này trình bày kết quả của từng task, bắt đầu từ Task~1 (đặc tả yêu cầu) đến Task~5 (triển khai và bàn giao), kèm theo ma trận truy vết giữa yêu cầu, thiết kế, mã nguồn và kiểm thử.
+
+\subsection{Phạm vi sản phẩm}
+
+Luồng nghiệp vụ tối thiểu mà BrewLite phải đáp ứng:
+
+\begin{center}
+\textbf{Xem menu} $\rightarrow$ \textbf{Chọn tùy chọn} $\rightarrow$ \textbf{Giỏ hàng} $\rightarrow$ \textbf{Đặt đơn} $\rightarrow$ \textbf{Thanh toán} $\rightarrow$ \textbf{Theo dõi đơn}
+\end{center}
+
+Hệ thống được xây dựng trên ba thành phần công nghệ bắt buộc:
+\begin{itemize}
+    \item \textbf{Frontend:} Next.js theo hướng mobile-first/PWA.
+    \item \textbf{Backend:} NestJS (TypeScript, REST API).
+    \item \textbf{Cơ sở dữ liệu:} PostgreSQL.
+\end{itemize}
+
+Ngoài ra, hệ thống sử dụng Docker để đóng gói và đồng bộ môi trường, GitHub Actions cho CI/CD, và dịch vụ thanh toán mô phỏng để kiểm thử luồng thanh toán.
+
+\section{Quy trình từ yêu cầu đến triển khai}
+
+Dự án được chia thành năm task thực hiện tuần tự. Task sau chỉ được nghiệm thu khi các tạo phẩm bắt buộc của task trước đã có trên kho mã nguồn với lịch sử thay đổi rõ ràng.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{|c|p{4.5cm}|p{5.8cm}|c|}
+\hline
+\textbf{Task} & \textbf{Giai đoạn} & \textbf{Tạo phẩm chính} & \textbf{Điểm} \\ \hline
+1 & Khai thác và đặc tả yêu cầu & Stakeholder, phạm vi, SRS, use-case tổng quát và đặc tả use-case & 2 \\ \hline
+2 & Mô hình hóa hệ thống & Activity diagram, sequence diagram và class diagram & 2 \\ \hline
+3 & Thiết kế kiến trúc & Mô tả kiến trúc, quyết định kiến trúc và deployment diagram & 2 \\ \hline
+4 & Triển khai Sprint~1 & Repository, tài liệu, CI cơ bản và MVP đầu tiên & 2 \\ \hline
+5 & Sprint~2 và Delivery & MVP hoàn chỉnh, CD, production, kiểm thử và bàn giao & 2 \\ \hline
+\multicolumn{3}{|r|}{\textbf{Tổng cộng}} & \textbf{10} \\ \hline
+\end{tabular}
+\end{center}
+
+\section{Task 1 – Khai thác và đặc tả yêu cầu}
+
+Task~1 tập trung vào việc xác định bối cảnh nghiệp vụ, nhận diện các bên liên quan, xây dựng tài liệu đặc tả yêu cầu phần mềm (SRS) rút gọn và đặc tả chi tiết một use-case trọng tâm. Đây là nền tảng để các task tiếp theo -- mô hình hóa, thiết kế, hiện thực -- có cơ sở thực hiện đúng hướng.
+
+\subsection{Task 1.1 – Bối cảnh, stakeholder và phạm vi}
+
+\subsubsection{Bối cảnh và vấn đề nghiệp vụ}
+
+Nhiều quán nước và cà phê quy mô nhỏ tại Việt Nam vẫn tiếp nhận đơn hàng chủ yếu qua hình thức gọi trực tiếp tại quầy. Quy trình này tồn tại một số vấn đề:
+
+\begin{itemize}
+    \item Khách hàng phải xếp hàng chờ đợi, đặc biệt trong khung giờ cao điểm (giờ nghỉ trưa, chiều tối).
+    \item Nhân viên ghi đơn thủ công dễ nhầm lẫn sản phẩm, tùy chọn (size, topping) hoặc số lượng.
+    \item Thanh toán tiền mặt gây bất tiện: thiếu tiền thối, không kiểm soát doanh thu tức thì.
+    \item Không có hệ thống lưu trữ lịch sử đơn hàng, khó phân tích dữ liệu kinh doanh và hành vi khách hàng.
+    \item Khách hàng không biết trạng thái đơn hàng (đang pha chế, sẵn sàng nhận) sau khi đặt.
+\end{itemize}
+
+\textbf{BrewLite} ra đời nhằm giải quyết các vấn đề trên bằng cách cung cấp một ứng dụng web đặt nước trực tuyến, hỗ trợ thanh toán không tiền mặt. Khách hàng có thể tự xem menu, chọn sản phẩm cùng tùy chọn, đặt đơn và thanh toán qua thiết bị di động mà không cần tương tác trực tiếp tại quầy. Nhân viên pha chế nhận đơn chính xác từ hệ thống và cập nhật trạng thái để khách hàng theo dõi.
+
+\subsubsection{Stakeholder}
+
+Bảng~\ref{tab:stakeholder} liệt kê các bên liên quan chính của hệ thống BrewLite cùng mục tiêu và kỳ vọng.
+
+\begingroup
+\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{6pt}
+\setlength{\arrayrulewidth}{0.5pt}
+\begin{longtable}{|p{2.8cm}|p{3.5cm}|p{6.8cm}|}
+\caption{Bảng stakeholder hệ thống BrewLite}
+\label{tab:stakeholder} \\
+\hline
+\textbf{Stakeholder} & \textbf{Vai trò} & \textbf{Mục tiêu và kỳ vọng} \\ \hline
+\endfirsthead
+\hline
+\textbf{Stakeholder} & \textbf{Vai trò} & \textbf{Mục tiêu và kỳ vọng} \\ \hline
+\endhead
+\endfoot
+\endlastfoot
+
+Khách hàng & Người dùng cuối, đặt và thanh toán đơn hàng & Đặt nước nhanh chóng, chọn size/topping dễ dàng, thanh toán không tiền mặt, theo dõi trạng thái đơn hàng và xem lại lịch sử đơn. \\ \hline
+
+Nhân viên quầy & Tiếp nhận và pha chế đơn hàng & Nhận đơn hàng chính xác từ hệ thống, cập nhật trạng thái pha chế (đang chuẩn bị, sẵn sàng giao), giảm sai sót do ghi chép thủ công. \\ \hline
+
+Quản lý cửa hàng & Quản lý vận hành và menu sản phẩm & Quản lý danh mục sản phẩm, theo dõi đơn hàng tổng thể, đảm bảo hệ thống hoạt động ổn định phục vụ kinh doanh. \\ \hline
+
+Giảng viên / Khách hàng nghiệm thu & Đánh giá sản phẩm theo tiêu chí môn học & Hệ thống đáp ứng đầy đủ yêu cầu đề bài, có tài liệu rõ ràng, mã nguồn có kiểm thử, pipeline CI/CD hoạt động và URL production truy cập được. \\ \hline
+
+Nhóm phát triển & Thiết kế, hiện thực và triển khai hệ thống & Áp dụng quy trình công nghệ phần mềm, chia task hợp lý, sử dụng Git/GitHub hiệu quả, hoàn thành đúng hạn và học hỏi công nghệ mới. \\ \hline
+
+Đơn vị thanh toán & Cung cấp dịch vụ thanh toán (SePay sandbox) & API thanh toán hoạt động ổn định, nhận webhook (IPN) chính xác, thông tin giao dịch được ghi nhận đầy đủ. \\ \hline
+
+\end{longtable}
+\endgroup
+
+\subsubsection{Phạm vi}
+
+\noindent\textbf{Phạm vi MVP (In-scope)}
+
+Các tính năng nằm trong phạm vi MVP mà nhóm cam kết hoàn thành:
+
+\begin{enumerate}
+    \item \textbf{Xem menu sản phẩm:} Hiển thị danh sách sản phẩm với tên, hình ảnh, giá bán.
+    \item \textbf{Xem chi tiết và chọn tùy chọn:} Xem thông tin chi tiết sản phẩm, chọn size và topping.
+    \item \textbf{Quản lý giỏ hàng:} Thêm, cập nhật số lượng, xóa sản phẩm trong giỏ hàng.
+    \item \textbf{Xác thực người dùng:} Đăng ký, đăng nhập, đăng xuất với JWT.
+    \item \textbf{Đặt đơn hàng:} Tạo đơn hàng từ giỏ hàng hợp lệ, kiểm tra tồn kho.
+    \item \textbf{Thanh toán mô phỏng:} Lựa chọn phương thức (Ví/Thẻ), xử lý và xác nhận kết quả.
+    \item \textbf{Theo dõi và quản lý đơn:} Xem trạng thái, lịch sử đơn hàng; nhân viên cập nhật trạng thái pha chế.
+    \item \textbf{Triển khai:} Docker, CI/CD qua GitHub Actions, URL production truy cập được qua HTTPS.
+\end{enumerate}
+
+\noindent\textbf{Phạm vi mở rộng (Future scope)}
+
+Các tính năng có thể phát triển thêm sau MVP nhưng không bắt buộc trong phạm vi dự án:
+
+\begin{itemize}
+    \item Hệ thống tích điểm khách hàng thân thiết (loyalty program).
+    \item Mã giảm giá và chương trình khuyến mãi.
+    \item Giao diện quản trị cho quản lý (admin panel): thêm/sửa/ẩn sản phẩm.
+    \item Báo cáo và thống kê doanh thu.
+    \item Thông báo đẩy (push notification) khi đơn hàng thay đổi trạng thái.
+    \item Đánh giá và nhận xét sản phẩm từ khách hàng.
+\end{itemize}
+
+\noindent\textbf{Ngoài phạm vi (Out-of-scope)}
+
+Các nội dung nhóm \textbf{không} thực hiện trong dự án này:
+
+\begin{itemize}
+    \item Giao hàng tận nơi (delivery) -- hệ thống chỉ hỗ trợ nhận tại quầy.
+    \item Thanh toán bằng tiền thật -- toàn bộ thanh toán là mô phỏng (sandbox).
+    \item Hỗ trợ nhiều chi nhánh cửa hàng (multi-store).
+    \item Ứng dụng native trên iOS/Android -- chỉ có PWA trên trình duyệt.
+    \item Tích hợp với hệ thống kế toán hoặc ERP bên ngoài.
+    \item Hỗ trợ đa ngôn ngữ (i18n).
+\end{itemize}
+
+\subsubsection{Giả định}
+
+\begin{enumerate}
+    \item Cửa hàng hoạt động với một chi nhánh duy nhất.
+    \item Khách hàng sử dụng thiết bị di động hoặc máy tính có kết nối Internet và trình duyệt hiện đại (Chrome, Safari, Firefox).
+    \item Thanh toán hoàn toàn là mô phỏng thông qua SePay sandbox; không xử lý tiền thật.
+    \item Menu sản phẩm được nhập sẵn qua database seed; trong MVP, quản lý không chỉnh sửa menu qua giao diện.
+    \item PostgreSQL và các dịch vụ hạ tầng (Docker, GitHub Actions) luôn khả dụng trong quá trình phát triển và triển khai.
+    \item Nhóm phát triển gồm 6 thành viên làm việc bán thời gian (sinh viên).
+    \item Khách hàng cần đăng nhập trước khi đặt đơn và thanh toán.
+\end{enumerate}
+
+\subsubsection{Ràng buộc}
+
+\begin{enumerate}
+    \item \textbf{Công nghệ bắt buộc:} Frontend phải dùng Next.js, backend phải dùng NestJS, dữ liệu lưu trong PostgreSQL. Không được thay thế ba thành phần này.
+    \item \textbf{Thời gian:} Dự án phải hoàn thành theo lịch trình môn Công nghệ Phần mềm, học kỳ~I năm học 2026--2027.
+    \item \textbf{Nhân lực:} Nhóm gồm 6 sinh viên, mỗi thành viên dành thời gian có giới hạn ngoài giờ học.
+    \item \textbf{Thanh toán:} Chỉ mô phỏng, tuyệt đối không sử dụng thông tin thanh toán thật hoặc xử lý giao dịch tài chính thực tế.
+    \item \textbf{Quy trình:} Năm task phải được thực hiện tuần tự; task sau chỉ nghiệm thu khi task trước hoàn thành.
+    \item \textbf{Bảo mật:} Không đưa secret (JWT secret, mật khẩu database, khóa thanh toán) lên GitHub hoặc vào log CI/CD.
+    \item \textbf{Triển khai:} Hệ thống phải có URL production truy cập được qua HTTPS tại thời điểm nghiệm thu.
+\end{enumerate}
+
+\subsubsection{Rủi ro ban đầu}
+
+Bảng~\ref{tab:rui-ro} phân tích các rủi ro chính có thể ảnh hưởng đến dự án cùng biện pháp giảm thiểu.
+
+\begingroup
+\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{5pt}
+\setlength{\arrayrulewidth}{0.5pt}
+\begin{longtable}{|c|p{3.2cm}|c|c|p{4.8cm}|}
+\caption{Bảng phân tích rủi ro ban đầu}
+\label{tab:rui-ro} \\
+\hline
+\textbf{Mã} & \textbf{Rủi ro} & \textbf{Xác suất} & \textbf{Tác động} & \textbf{Biện pháp giảm thiểu} \\ \hline
+\endfirsthead
+\hline
+\textbf{Mã} & \textbf{Rủi ro} & \textbf{Xác suất} & \textbf{Tác động} & \textbf{Biện pháp giảm thiểu} \\ \hline
+\endhead
+\endfoot
+\endlastfoot
+
+R-01 & Thành viên chưa quen với Next.js hoặc NestJS & Cao & Trung bình & Chia sẻ tài liệu học nội bộ, pair programming, code review hỗ trợ lẫn nhau. \\ \hline
+
+R-02 & Xung đột mã nguồn (merge conflict) khi nhiều người cùng sửa & Trung bình & Trung bình & Phân nhánh theo tính năng, mỗi thành viên làm trên branch riêng, review trước khi merge. \\ \hline
+
+R-03 & Deadline gấp, khối lượng công việc lớn so với nhân lực & Cao & Cao & Ưu tiên tính năng MVP, cắt giảm tính năng phụ, theo dõi tiến độ hàng tuần qua bảng backlog. \\ \hline
+
+R-04 & API sandbox thanh toán (SePay) thay đổi hoặc ngừng hoạt động & Thấp & Cao & Xây dựng mock/stub thanh toán dự phòng để kiểm thử không phụ thuộc dịch vụ bên ngoài. \\ \hline
+
+R-05 & Mất dữ liệu database khi triển khai hoặc migration & Thấp & Cao & Sao lưu database trước mỗi lần migration, sử dụng migration có thể rollback. \\ \hline
+
+R-06 & Thành viên không hoàn thành task đúng hạn & Trung bình & Cao & Họp tiến độ ngắn hàng tuần, phát hiện sớm điểm nghẽn, sẵn sàng phân công lại kịp thời. \\ \hline
+
+\end{longtable}
+\endgroup
+
+\subsection{Task 1.2 – Yêu cầu chức năng và phi chức năng}
+\subsubsection{Yêu cầu chức năng}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-01 – Xem menu sản phẩm}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Hệ thống cho phép khách hàng khám phá thực đơn và xem danh sách các món đồ uống đang được cung cấp theo từng danh mục.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:}
+\begin{itemize}
+    \item Mỗi sản phẩm trên danh sách hiển thị đầy đủ: hình ảnh minh họa, tên sản phẩm, mô tả ngắn gọn và mức giá cơ sở (giá khởi điểm cho size tiêu chuẩn).
+    \item Hỗ trợ bộ lọc danh mục (Tabs: Cà phê, Trà sữa, Trà trái cây, Đá xay...); phản hồi tức thì trên cùng trang (SPA) không tải lại trang.
+    \item Hiển thị hiệu ứng tải (Loading / Skeleton) trong khi chờ dữ liệu nạp từ Backend API \texttt{GET /products}.
+    \item Các sản phẩm hết hàng hoặc ngừng kinh doanh không được hiển thị như sản phẩm có thể đặt hàng.
+\end{itemize}
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-02 – Xem chi tiết sản phẩm}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Khách hàng có thể mở cửa sổ chi tiết (Modal) của một sản phẩm để tùy biến kích cỡ (size) theo khẩu vị.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:}
+\begin{itemize}
+    \item Khi chọn một sản phẩm, hệ thống mở Modal hiển thị tên, hình ảnh, mô tả chi tiết, giá gốc và các kích cỡ hỗ trợ (Size S, M, L).
+    \item Bắt buộc chọn duy nhất 1 kích cỡ tại một thời điểm (Single choice). Mặc định hệ thống tự chọn Size tiêu chuẩn (Size M).
+    \item Đơn giá hiển thị tự động cộng hoặc trừ chênh lệch phụ thu tương ứng theo từng kích cỡ.
+\end{itemize}
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-03 – Chọn tùy chọn sản phẩm và tính giá động}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Khách hàng có thể chọn nhiều loại topping thêm cho ly nước và theo dõi tổng tiền tạm tính tự động theo thời gian thực.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:}
+\begin{itemize}
+    \item Cho phép chọn cùng lúc nhiều loại topping khác nhau (Multiple choice: Trân châu, Thạch đào, Kem cheese...); chặn hoàn toàn số lượng âm.
+    \item Tổng tiền tạm tính ở chân Modal được tính toán tự động theo thời gian thực:
+    \[
+    \text{Tổng tiền} = \Big(\text{Giá cơ sở} + \text{Phụ thu Size} + \sum \text{Giá Topping}\Big) \times \text{Số lượng ly}
+    \]
+    \item Khi bấm nút ``Thêm vào giỏ hàng'', toàn bộ cấu hình món đã chọn được đóng gói chính xác vào giỏ hàng và tự động đóng Modal.
+\end{itemize}
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-04 – Thêm sản phẩm vào giỏ hàng}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Khách hàng có thể thêm sản phẩm cùng các tùy chọn đã chọn vào giỏ hàng.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} Sản phẩm được thêm vào giỏ hàng với đúng số lượng, size, topping và đơn giá tương ứng.
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-05 – Cập nhật giỏ hàng}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Khách hàng có thể thay đổi số lượng hoặc tùy chọn sản phẩm trong giỏ hàng.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} Hệ thống cập nhật số lượng, thành tiền của từng sản phẩm và tổng tiền giỏ hàng chính xác sau mỗi thay đổi. Số lượng phải là số nguyên dương.
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-06 – Xóa sản phẩm khỏi giỏ hàng}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Khách hàng có thể xóa sản phẩm không muốn mua khỏi giỏ hàng.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} Sản phẩm được loại khỏi giỏ hàng và tổng tiền được tính lại chính xác.
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-07 – Kiểm tra giỏ hàng trước khi đặt đơn}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Hệ thống kiểm tra thông tin sản phẩm, số lượng, tùy chọn và giá trước khi tạo đơn hàng.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} Hệ thống chỉ cho phép tiếp tục khi giỏ hàng có ít nhất một sản phẩm hợp lệ. Nếu sản phẩm không còn khả dụng hoặc giá đã thay đổi, hệ thống thông báo cho khách hàng và yêu cầu xác nhận thông tin mới khi cần thiết.
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-08 – Nhập thông tin nhận đơn}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Khách hàng cung cấp thông tin cần thiết để cửa hàng tiếp nhận và xử lý đơn hàng.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} Hệ thống kiểm tra các trường thông tin bắt buộc theo hình thức nhận đơn được hỗ trợ. Nếu dữ liệu không hợp lệ hoặc còn thiếu, hệ thống thông báo lỗi cụ thể.
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-09 – Xem lại thông tin đơn hàng}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Trước khi đặt đơn, khách hàng có thể kiểm tra các sản phẩm, tùy chọn, số lượng và tổng tiền.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} Hệ thống hiển thị đầy đủ thông tin đơn hàng và tổng tiền được tính từ dữ liệu hợp lệ ở phía máy chủ.
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-10 – Tạo đơn hàng}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Hệ thống tạo đơn hàng từ giỏ hàng hợp lệ của khách hàng.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} 
+\begin{itemize}
+\item Đơn hàng được cấp mã định danh duy nhất.
+\item Đơn hàng lưu thông tin sản phẩm, số lượng, tùy chọn, đơn giá và tổng tiền tại thời điểm đặt.
+\item Hệ thống kiểm tra lại dữ liệu trước khi lưu đơn hàng.
+\item Đơn hàng không được tạo trùng do cùng một yêu cầu gửi lại ngoài ý muốn.
+\item Nếu thao tác lưu đơn thất bại, hệ thống thông báo kết quả phù hợp và không để lại dữ liệu đơn hàng dở dang.
+\end{itemize}
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-11 – Theo dõi trạng thái đơn hàng}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Khách hàng có thể xem trạng thái hiện tại của đơn hàng đã đặt.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} Hệ thống hiển thị mã đơn hàng, thời điểm đặt và trạng thái hiện tại. Thông tin hiển thị phải khớp với dữ liệu được lưu trên hệ thống.
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-12 – Cập nhật trạng thái đơn hàng}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Nhân viên hoặc người có quyền phù hợp có thể cập nhật trạng thái đơn hàng theo quy trình xử lý của cửa hàng.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} Chỉ người có quyền mới được cập nhật trạng thái. Hệ thống từ chối các chuyển đổi trạng thái không hợp lệ và lưu trạng thái mới khi cập nhật thành công.
+\item[] \textbf{Các trạng thái dự kiến:} 
+\begin{itemize}
+\item Chờ thanh toán.
+\item Đã xác nhận.
+\item Đang chuẩn bị.
+\item Sẵn sàng giao/nhận.
+\item Hoàn thành.
+\item Đã hủy.
+\end{itemize}
+\par Việc chuyển trạng thái phải tuân theo quy tắc nghiệp vụ. Trạng thái thanh toán được quản lý riêng, không mặc định đồng nhất với trạng thái xử lý đơn hàng.
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-13 – Xem lịch sử đơn hàng}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Khách hàng có thể xem lại các đơn hàng đã đặt thuộc tài khoản của mình.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} Hệ thống hiển thị danh sách đơn hàng của đúng khách hàng, bao gồm mã đơn, thời điểm đặt, tổng tiền và trạng thái. Khách hàng không được truy cập lịch sử đơn hàng của tài khoản khác.
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-14 – Đăng ký tài khoản}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Hệ thống cho phép khách hàng tạo tài khoản bằng cách cung cấp họ tên, email và mật khẩu.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} 
+\begin{itemize}
+\item Người dùng đăng ký thành công khi cung cấp đầy đủ thông tin hợp lệ.
+\item Email đăng ký không được trùng với email đã tồn tại.
+\item Mật khẩu phải có tối thiểu 8 ký tự.
+\item Hệ thống hiển thị thông báo khi đăng ký thành công hoặc thất bại.
+\item Mật khẩu được mã hóa bằng thuật toán băm an toàn trước khi lưu vào cơ sở dữ liệu.
+\end{itemize}
+\end{list}
+
+\noindent\textbf{FR-15 – Đăng nhập tài khoản}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Hệ thống cho phép người dùng đăng nhập bằng email và mật khẩu đã đăng ký.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} 
+\begin{itemize}
+\item Người dùng đăng nhập thành công khi email và mật khẩu chính xác.
+\item Hệ thống trả về JWT hợp lệ sau khi xác thực thành công.
+\item Khi thông tin đăng nhập không chính xác, hệ thống hiển thị thông báo lỗi phù hợp.
+\item Người dùng chưa đăng nhập không thể thực hiện các thao tác yêu cầu xác thực.
+\end{itemize}
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-16 – Đăng xuất tài khoản}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Hệ thống cho phép người dùng đăng xuất khỏi phiên làm việc hiện tại.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} 
+\begin{itemize}
+\item Khi chọn đăng xuất, hệ thống xóa thông tin xác thực của phiên hiện tại ở phía ứng dụng.
+\item Người dùng được chuyển về trạng thái chưa đăng nhập.
+\item Người dùng phải đăng nhập lại để tiếp tục sử dụng các chức năng được bảo vệ.
+\item JWT đã được cấp trước đó có thể vẫn hợp lệ đến khi hết hạn nếu hệ thống chưa triển khai cơ chế thu hồi token.
+\end{itemize}
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-17 – Xác thực truy cập bằng JWT}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Backend NestJS kiểm tra JWT trước khi cho phép người dùng truy cập các API yêu cầu xác thực.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} 
+\begin{itemize}
+\item API được bảo vệ chỉ xử lý yêu cầu khi JWT hợp lệ.
+\item JWT không hợp lệ, hết hạn hoặc không được cung cấp sẽ bị từ chối với mã HTTP 401.
+\item Người dùng không được truy cập thông tin đơn hàng thuộc tài khoản khác.
+\item Hệ thống kiểm tra quyền truy cập trước khi thực hiện thao tác trên tài nguyên.
+\end{itemize}
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-18 – Lựa chọn phương thức thanh toán}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Khách hàng có thể lựa chọn một trong hai phương thức thanh toán mô phỏng: Ví điện tử hoặc Thẻ.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} 
+\begin{itemize}
+\item Hệ thống hiển thị đầy đủ hai phương thức thanh toán.
+\item Khách hàng phải chọn một phương thức trước khi gửi yêu cầu thanh toán.
+\item Phương thức được chọn phải được ghi nhận cùng thông tin thanh toán của đơn hàng.
+\end{itemize}
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-19 – Xử lý thanh toán mô phỏng}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Hệ thống gửi yêu cầu thanh toán đến dịch vụ thanh toán mô phỏng và tiếp nhận kết quả xử lý.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} 
+\begin{itemize}
+\item Chỉ cho phép thanh toán đối với đơn hàng hợp lệ.
+\item Số tiền thanh toán phải bằng tổng tiền đơn hàng được backend xác nhận.
+\item Hệ thống hỗ trợ mô phỏng cả kết quả thanh toán thành công và thất bại.
+\item Khi thanh toán thành công, giao dịch được ghi nhận với trạng thái thành công.
+\item Khi thanh toán thất bại, hệ thống ghi nhận trạng thái thất bại và hiển thị thông báo cho khách hàng.
+\end{itemize}
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-20 – Xác nhận kết quả thanh toán}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Sau khi xử lý thanh toán, hệ thống thông báo kết quả và cập nhật trạng thái thanh toán của đơn hàng.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} 
+\begin{itemize}
+\item Khi thanh toán thành công, hệ thống hiển thị thông báo xác nhận.
+\item Hệ thống lưu mã giao dịch, phương thức thanh toán, số tiền, thời gian và trạng thái thanh toán.
+\item Khi thanh toán thất bại, đơn hàng không được đánh dấu là đã thanh toán.
+\item Trạng thái thanh toán được đồng bộ với thông tin đơn hàng.
+\end{itemize}
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{FR-21 – Ngăn chặn thanh toán trùng lặp}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Hệ thống kiểm soát các yêu cầu thanh toán được gửi lặp lại nhằm tránh ghi nhận nhiều giao dịch thành công cho cùng một lần thanh toán.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} 
+\begin{itemize}
+\item Khi gửi lại yêu cầu với cùng mã idempotency key, hệ thống không tạo thêm giao dịch thanh toán mới.
+\item Hệ thống trả về kết quả đã ghi nhận của yêu cầu tương ứng.
+\item Một yêu cầu thanh toán đã hoàn tất không được xử lý thành công thêm lần nữa chỉ vì người dùng nhấn nút nhiều lần.
+\end{itemize}
+\end{list}
+
+\subsubsection{Yêu cầu phi chức năng}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{NFR-01 – Bảo vệ mật khẩu người dùng}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Mật khẩu người dùng phải được bảo vệ trong quá trình lưu trữ và xác thực.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} 
+\begin{itemize}
+\item Mật khẩu được băm bằng thuật toán phù hợp như bcrypt hoặc Argon2.
+\item Không lưu mật khẩu dưới dạng văn bản thuần.
+\item API không trả về mật khẩu hoặc giá trị băm mật khẩu.
+\item Kiểm thử cơ sở dữ liệu xác nhận không tồn tại mật khẩu dạng văn bản thuần.
+\end{itemize}
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{NFR-02 – Bảo mật truyền dữ liệu}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Dữ liệu trao đổi giữa trình duyệt, backend và các dịch vụ bên ngoài phải được bảo vệ.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} 
+\begin{itemize}
+\item Môi trường production sử dụng giao thức HTTPS.
+\item Thông tin đăng nhập và thanh toán không được truyền qua HTTP công khai.
+\item Các yêu cầu không an toàn phải được chuyển hướng sang HTTPS hoặc từ chối theo cấu hình triển khai.
+\end{itemize}
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{NFR-03 – Kiểm soát truy cập}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Hệ thống phải giới hạn quyền truy cập dựa trên trạng thái xác thực và quyền của người dùng.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} 
+\begin{itemize}
+\item Người dùng chưa đăng nhập không thể truy cập API quản lý đơn hàng cá nhân.
+\item Khách hàng chỉ có thể xem những đơn hàng thuộc tài khoản của mình.
+\item Các thao tác dành cho nhân viên hoặc quản lý phải được kiểm tra quyền trên backend.
+\item Yêu cầu không đủ quyền bị từ chối với mã HTTP 403.
+\end{itemize}
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{NFR-04 – Kiểm tra và xác thực dữ liệu đầu vào}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Hệ thống phải kiểm tra dữ liệu được gửi từ frontend trước khi xử lý.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} 
+\begin{itemize}
+\item Backend kiểm tra kiểu dữ liệu, định dạng và các trường bắt buộc.
+\item Các dữ liệu không hợp lệ bị từ chối với mã HTTP 400.
+\item Dữ liệu do người dùng nhập không được sử dụng trực tiếp để xây dựng câu lệnh SQL không an toàn.
+\item Giá trị thanh toán không được tin cậy hoàn toàn từ frontend mà phải được backend xác minh.
+\end{itemize}
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{NFR-05 – Bảo vệ thông tin cấu hình và dữ liệu nhạy cảm}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Hệ thống phải bảo vệ các thông tin bí mật như JWT secret, thông tin kết nối PostgreSQL và khóa cấu hình dịch vụ.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} 
+\begin{itemize}
+\item Secret được quản lý thông qua biến môi trường hoặc dịch vụ quản lý bí mật.
+\item Không đưa mật khẩu database hoặc JWT secret thật lên GitHub.
+\item Các thông tin nhạy cảm không xuất hiện trong log hệ thống hoặc log CI/CD.
+\item Cơ sở dữ liệu production không được công khai trực tiếp trên Internet.
+\end{itemize}
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{NFR-06 – Ghi nhận và theo dõi sự kiện bảo mật}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Hệ thống ghi nhận những sự kiện cần thiết phục vụ kiểm tra lỗi và phát hiện hành vi truy cập bất thường.
+\item[] \textbf{Mức ưu tiên:} Should.
+\item[] \textbf{Tiêu chí chấp nhận:} 
+\begin{itemize}
+\item Ghi nhận các lần đăng nhập thất bại và lỗi xử lý thanh toán.
+\item Log có thời gian, loại sự kiện và thông tin định danh phù hợp.
+\item Không ghi mật khẩu, JWT đầy đủ hoặc thông tin thẻ nhạy cảm vào log.
+\item Có thể tra cứu log để xác định nguyên nhân khi một giao dịch thanh toán gặp lỗi.
+\end{itemize}
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{NFR-07 – Hiệu năng: Thời gian phản hồi API}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Hệ thống Backend (NestJS) phải phản hồi các yêu cầu từ Client (Next.js) một cách nhanh chóng để tối ưu trải nghiệm người dùng.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} 95\% các yêu cầu API GET (xem menu, danh sách đơn hàng) phản hồi dưới 2 giây. Các API ghi dữ liệu (POST/PUT như tạo đơn, thanh toán) xử lý dưới 3 giây trong điều kiện mạng bình thường.
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{NFR-08 – Hiệu năng: Khả năng chịu tải đồng thời}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Hệ thống NestJS và CSDL PostgreSQL phải đảm bảo hoạt động ổn định trong các khung giờ cao điểm khi lượng đặt hàng tăng đột biến.
+\item[] \textbf{Mức ưu tiên:} Should.
+\item[] \textbf{Tiêu chí chấp nhận:} Hệ thống duy trì hoạt động với tỷ lệ lỗi 5xx dưới 1\% khi chịu tải đồng thời tối thiểu 100 người dùng và xử lý thành công ít nhất 100 request/giây.
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{NFR-09 – Tính khả dụng: Giao diện Mobile-first \& PWA}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Giao diện Next.js được thiết kế tối ưu cho điện thoại di động và hỗ trợ các tính năng Progressive Web App (PWA).
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} Giao diện hiển thị chuẩn xác, không bị vỡ bố cục trên màn hình di động có chiều rộng từ 375px trở lên và cho phép người dùng thêm ứng dụng vào màn hình chính (Add to Home Screen).
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{NFR-10 – Tính khả dụng: Phản hồi trạng thái giao diện}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Giao diện người dùng phải phản hồi tức thì và cung cấp thông tin trực quan đối với mọi tương tác hoặc trạng thái chờ của hệ thống.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} Hiển thị hiệu ứng chờ (Skeleton/Spinner) khi tải dữ liệu và hiển thị thông báo lỗi thân thiện kèm nút "Thử lại" (Retry) khi mất kết nối hoặc gọi API thất bại.
+\end{list}
+
+\par\ifdim\dimexpr\pagegoal-\pagetotal\relax<6\baselineskip\newpage\fi
+\addvspace{0.8\baselineskip}
+
+\noindent\textbf{NFR-11 – Khả năng triển khai: Đóng gói Containerization}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Toàn bộ các dịch vụ hệ thống (Next.js, NestJS, PostgreSQL) được đóng gói dưới dạng Docker container để đồng bộ môi trường.
+\item[] \textbf{Mức ưu tiên:} Must.
+\item[] \textbf{Tiêu chí chấp nhận:} Tất cả các dịch vụ được định nghĩa trong file docker-compose.yml và có thể khởi chạy hoàn chỉnh ở môi trường cục bộ chỉ với một lệnh docker compose up.
+\end{list}
+
+
+\noindent\textbf{NFR-12 – Khả năng triển khai: Quy trình CI/CD \& Health Check}\par\nopagebreak
+\begin{list}{}{%
+    \setlength{\leftmargin}{0.8cm}%
+    \setlength{\rightmargin}{0pt}%
+    \setlength{\labelwidth}{0pt}%
+    \setlength{\labelsep}{0pt}%
+    \setlength{\itemindent}{0pt}%
+    \setlength{\listparindent}{0pt}%
+    \setlength{\itemsep}{5pt}%
+    \setlength{\parsep}{0pt}%
+    \setlength{\topsep}{5pt}%
+}
+\item[] \textbf{Mô tả:} Hệ thống tích hợp quy trình kiểm thử tự động qua GitHub Actions và cung cấp điểm cuối (endpoint) giám sát sức khỏe ứng dụng.
+\item[] \textbf{Mức ưu tiên:} Should.
+\item[] \textbf{Tiêu chí chấp nhận:} Pipeline CI tự động chặn merge Pull Request nếu quá trình Lint, Unit Test hoặc Build thất bại. Endpoint GET /health trả về mã trạng thái 200 OK khi các dịch vụ hoạt động bình thường.
+\end{list}
+
+
+\subsubsection{Sơ đồ use-case tổng quát}
+
+\begin{figure}[H]
+    \centering
+    \reportimage[width=\linewidth]{assets/use-case-tong-quat.jpg}
+    \caption{Sơ đồ use-case tổng quát của hệ thống BrewLite}
+    \label{fig:use-case-tong-quat}
+\end{figure}
+
+\subsection{Task 1.3 – Đặc tả một use-case trọng tâm}
+
+\subsubsection{Bảng đặc tả use-case: Đặt và thanh toán đơn hàng}
+\begingroup
+\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{6pt}
+\setlength{\arrayrulewidth}{0.5pt}
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.23\textwidth}|>{\raggedright\arraybackslash}p{0.67\textwidth}|}
+\hline
+\textbf{Thành phần} & \textbf{Nội dung chi tiết} \\ \hline
+\endfirsthead
+\hline
+\textbf{Thành phần} & \textbf{Nội dung chi tiết} \\ \hline
+\endhead
+\endfoot
+\endlastfoot
+\textbf{Mã Use-case} & UC-01 \\ \hline
+\textbf{Tên Use-case} & Đặt và thanh toán đơn \\ \hline
+\textbf{Actor chính} & Khách hàng \\ \hline
+\textbf{Actor phụ / Hệ thống} & \textbullet\  Hệ thống Backend NestJS API\par\smallskip \textbullet\  Cơ sở dữ liệu PostgreSQL\par\smallskip \textbullet\  Dịch vụ thanh toán (SePay Sandbox) \\ \hline
+\textbf{Trigger} & Khách hàng nhấn nút "Thanh toán" từ màn hình giỏ hàng hoặc nhấn "Xác nhận đặt hàng". \\ \hline
+\textbf{Mô tả vắn tắt} & Khách hàng kiểm tra giỏ hàng, xác nhận thông tin đơn hàng, chọn phương thức thanh toán và tiến hành thanh toán trực tuyến. Hệ thống thực hiện khởi tạo đơn, trừ số lượng tồn kho và cập nhật trạng thái đơn hàng. \\ \hline
+\textbf{Mã yêu cầu liên quan} & \textbullet\  FR-04, FR-05, FR-07: Quản lý giỏ hàng\par\smallskip \textbullet\  FR-08, FR-09, FR-10: Tạo và xác nhận đơn hàng\par\smallskip \textbullet\  FR-17: Xác thực truy cập bằng JWT\par\smallskip \textbullet\  FR-18, FR-19, FR-20, FR-21: Xử lý thanh toán và chống trùng lặp \\ \hline
+\textbf{Tiền điều kiện} & 1. Khách hàng đã đăng nhập vào ứng dụng (có token JWT hợp lệ).\par\smallskip 2. Giỏ hàng có ít nhất 01 sản phẩm.\par\smallskip 3. Dịch vụ thanh toán (Payment Gateway) đang hoạt động bình thường. \\ \hline
+\textbf{Hậu điều kiện} & \textbullet\  Thành công: Bản ghi đơn hàng được tạo ở trạng thái PAID, số lượng tồn kho sản phẩm được trừ, giỏ hàng được làm sạch, khách hàng được chuyển đến màn hình theo dõi đơn.\par\smallskip \textbullet\  Thất bại: Đơn hàng bị hủy (CANCELLED), tồn kho không thay đổi, giỏ hàng giữ nguyên và hiển thị thông báo lỗi phù hợp. \\ \hline
+\end{longtable}
+\endgroup
+
+\subsubsection{Các luồng thực hiện (Flow of events)}
+\begingroup
+\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{6pt}
+\setlength{\arrayrulewidth}{0.5pt}
+\begin{longtable}{|>{\raggedright\arraybackslash}p{0.23\textwidth}|>{\raggedright\arraybackslash}p{0.67\textwidth}|}
+\hline
+\textbf{Loại luồng} & \textbf{Bước thực hiện chi tiết} \\ \hline
+\endfirsthead
+\hline
+\textbf{Loại luồng} & \textbf{Bước thực hiện chi tiết} \\ \hline
+\endhead
+\endfoot
+\endlastfoot
+\textbf{Luồng chính} & 1. Khách hàng mở màn hình Giỏ hàng trên ứng dụng Next.js, kiểm tra danh sách món, tùy chọn (size, topping) và tổng tiền. \\ \hline
+\textbf{} & 2. Khách hàng nhấn nút "Thanh toán". \\ \hline
+\textbf{} & 3. Hệ thống hiển thị giao diện xác nhận thông tin đơn hàng và chọn phương thức thanh toán (Thẻ/Ví mô phỏng). \\ \hline
+\textbf{} & 4. Khách hàng chọn phương thức thanh toán và nhấn "Xác nhận đặt hàng". \\ \hline
+\textbf{} & 5. Frontend gửi yêu cầu POST /orders (kèm JWT Token, Idempotency-Key và dữ liệu đơn hàng) tới NestJS API. \\ \hline
+\textbf{} & 6. NestJS API xác thực JWT, kiểm tra tính hợp lệ của dữ liệu và kiểm tra tồn kho trong PostgreSQL. \\ \hline
+\textbf{} & 7. NestJS API khởi tạo đơn hàng tạm thời (PENDING) và gọi Dịch vụ thanh toán (Payment Service). \\ \hline
+\textbf{} & 8. Payment Service xử lý thanh toán thành công và trả về mã giao dịch (Transaction ID). \\ \hline
+\textbf{} & 9. NestJS API cập nhật đơn hàng thành PAID, trừ tồn kho sản phẩm và lưu lịch sử thanh toán trong một transaction duy nhất. \\ \hline
+\textbf{} & 10. NestJS API trả về phản hồi thành công (HTTP 201 Created). \\ \hline
+\textbf{} & 11. Frontend xóa giỏ hàng địa phương và chuyển hướng Khách hàng sang màn hình Theo dõi đơn hàng. \\ \hline
+\textbf{Luồng thay thế} & \textbullet\  AF-01 (Áp dụng mã giảm giá): Tại bước 3, khách hàng nhập mã ưu đãi hợp lệ. Hệ thống tính lại tổng tiền thanh toán trước khi khách hàng bấm xác nhận. \\ \hline
+\textbf{Luồng ngoại lệ / Lỗi} & \textbullet\  EF-01 (Lỗi xác thực - 401 Unauthorized): Token JWT hết hạn hoặc không hợp lệ. Hệ thống báo lỗi và yêu cầu khách hàng đăng nhập lại. \\ \hline
+\textbf{} & \textbullet\  EF-02 (Hết hàng - 400 Bad Request): Món/topping trong giỏ đã hết tồn kho khi kiểm tra tại bước 6. Hệ thống hủy thao tác và thông báo khách hàng cập nhật lại giỏ hàng. \\ \hline
+\textbf{} & \textbullet\  EF-03 (Thanh toán thất bại): Cổng thanh toán trả về lỗi (không đủ tiền, lỗi kết nối). Hệ thống cập nhật đơn hàng thành CANCELLED, rollback tồn kho, giữ nguyên giỏ hàng và cho phép thử lại. \\ \hline
+\textbf{} & \textbullet\  EF-04 (Yêu cầu trùng lặp): Khi nhận cùng một Idempotency-Key đã xử lý, backend trả về kết quả đơn hàng đã tạo trước đó mà không trừ tồn kho lần hai. \\ \hline
+\end{longtable}
+\endgroup
+
+\subsubsection{Sơ đồ use-case}
+\begin{figure}[H]
+    \centering
+    \reportimage[width=\linewidth,height=0.75\textheight,keepaspectratio]{assets/use-case-dat-thanh-toan.png}
+    \caption{Sơ đồ use-case đặt và thanh toán đơn hàng}
+    \label{fig:use-case-dat-thanh-toan}
+\end{figure}
+
+\subsection{Task 1.4 – Rà soát chất lượng yêu cầu và lưu trữ dữ liệu}
+
+\subsubsection{Yêu cầu về dữ liệu và lưu trữ}
+
+Để đảm bảo tính toàn vẹn và nhất quán của hệ thống theo quy định đề bài, kiến trúc lưu trữ dữ liệu trên PostgreSQL phải tuân thủ các nguyên tắc sau:
+
+\begin{enumerate}
+    \item \textbf{Snapshot dữ liệu khi tạo đơn hàng (Data Snapshotting):} Tại thời điểm tạo đơn hàng (FR-10), hệ thống phải snapshot toàn bộ tên món, giá bán, size và topping vào bảng \texttt{OrderItem}. Khi giá sản phẩm gốc trong bảng \texttt{Product} thay đổi trong tương lai, tổng tiền và chi tiết của các đơn hàng cũ tuyệt đối không bị ảnh hưởng.
+    \item \textbf{Toàn vẹn giao dịch (ACID Transaction):} Thao tác tạo đơn hàng, trừ số lượng tồn kho (\texttt{stock}) và lưu bản ghi thanh toán phải được thực thi trong một Database Transaction duy nhất. Nếu bất kỳ bước nào thất bại, toàn bộ quá trình phải được rollback tự động để tránh mất mát dữ liệu hoặc tạo đơn rác.
+    \item \textbf{Kiểm soát tương tranh tồn kho (Concurrency Control):} Khi nhiều người dùng cùng đặt mua sản phẩm có số lượng tồn kho giới hạn tại cùng thời điểm, hệ thống phải sử dụng cơ chế khóa phù hợp (Pessimistic Locking hoặc Optimistic Locking) nhằm đảm bảo số lượng tồn không bao giờ bị âm.
+    \item \textbf{Cơ chế Idempotency:} Lưu trữ khóa \texttt{idempotency\_key} cùng với bản ghi giao dịch thanh toán nhằm ngăn chặn việc trừ tiền hoặc tạo đơn hai lần do lỗi mạng hoặc người dùng nhấn nút nhiều lần.
+    \item \textbf{Bảo mật dữ liệu định danh (Data Privacy):} Mật khẩu người dùng chỉ được lưu dưới dạng chuỗi băm (hash bằng bcrypt/Argon2). Khóa bí mật JWT Secret và SePay Secret Key không được lưu trong database mà phải lấy từ biến môi trường.
+\end{enumerate}
+
+\subsubsection{Checklist kiểm định chất lượng đặc tả yêu cầu}
+
+Bảng~\ref{tab:quality-checklist} trình bày kết quả rà soát chất lượng tài liệu đặc tả yêu cầu (SRS) theo các tiêu chí chuẩn kỹ nghệ phần mềm (IEEE 830 / ISO/IEC/IEEE 29148).
+
+\begingroup
+\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{5pt}
+\setlength{\arrayrulewidth}{0.5pt}
+\begin{longtable}{|c|p{4.2cm}|p{6.8cm}|c|}
+\caption{Checklist rà soát chất lượng tài liệu yêu cầu}
+\label{tab:quality-checklist} \\
+\hline
+\textbf{STT} & \textbf{Tiêu chí kiểm định} & \textbf{Nội dung kiểm tra thực tế trên SRS BrewLite} & \textbf{Kết quả} \\ \hline
+\endfirsthead
+\hline
+\textbf{STT} & \textbf{Tiêu chí kiểm định} & \textbf{Nội dung kiểm tra thực tế trên SRS BrewLite} & \textbf{Kết quả} \\ \hline
+\endhead
+\endfoot
+\endlastfoot
+
+1 & \textbf{Tính đầy đủ (Completeness)} & Toàn bộ 21 yêu cầu chức năng (FR-01 đến FR-21) và 12 yêu cầu phi chức năng (NFR-01 đến NFR-12) đều có mã định danh, mô tả chi tiết, độ ưu tiên MoSCoW và tiêu chí chấp nhận. & \textbf{Đạt} \\ \hline
+
+2 & \textbf{Tính nhất quán (Consistency)} & Không có sự trùng lặp mã yêu cầu; quy ước phân loại MoSCoW (Must, Should) được áp dụng đồng bộ xuyên suốt toàn tài liệu; thuật ngữ kỹ thuật thống nhất giữa frontend (Next.js), backend (NestJS) và database (PostgreSQL). & \textbf{Đạt} \\ \hline
+
+3 & \textbf{Tính rõ ràng (Unambiguity)} & Mỗi yêu cầu chỉ diễn đạt một ý định nghiệp vụ duy nhất, không dùng từ ngữ mơ hồ; tiêu chí chấp nhận nêu rõ điều kiện đầu vào và kết quả mong đợi (ví dụ: mã HTTP 400, 401, 201). & \textbf{Đạt} \\ \hline
+
+4 & \textbf{Khả năng kiểm chứng (Verifiability)} & Tất cả các tiêu chí chấp nhận có thể kiểm thử thông qua Unit Test, E2E Test hoặc kiểm tra thủ công (ví dụ: NFR-07 quy định 95\% request GET dưới 2s, NFR-08 quy định chịu tải 100 req/s). & \textbf{Đạt} \\ \hline
+
+5 & \textbf{Khả năng truy vết (Traceability)} & Các yêu cầu chức năng cốt lõi (FR-04, FR-08, FR-10, FR-18) được ánh xạ trực tiếp sang use-case trọng tâm UC-01, sẵn sàng để liên kết vào ma trận truy vết ở Task~8. & \textbf{Đạt} \\ \hline
+
+6 & \textbf{Tính khả thi (Feasibility)} & Phạm vi yêu cầu được giới hạn ở mức MVP phù hợp với năng lực nhóm và thời hạn học kỳ; loại bỏ các tính năng phức tạp (delivery, multi-store, tiền thật). & \textbf{Đạt} \\ \hline
+
+\end{longtable}
+\endgroup
+
+
+\leavevmode\par
+\vspace{8mm}
+
+\section{Task 2 – Mô hình hóa hệ thống}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\subsection{Task 2.1 – Activity diagram}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\subsection{Task 2.2 – Sequence diagram}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\subsection{Task 2.3 – Class diagram}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\section{Task 3 – Thiết kế kiến trúc}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\subsection{Task 3.1 – Phương pháp và quyết định kiến trúc}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\subsection{Task 3.2 – Deployment diagram}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\section{Task 4 – Triển khai Sprint 1}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\subsection{Task 4.1 – Thiết lập repository}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\subsection{Task 4.2 – Quản lý tài liệu}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\subsection{Task 4.3 – MVP Sprint 1}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\subsection{Task 4.4 – Continuous Integration}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\section{Task 5 – Triển khai Sprint 2, CI/CD và Delivery}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\subsection{Task 5.1 – Hoàn thiện MVP}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\subsection{Task 5.2 – Tích hợp và kiểm thử}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\subsection{Task 5.3 – Continuous Delivery/Deployment}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\subsection{Task 5.4 – Triển khai và bàn giao}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\section{Truy vết}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\subsection{Truy vết bắt buộc}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\section{Cấu trúc repository}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\subsection{Checklist nộp bài}
+% Điền nội dung tại đây.
+\leavevmode\par
+\vspace{8mm}
+
+\end{document}
