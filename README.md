@@ -12,10 +12,10 @@
 |:---:|---|:---:|:---:|---|
 | 1 | **Kiệt** | 3124410175 | **Trưởng nhóm** | Bối cảnh, Stakeholder, Scope, Rủi ro, Quản lý Repo & Báo cáo |
 | 2 | **Luân** | 3124410204 | Thành viên | SRS Sản phẩm, Giỏ hàng, Đơn hàng, Frontend Next.js |
-| 3 | **Hùng** | | Thành viên | SRS Xác thực, Thanh toán, Bảo mật, Backend NestJS |
-| 4 | **Triệu** | | Thành viên | Sơ đồ Use-case tổng quát, Sequence Diagram |
+| 3 | **Hùng** | 3124410107 | Thành viên | SRS Xác thực, Thanh toán, Bảo mật, Backend NestJS |
+| 4 | **Triệu** | 3124410376 | Thành viên | Sơ đồ Use-case tổng quát, Sequence Diagram |
 | 5 | **Lượng** | 3124410207 | Thành viên | Đặc tả Use-case trọng tâm UC-01, Sequence Diagram |
-| 6 | **Kha** | | Thành viên | Rà soát chất lượng SRS, Yêu cầu Dữ liệu, Activity Diagram |
+| 6 | **Kha** | 3124410136 | Thành viên | Rà soát chất lượng SRS, Yêu cầu Dữ liệu, Activity Diagram |
 
 ---
 
