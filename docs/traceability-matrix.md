@@ -2,16 +2,16 @@
 
 Ma trận này ánh xạ từng yêu cầu chức năng (FR) trong [SRS](./requirements/srs.md) sang User Story/Use-case, sơ đồ thiết kế và component kiến trúc chịu trách nhiệm. Component ở đây là các khối logic dự kiến của kiến trúc Next.js – NestJS – PostgreSQL – SePay, không phải tên module/mã nguồn đã triển khai.
 
-> **Trạng thái sơ đồ:** `docs/diagrams/` hiện chưa có sơ đồ được lưu. Các mã AD-01, SD-01, CD-01 và SM-01 dưới đây là mã tham chiếu thống nhất để dùng khi tạo và đặt tên sơ đồ; cần thay bằng tên file thực tế nếu tên file khác. SM-01 được đưa vào để truy vết rõ vòng đời trạng thái đơn hàng theo SRS.
+> **Trạng thái sơ đồ:** Toàn bộ sơ đồ tham chiếu (**AD-01**, **SD-01**, **CD-01**) đã được hoàn thiện và lưu trữ tại thư mục [docs/diagrams/](./diagrams). Danh mục component bên dưới đại diện cho các khối kiến trúc logic trong hệ thống Next.js – NestJS – PostgreSQL – SePay.
 
 ## Danh mục sơ đồ
 
-| Mã | Sơ đồ | Phạm vi |
-|---|---|---|
-| **AD-01** | Activity Diagram – Luồng đặt hàng | Luồng nghiệp vụ từ xem menu đến nhận đơn; gồm các nhánh nghiệp vụ liên quan. |
-| **SD-01** | Sequence Diagram – Checkout (UC-01) | Tương tác Customer → Next.js → NestJS → PostgreSQL → SePay trong luồng đặt và thanh toán. |
-| **CD-01** | Class Diagram – Domain Model | Các lớp miền `User`, `Product`, `Order`, `OrderItem`, `Payment`, `Promotion`, `LoyaltyTransaction` và quan hệ giữa chúng. |
-| **SM-01** | State Machine – Order | Các trạng thái đơn hàng và chuyển trạng thái hợp lệ theo FR-11/FR-12. |
+| Mã | Sơ đồ | Tệp lưu trữ | Phạm vi |
+|---|---|---|---|
+| **AD-01** | Activity Diagram – Luồng đặt hàng | [ctivity-diagram.svg](./diagrams/activity-diagram.svg) | Luồng nghiệp vụ từ xem menu đến nhận đơn; gồm các nhánh nghiệp vụ liên quan. |
+| **SD-01** | Sequence Diagram – Checkout (UC-01) | [sequence-checkout.svg](./diagrams/sequence-checkout.svg) ([.puml](./diagrams/sequence-checkout.puml)) | Tương tác Customer → Next.js → NestJS → PostgreSQL → SePay trong luồng đặt và thanh toán. |
+| **CD-01** | Class Diagram – Domain Model | [class-diagram-overall.png](./diagrams/class-diagram-overall.png) | Các lớp miền User, Product, Order, OrderItem, Payment, Promotion, LoyaltyTransaction và quan hệ giữa chúng. |
+| **SM-01** | State Machine – Order | Quy định tại SRS & Class Diagram | Các trạng thái đơn hàng và chuyển trạng thái hợp lệ theo FR-11/FR-12. |
 
 ## Danh mục component
 
