@@ -1,0 +1,94 @@
+@startuml deployment-diagram
+skinparam dpi 180
+skinparam monochrome false
+skinparam roundcorner 8
+skinparam defaultFontName Arial
+skinparam packageStyle rectangle
+
+title UML Deployment Diagram ? Ki?n tr?c Tri?n khai Production BrewLite
+
+cloud "Client Environment" {
+    node "Kh?ch h?ng / Nh?n vi?n\n[User Device: Smartphone / Laptop]" as ClientDevice <<device>> {
+        node "Web Browser / PWA Shell" as Browser {
+            component "Next.js Mobile-First UI\n(React Client / SPA)" as WebApp
+            database "Local Storage\n(JWT Token, Cart State)" as ClientStorage
+        }
+    }
+}
+
+cloud "CI/CD & Source Control\n[GitHub Ecosystem]" as GitHubPlatform {
+    node "GitHub Repository\n(ngtuankiet241-cmd/Assignment2--Brewlite)" as GitRepo {
+        artifact "Source Code\n(apps/web, apps/api)" as CodeArtifact
+    }
+    node "GitHub Actions Runner\n[Ubuntu Linux VM]" as CIRunner {
+        component "CI/CD Pipeline\n(.github/workflows/ci.yml)" as CIPipeline
+        component "Quality Gates\n- ESLint & Prettier\n- Type-check (tsc)\n- Jest Unit & Integration Tests" as QualityGate
+    }
+}
+
+cloud "Production Cloud Infrastructure" as ProdCloud {
+
+    node "Vercel Global Edge Network\n[Frontend Hosting & CDN]" as VercelNode <<cloud>> {
+        component "Next.js 14 Web Server\n(App Router, SSR, Static Assets)" as NextJsServer
+    }
+
+    node "Render.com PaaS Cloud\n[Backend Hosting Platform]" as RenderPlatform {
+        
+        node "Docker Container: API Service\n[Linux Container / Node.js 20]" as ApiContainer {
+            component "NestJS 10 Application\n(Port 3001 mapped to 443 via Proxy)" as NestJsApp
+            component "Prisma ORM Client\n(Connection Pooling)" as PrismaClient
+            component "Health Check Endpoint\n(GET /health)" as HealthCheck
+            component "Logging Interceptor\n(stdout / Render Logs)" as Logging
+        }
+
+        node "Database Server\n[Render Managed PostgreSQL 16]" as DbNode {
+            database "PostgreSQL 16 Engine\n(Port 5432 - Internal TCP/SSL)" as PostgresEngine
+            storage "Persistent Storage Volume\n(Daily Backup, Encrypted)" as DBVolume
+        }
+
+        folder "Production Environment Variables & Secrets\n[Render Secret Management]" as RenderSecrets {
+            file ".env (Encrypted)" as EnvVars [
+                DATABASE_URL = postgres://...
+                JWT_SECRET = ****************
+                SEPAY_API_KEY = ****************
+                SEPAY_WEBHOOK_SECRET = **********
+                PORT = 3001
+                NODE_ENV = production
+            ]
+        }
+    }
+}
+
+cloud "External Services (Sandbox)" as ExternalServices {
+    node "SePay Sandbox Gateway\n[Mock Payment Provider]" as SePayNode <<cloud>> {
+        component "Payment Gateway API\n(Sandbox Endpoints)" as SePayApi
+        component "IPN Webhook Dispatcher" as SePayWebhook
+    }
+}
+
+' Connections
+ClientDevice -[#blue,bold]-> VercelNode : "HTTPS / Port 443\nLoad HTML, JS, CSS PWA"
+ClientDevice -[#blue,bold]-> ApiContainer : "HTTPS / Port 443\nREST API (JSON)\nAuthorization: Bearer <JWT>\nIdempotency-Key"
+
+PostgresEngine --> DBVolume : "Mounts & Read/Write"
+
+NestJsApp --> PostgresEngine : "Internal Private Network\nTCP:5432 / TLS Encrypted\nPrisma Connection Pool"
+RenderSecrets ..> ApiContainer : "Injected via\nContainer Env"
+
+NestJsApp -[#darkgreen,bold]-> SePayApi : "HTTPS / Port 443\nPOST /payment/create"
+SePayWebhook -[#darkgreen,bold]-> NestJsApp : "HTTPS / Port 443\nPOST /payments/ipn\n(Signed Webhook Callback)"
+
+' CI/CD connections
+GitRepo --> CIPipeline : "Git Push (main branch)"
+CIPipeline --> QualityGate : "Executes Tests & Lint"
+CIPipeline -[#purple,dashed]-> VercelNode : "CD: Deploy Web"
+CIPipeline -[#purple,dashed]-> ApiContainer : "CD: Deploy API"
+
+legend bottom
+    |= K? hi?u |= M? t? |
+    |<#blue>  | T??ng t?c Client - Server qua HTTPS / TLS 1.3 |
+    |<#darkgreen> | T??ng t?c v?i C?ng thanh to?n m? ph?ng SePay (Sandbox) |
+    |<#purple> | T? ??ng h?a CI/CD qua GitHub Actions |
+    |--| K?t n?i n?i b? m?ng b?o m?t (Private Network / TCP) |
+endlegend
+@enduml

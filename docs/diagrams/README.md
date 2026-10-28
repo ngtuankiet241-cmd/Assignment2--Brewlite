@@ -100,3 +100,23 @@ Hệ thống được tổ chức thành 6 nhóm chức năng (Packages):
 - **`PaymentMethod`:** `WALLET`, `CARD`.
 - **`OptionType`:** `SIZE`, `TOPPING`.
 - **`LoyaltyType`:** `EARN`, `REDEEM`.
+
+
+---
+
+## 5. Task 3.2 ? Deployment Diagram (S? ?? Tri?n khai Production)
+
+S? ?? m? t? c?u tr?c v?t l?, h? t?ng cloud, m?ng k?t n?i v? ranh gi?i m?i tr??ng cho h? th?ng BrewLite tr?n m?i tr??ng v?n h?nh th?c t?.
+
+- **File m? ngu?n PlantUML:** [`deployment-diagram.puml`](deployment-diagram.puml)
+- **File ?nh k?t xu?t:** [`deployment-diagram.png`](deployment-diagram.png)
+- **T?i li?u ??c t? chi ti?t:** [`docs/deployment.md`](../deployment.md)
+
+![Deployment Diagram](deployment-diagram.png)
+
+### ?? ?i?m nh?n k? thu?t:
+1. **Frontend Hosting:** Vercel Global Edge Network ph?c v? Next.js 14 PWA qua HTTPS / TLS 1.3 (port 443).
+2. **Backend API:** Render.com PaaS ch?y Linux Container (Node.js 20 LTS, NestJS 10) t?i c?ng n?i b? 3001, reverse proxy ra c?ng 443.
+3. **Database:** Render Managed PostgreSQL 16 g?n ??a l?u tr? b?n v?ng (Persistent Storage Disk) k?t n?i n?i b? c?ng 5432 b?o m?t qua SSL.
+4. **C?ng thanh to?n:** SePay Sandbox Gateway k?t n?i hai chi?u qua HTTPS API v? Webhook IPN (`POST /payments/ipn`).
+5. **CI/CD:** GitHub Actions t? ??ng ki?m th? (Lint, Type-check, Jest) v? trigger t? ??ng tri?n khai khi push v?o nh?nh `main`.

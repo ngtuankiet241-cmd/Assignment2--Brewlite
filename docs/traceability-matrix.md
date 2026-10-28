@@ -8,8 +8,8 @@ Ma trận này ánh xạ từng yêu cầu chức năng (FR) trong [SRS](./requi
 
 | Mã | Sơ đồ | Tệp lưu trữ | Phạm vi |
 |---|---|---|---|
-| **AD-01** | Activity Diagram – Luồng đặt hàng | [ctivity-diagram.svg](./diagrams/activity-diagram.svg) | Luồng nghiệp vụ từ xem menu đến nhận đơn; gồm các nhánh nghiệp vụ liên quan. |
-| **SD-01** | Sequence Diagram – Checkout (UC-01) | [sequence-checkout.svg](./diagrams/sequence-checkout.svg) ([.puml](./diagrams/sequence-checkout.puml)) | Tương tác Customer → Next.js → NestJS → PostgreSQL → SePay trong luồng đặt và thanh toán. |
+| **AD-01** | Activity Diagram – Luồng đặt hàng | [activity-diagram.svg](./diagrams/activity-diagram.svg) ([.png](./diagrams/activity-diagram.png)) | Luồng nghiệp vụ từ xem menu đến nhận đơn; gồm các nhánh nghiệp vụ liên quan. |
+| **SD-01** | Sequence Diagram – Checkout (UC-01) | [sequence-checkout.svg](./diagrams/sequence-checkout.svg) ([.png](./diagrams/sequence-checkout.png), [.puml](./diagrams/sequence-checkout.puml)) | Tương tác Customer → Next.js → NestJS → PostgreSQL → SePay trong luồng đặt và thanh toán. |
 | **CD-01** | Class Diagram – Domain Model | [class-diagram-overall.png](./diagrams/class-diagram-overall.png) | Các lớp miền User, Product, Order, OrderItem, Payment, Promotion, LoyaltyTransaction và quan hệ giữa chúng. |
 | **SM-01** | State Machine – Order | Quy định tại SRS & Class Diagram | Các trạng thái đơn hàng và chuyển trạng thái hợp lệ theo FR-11/FR-12. |
 

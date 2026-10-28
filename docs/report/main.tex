@@ -1384,39 +1384,190 @@ Bảng~\ref{tab:quality-checklist} trình bày kết quả rà soát chất lư�
 \vspace{8mm}
 
 \section{Task 2 – Mô hình hóa hệ thống}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+Task~2 xây dựng ba sơ đồ UML cốt lõi để mô hình hóa hành vi, tương tác và cấu trúc dữ liệu của hệ thống BrewLite:
+(1)~Sơ đồ Hoạt động mô tả luồng nghiệp vụ end-to-end;
+(2)~Sơ đồ Tuần tự đặc tả chi tiết tương tác đa thành phần trong use-case trọng tâm UC-01;
+(3)~Sơ đồ Lớp Lĩnh vực xác định mô hình thực thể và cấu trúc dữ liệu toàn hệ thống.
+Tất cả sơ đồ đều được lưu kèm tệp nguồn (PlantUML/draw.io) và ảnh kết xuất tại thư mục \texttt{docs/diagrams/}.
 
 \subsection{Task 2.1 – Activity diagram}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+Sơ đồ Hoạt động mô tả toàn bộ luồng nghiệp vụ từ khi khách hàng duyệt menu đến khi hoàn tất đơn hàng và theo dõi tiến độ pha chế, được tổ chức theo ba làn trách nhiệm (swimlanes):
+
+\begin{itemize}
+    \item \textbf{Khách hàng (Customer):} Thực hiện duyệt thực đơn, chọn size và topping, quản lý giỏ hàng, nhập thông tin nhận đơn và xác nhận thanh toán.
+    \item \textbf{Hệ thống BrewLite (Next.js \& NestJS):} Kiểm tra phiên đăng nhập qua JWT, kiểm tra tồn kho (pessimistic lock \texttt{SELECT \dots FOR UPDATE}), tính lại tổng tiền, tạo đơn và kiểm soát Idempotency Key để ngăn ghi đơn trùng lặp.
+    \item \textbf{Dịch vụ Thanh toán (SePay Sandbox):} Tiếp nhận yêu cầu thanh toán mô phỏng và phản hồi kết quả (Thành công / Thất bại) qua Webhook IPN.
+\end{itemize}
+
+Sơ đồ xử lý đầy đủ các nhánh rẽ nghiệp vụ và ngoại lệ:
+\begin{itemize}
+    \item \textit{Chưa đăng nhập / JWT hết hạn:} Yêu cầu đăng nhập trước khi tiếp tục; cho phép thử lại hoặc dừng luồng.
+    \item \textit{Hết hàng hoặc thay đổi giá:} Cảnh báo và yêu cầu khách xác nhận trước khi tiếp tục.
+    \item \textit{Chống tạo đơn trùng lặp:} Idempotency Key cho phép truy hồi đơn đã tạo thay vì tạo mới.
+    \item \textit{Thanh toán thất bại:} Khách hàng có thể thử lại với Idempotency Key mới hoặc chuyển sang phương thức khác.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \reportimage[width=\linewidth,height=0.90\textheight,keepaspectratio]{assets/activity-diagram.png}
+    \caption{Sơ đồ Hoạt động – Luồng đặt hàng và thanh toán BrewLite (UC-01)}
+    \label{fig:activity-diagram}
+\end{figure}
 
 \subsection{Task 2.2 – Sequence diagram}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+Sơ đồ Tuần tự đặc tả chi tiết sự tương tác theo trình tự thời gian giữa năm lifeline trong use-case trọng tâm \textbf{UC-01: Đặt và thanh toán đơn hàng}:
+
+\begin{enumerate}
+    \item \textbf{Customer (Khách hàng)} -- Tác nhân khởi phát yêu cầu.
+    \item \textbf{Next.js UI (Frontend)} -- Giao diện người dùng, tổng hợp và gửi yêu cầu API.
+    \item \textbf{NestJS API (Backend)} -- Lõi nghiệp vụ: xác thực, kiểm tra tồn kho, tạo đơn.
+    \item \textbf{PostgreSQL (Database)} -- Nguồn dữ liệu chính xác nhận tồn kho và lưu đơn hàng.
+    \item \textbf{Mock Payment Service (SePay Sandbox)} -- Cổng thanh toán mô phỏng.
+\end{enumerate}
+
+\textbf{Các điểm nhấn kỹ thuật quan trọng:}
+\begin{itemize}
+    \item \textbf{Xác thực JWT \& Idempotency khi đặt hàng:} Mọi yêu cầu tạo đơn phải kèm JWT hợp lệ và \texttt{Idempotency-Key} duy nhất; hệ thống trả \texttt{409 Conflict} nếu key đã tồn tại thay vì tạo đơn trùng.
+    \item \textbf{Database Transaction \& Concurrency Control:} Toàn bộ luồng kiểm tra tồn kho và tạo đơn được bao trong \texttt{\$transaction} Prisma. Mỗi sản phẩm được khóa bi quan (\texttt{SELECT \dots FOR UPDATE}) trước khi trừ stock; nếu không đủ hàng, thực hiện \texttt{ROLLBACK} ngay và trả \texttt{400 Bad Request}.
+    \item \textbf{Xử lý Double-Click Lock khi thanh toán:} Bản ghi \texttt{PaymentTransaction} khởi tạo với trạng thái \texttt{PROCESSING} và Unique Constraint trên khóa giao dịch; gửi lặp bị trả về \texttt{409 Conflict} mà không gọi cổng thanh toán lần hai.
+    \item \textbf{Nhánh thanh toán thành công:} Đơn hàng chuyển sang \texttt{PAID}, lưu mã giao dịch; \textbf{thất bại:} đơn sang \texttt{PAYMENT\_FAILED}, kho hàng được giải phóng sau timeout cho phép thử lại.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \reportimage[width=\linewidth,height=0.90\textheight,keepaspectratio]{assets/sequence-checkout.png}
+    \caption{Sơ đồ Tuần tự – UC-01: Đặt và thanh toán đơn hàng (BrewLite)}
+    \label{fig:sequence-checkout}
+\end{figure}
 
 \subsection{Task 2.3 – Class diagram}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+Sơ đồ Lớp mô tả cấu trúc các đối tượng nghiệp vụ, thuộc tính, kiểu dữ liệu, phương thức và quan hệ trong hệ thống BrewLite theo mô hình miền (Domain Model).
+
+\subsubsection{Sơ đồ lớp tổng quát}
+
+\begin{figure}[H]
+    \centering
+    \reportimage[width=\linewidth,height=0.88\textheight,keepaspectratio]{assets/class-diagram-overall.png}
+    \caption{Sơ đồ Lớp tổng quát – Domain Model BrewLite (7 nhóm chức năng)}
+    \label{fig:class-diagram-overall}
+\end{figure}
+
+Hệ thống được tổ chức thành 6 nhóm lớp chức năng:
+\begin{enumerate}
+    \item \textbf{Người dùng (User):} Lưu thông tin tài khoản, mật khẩu băm bằng bcrypt và điểm tích lũy.
+    \item \textbf{Sản phẩm \& Tùy chọn (Product \& ProductOption):} Quản lý đồ uống, giá bán, tồn kho, kích cỡ và topping.
+    \item \textbf{Giỏ hàng (Cart, CartItem, CartItemOption):} Quản lý giỏ hàng tạm thời và tùy chọn của từng mục.
+    \item \textbf{Đơn hàng (Order, OrderItem):} Lớp \texttt{OrderItem} áp dụng \textit{Data Snapshotting} -- lưu cố định tên, giá, size và topping tại thời điểm đặt; thay đổi giá sản phẩm gốc sau này không ảnh hưởng lịch sử đơn.
+    \item \textbf{Thanh toán (Payment):} Quản lý giao dịch mô phỏng, phương thức, trạng thái và khóa \texttt{idempotencyKey}.
+    \item \textbf{Khuyến mãi \& Tích điểm (Promotion, LoyaltyTransaction):} Phục vụ mở rộng tích điểm và mã giảm giá.
+\end{enumerate}
+
+\subsubsection{Chi tiết sản phẩm và giỏ hàng}
+
+\begin{figure}[H]
+    \centering
+    \reportimage[width=\linewidth,height=0.75\textheight,keepaspectratio]{assets/class-diagram-cart.png}
+    \caption{Sơ đồ Lớp chi tiết – Product, Cart và các lớp tùy chọn}
+    \label{fig:class-diagram-cart}
+\end{figure}
+
+\subsubsection{Chi tiết đơn hàng và thanh toán}
+
+\begin{figure}[H]
+    \centering
+    \reportimage[width=\linewidth,height=0.75\textheight,keepaspectratio]{assets/class-diagram-order.png}
+    \caption{Sơ đồ Lớp chi tiết – Order, OrderItem và Payment}
+    \label{fig:class-diagram-order}
+\end{figure}
 
 \section{Task 3 – Thiết kế kiến trúc}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+Task~3 thiết kế kiến trúc tổng thể của hệ thống BrewLite, bao gồm: lựa chọn phương pháp kiến trúc, ghi nhận các quyết định kiến trúc quan trọng dưới dạng ADR (Architecture Decision Record) và vẽ sơ đồ UML Deployment Diagram thể hiện hạ tầng triển khai production thực tế.
 
 \subsection{Task 3.1 – Phương pháp và quyết định kiến trúc}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+\subsubsection{Phương pháp kiến trúc}
+
+BrewLite áp dụng kiến trúc \textbf{3 tầng phân tách rõ ràng} (Layered / N-Tier Architecture), triển khai theo mô hình \textbf{monorepo} với hai ứng dụng độc lập trong cùng repository:
+
+\begin{itemize}
+    \item \textbf{Tầng Presentation:} Next.js~14 PWA (\texttt{apps/web}) -- giao diện người dùng mobile-first, React Server Components, App Router.
+    \item \textbf{Tầng Nghiệp vụ:} NestJS~10 (\texttt{apps/api}) -- logic miền, RBAC, Prisma ORM, middleware chống double-submit.
+    \item \textbf{Tầng Dữ liệu:} PostgreSQL~16 -- lưu trữ ACID, migration-first qua Prisma Migrate, khoá bi quan khi tạo đơn.
+    \item \textbf{Dịch vụ bên ngoài:} SePay Sandbox Payment Gateway -- thanh toán mô phỏng, IPN Webhook.
+\end{itemize}
+
+Các tầng giao tiếp qua giao thức HTTPS/REST (Frontend → Backend) và Prisma TCP/SSL nội bộ (Backend → Database). Kiến trúc tuân theo nguyên tắc \textit{Separation of Concerns}: mỗi tầng chỉ phụ thuộc một chiều vào tầng kế tiếp.
+
+\subsubsection{Các quyết định kiến trúc (ADR)}
+
+Bốn quyết định kiến trúc quan trọng được ghi lại tại \texttt{docs/architecture/adr/}:
+
+\begingroup
+\renewcommand{\arraystretch}{1.3}
+\setlength{\tabcolsep}{6pt}
+\begin{longtable}{|p{2.2cm}|p{5.5cm}|p{2.0cm}|p{3.0cm}|}
+\caption{Danh sách các Architecture Decision Records (ADR) -- BrewLite}
+\label{tab:adr} \\
+\hline
+\textbf{Mã ADR} & \textbf{Quyết định} & \textbf{Trạng thái} & \textbf{Ưu điểm chính} \\ \hline
+\endfirsthead
+\hline
+\textbf{Mã ADR} & \textbf{Quyết định} & \textbf{Trạng thái} & \textbf{Ưu điểm chính} \\ \hline
+\endhead
+\endfoot
+\endlastfoot
+
+\textbf{ADR-001} & Tách Frontend (Next.js) và Backend (NestJS) thành hai ứng dụng độc lập trong monorepo & Đã chấp thuận & Triển khai độc lập, dễ scale từng tầng \\ \hline
+\textbf{ADR-002} & Chọn PostgreSQL + Prisma ORM làm tầng dữ liệu & Đã chấp thuận & Toàn vẹn ACID, migration kiểm soát phiên bản, type-safe \\ \hline
+\textbf{ADR-003} & Xác thực bằng JWT stateless & Đã chấp thuận & Không lưu session server-side, phù hợp REST API \\ \hline
+\textbf{ADR-004} & Kiểm soát Idempotency cho luồng thanh toán & Đã chấp thuận & Ngăn ghi đơn và trừ tồn kho trùng lặp khi retry \\ \hline
+\end{longtable}
+\endgroup
+
+\textbf{Nguyên tắc thiết kế xuyên suốt:}
+\begin{itemize}
+    \item \textit{Separation of Concerns:} UI và business logic hoàn toàn tách biệt.
+    \item \textit{Fail Fast:} Validation DTO ở cổng vào (Pipe NestJS); từ chối request sớm trước khi vào DB.
+    \item \textit{Idempotency:} Mọi endpoint tạo đơn và thanh toán hỗ trợ \texttt{Idempotency-Key}.
+    \item \textit{Security by Default:} JWT Guard bật mặc định; endpoint public phải khai báo \texttt{@Public()} rõ ràng.
+    \item \textit{Data Integrity:} Toàn bộ thao tác ghi có side-effect bọc trong Prisma \texttt{\$transaction}.
+    \item \textit{Observable:} Log request/response qua \texttt{LoggingInterceptor}; endpoint \texttt{/health} giám sát sức khoẻ.
+\end{itemize}
 
 \subsection{Task 3.2 – Deployment diagram}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+Sơ đồ UML Deployment Diagram thể hiện kiến trúc vật lý và hạ tầng cloud của hệ thống BrewLite trên môi trường Production, bao gồm đầy đủ các node triển khai, giao thức kết nối, cổng mạng, ranh giới môi trường và luồng CI/CD tự động.
+
+\begin{figure}[H]
+    \centering
+    \reportimage[width=\linewidth,height=0.90\textheight,keepaspectratio]{assets/deployment-diagram.png}
+    \caption{UML Deployment Diagram – Kiến trúc triển khai Production BrewLite}
+    \label{fig:deployment-diagram}
+\end{figure}
+
+\textbf{Các node triển khai chính:}
+\begin{itemize}
+    \item \textbf{Client Device / PWA Browser:} Thiết bị người dùng chạy giao diện Next.js PWA; \texttt{localStorage} lưu JWT Token và trạng thái giỏ hàng.
+    \item \textbf{Vercel Global Edge Network (Frontend):} Phục vụ \texttt{apps/web} (Next.js~14 App Router) qua HTTPS/TLS~1.3 cổng~443 với Global CDN. Tự động triển khai khi push lên nhánh \texttt{main}.
+    \item \textbf{Render.com Docker Container (Backend API):} Chạy \texttt{apps/api} (NestJS~10) trên Linux Container Node.js~20~LTS, cổng nội bộ \texttt{3001} được Render SSL Reverse Proxy chuyển tiếp ra cổng~443. Trang bị Health Check Endpoint \texttt{GET /health} và LoggingInterceptor xuất nhật ký ra stdout.
+    \item \textbf{Render Managed PostgreSQL~16 (Database):} Kết nối nội bộ Private Network cổng \texttt{5432/SSL}; gắn đĩa lưu trữ bền vững có mã hóa với sao lưu tự động hàng ngày. Không mở IP public trực tiếp ra Internet.
+    \item \textbf{SePay Sandbox Gateway (External):} Tiếp nhận yêu cầu thanh toán (\texttt{POST /payment/create}) và gửi thông báo kết quả thời gian thực qua Webhook IPN (\texttt{POST /payments/ipn}) có xác thực chữ ký bí mật.
+    \item \textbf{GitHub Actions CI/CD:} Pipeline tự động chạy Quality Gates (ESLint, type-check, Jest) rồi kích hoạt triển khai Vercel và Render khi CI qua thành công.
+\end{itemize}
+
+\textbf{Ranh giới môi trường:}
+\begin{itemize}
+    \item \textit{Local Development:} \texttt{docker-compose.yml} khởi chạy ba container: Next.js (\texttt{localhost:3000}), NestJS (\texttt{localhost:3001}), PostgreSQL (\texttt{localhost:5432}).
+    \item \textit{CI / Testing:} GitHub Actions Ubuntu Runner -- chạy test, lint, build; không triển khai tự động trừ khi nhánh \texttt{main} được merge thành công.
+    \item \textit{Production:} Vercel (Web) + Render.com (API + DB) -- HTTPS, secret mã hóa, persistent storage, health check.
+\end{itemize}
+
+\textbf{Quản lý Secret \& Biến môi trường:} Toàn bộ biến nhạy cảm (\texttt{DATABASE\_URL}, \texttt{JWT\_SECRET}, \texttt{SEPAY\_API\_KEY}, \texttt{SEPAY\_WEBHOOK\_SECRET}) được mã hóa và quản lý trực tiếp trên Render Dashboard và Vercel Environment Variables -- không lưu vết trong repository hay log CI.
 
 \section{Task 4 – Triển khai Sprint 1}
 % Điền nội dung tại đây.
