@@ -1,7 +1,15 @@
 @startuml sequence-checkout
 autonumber
-skinparam BoxPadding 10
-skinparam ParticipantPadding 15
+<style>
+sequenceDiagram {
+  participant {
+    Padding 15
+  }
+  box {
+    Padding 10
+  }
+}
+</style>
 skinparam ResponseMessageBelowArrow true
 skinparam RoundCorner 8
 

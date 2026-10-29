@@ -1,1 +1,254 @@
-@startuml\ntitle BrewLite – Activity Diagram: Đặt hàng và thanh toán\n\nskinparam backgroundColor white\nskinparam shadowing false\nskinparam defaultFontName Arial\nskinparam activity {\n    BackgroundColor #F2F6FC\n    BorderColor #36597D\n    DiamondBackgroundColor #FFF2CC\n    DiamondBorderColor #997300\n}\nskinparam ArrowColor #36597D\n\n|Khách hàng|\nstart\n:Mở menu;\n\n|Hệ thống BrewLite|\n:Hiển thị các sản phẩm đang được cung cấp;\n\n|Khách hàng|\n:Xem chi tiết sản phẩm;\n:Chọn size, topping và số lượng;\n\n|Hệ thống BrewLite|\n:Kiểm tra tùy chọn và tính giá;\n\nwhile (Tùy chọn và số lượng hợp lệ?) is (Không)\n    :Thông báo dữ liệu không hợp lệ;\n    |Khách hàng|\n    :Điều chỉnh tùy chọn và số lượng;\n    |Hệ thống BrewLite|\n    :Kiểm tra lại và tính giá;\nendwhile (Có)\n\n:Thêm sản phẩm vào giỏ hàng;\n\n|Khách hàng|\n:Xem, cập nhật hoặc xóa món trong giỏ;\n:Chọn đặt hàng;\n\n|Hệ thống BrewLite|\n:Kiểm tra phiên đăng nhập;\n\nif (Đã đăng nhập và JWT hợp lệ?) then (Có)\nelse (Chưa / Hết hạn)\n    :Yêu cầu đăng nhập;\n\n    |Khách hàng|\n    :Nhập email và mật khẩu;\n\n    |Hệ thống BrewLite|\n    :Xác thực thông tin đăng nhập;\n\n    while (Đăng nhập thành công?) is (Không)\n        :Thông báo lỗi đăng nhập;\n\n        |Khách hàng|\n        if (Thử đăng nhập lại?) then (Có)\n            :Nhập lại email và mật khẩu;\n        else (Không)\n            :Dừng đặt hàng;\n            stop\n        endif\n\n        |Hệ thống BrewLite|\n        :Xác thực lại thông tin;\n    endwhile (Có)\n\n    :Cấp JWT và tiếp tục đặt hàng;\nendif\n\n:Kiểm tra giỏ hàng, sản phẩm,\\ntùy chọn và tồn kho;\n\nwhile (Giỏ hàng hợp lệ và đủ hàng?) is (Không)\n    :Thông báo giỏ trống, món hết hàng\\nhoặc số lượng không đủ;\n\n    |Khách hàng|\n    if (Tiếp tục mua hàng?) then (Có)\n        :Thêm, đổi, xóa món\\nhoặc điều chỉnh số lượng;\n    else (Không)\n        :Dừng đặt hàng;\n        stop\n    endif\n\n    |Hệ thống BrewLite|\n    :Kiểm tra lại giỏ hàng và tồn kho;\nendwhile (Có)\n\n:Tính lại tổng tiền theo giá trên hệ thống;\n\nif (Giá đã thay đổi?) then (Có)\n    :Thông báo giá mới;\n\n    |Khách hàng|\n    if (Đồng ý giá mới?) then (Có)\n    else (Không)\n        :Dừng đặt hàng;\n        stop\n    endif\nelse (Không)\nendif\n\n|Khách hàng|\n:Nhập thông tin nhận đơn;\n\n|Hệ thống BrewLite|\n:Kiểm tra thông tin nhận đơn;\n\nwhile (Thông tin hợp lệ và đầy đủ?) is (Không)\n    :Hiển thị lỗi cụ thể;\n\n    |Khách hàng|\n    :Bổ sung hoặc sửa thông tin;\n\n    |Hệ thống BrewLite|\n    :Kiểm tra lại thông tin;\nendwhile (Có)\n\n:Hiển thị sản phẩm, tùy chọn,\\nsố lượng và tổng tiền;\n\n|Khách hàng|\n:Xem lại thông tin đơn hàng;\n\nif (Xác nhận đặt hàng?) then (Có)\nelse (Không)\n    :Dừng đặt hàng;\n    stop\nendif\n\n|Hệ thống BrewLite|\n:Kiểm tra JWT, dữ liệu, giá\\nvà tồn kho lần cuối;\n\nif (Dữ liệu vẫn hợp lệ và đủ hàng?) then (Có)\nelse (Không)\n    :Thông báo thay đổi hoặc hết hàng;\\nGiữ nguyên giỏ hàng;\n    |Khách hàng|\n    :Quay lại giỏ hàng để kiểm tra;\n    stop\nendif\n\n|Hệ thống BrewLite|\n:Kiểm tra mã chống tạo đơn trùng;\n\nif (Yêu cầu đã tạo đơn trước đó?) then (Có)\n    :Lấy lại đơn hàng đã tạo;\nelse (Không)\n    :Tạo đơn với mã duy nhất;\\nLưu sản phẩm, tùy chọn, số lượng,\\nđơn giá và tổng tiền tại thời điểm đặt;\n\n    if (Lưu đơn thành công?) then (Có)\n        :Ghi nhận đơn chờ thanh toán;\n    else (Không)\n        :Hoàn tác dữ liệu dở dang;\\nThông báo tạo đơn thất bại;\n        stop\n    endif\nendif\n\nif (Đơn đã thanh toán thành công?) then (Có)\n    :Trả lại kết quả thanh toán đã lưu;\nelse (Chưa)\n    repeat\n        |Hệ thống BrewLite|\n        :Hiển thị phương thức thanh toán:\\nVí điện tử hoặc Thẻ mô phỏng;\n\n        |Khách hàng|\n        :Chọn phương thức thanh toán;\n        :Gửi yêu cầu thanh toán;\n\n        |Hệ thống BrewLite|\n        :Kiểm tra quyền sở hữu đơn,\\nđiều kiện thanh toán và tổng tiền;\n\n        if (Yêu cầu thanh toán hợp lệ?) then (Có)\n        else (Không)\n            :Từ chối yêu cầu;\\nHiển thị lý do;\n            stop\n        endif\n\n        :Kiểm tra và khóa xử lý\\ntheo idempotency key;\n\n        if (Key đã có kết quả?) then (Có)\n            :Lấy lại kết quả đã ghi nhận;\\nKhông tạo giao dịch mới;\n        else (Không)\n            if (Key đang được xử lý?) then (Có)\n                :Chờ và lấy kết quả của yêu cầu đang xử lý;\\nKhông gửi thêm giao dịch;\n            else (Không)\n                :Ghi nhận phương thức và số tiền;\\nGửi yêu cầu thanh toán;\n\n                |Dịch vụ thanh toán|\n                :Tiếp nhận yêu cầu;\n                :Xử lý thanh toán mô phỏng;\n                :Trả kết quả thành công hoặc thất bại;\n\n                |Hệ thống BrewLite|\n                :Lưu mã giao dịch, phương thức,\\nsố tiền, thời gian và kết quả;\n            endif\n        endif\n\n        if (Thanh toán thành công?) then (Có)\n            :Cập nhật trạng thái thanh toán thành công;\\nĐồng bộ thông tin đơn hàng;\n        else (Không)\n            :Ghi nhận thanh toán thất bại;\\nKhông đánh dấu đơn đã thanh toán;\n            :Hiển thị thông báo lỗi;\n\n            |Khách hàng|\n            if (Thử thanh toán lại?) then (Có)\n                |Hệ thống BrewLite|\n                :Tạo idempotency key mới\\ncho lần thanh toán mới;\n            else (Không)\n                |Khách hàng|\n                :Dừng thanh toán;\n                stop\n            endif\n        endif\n\n        |Hệ thống BrewLite|\n    repeat while (Đơn chưa thanh toán thành công?) is (Có) not (Không)\nendif\n\n:Hiển thị xác nhận thanh toán thành công;\n\n|Khách hàng|\n:Mở màn hình theo dõi đơn hàng;\n\n|Hệ thống BrewLite|\n:Kiểm tra quyền truy cập;\n:Hiển thị mã đơn, thời điểm đặt\\nvà trạng thái hiện tại;\n\n|Khách hàng|\n:Xem trạng thái đơn hàng;\nstop\n\n@enduml
+@startuml
+title BrewLite – Activity Diagram: Đặt hàng và thanh toán
+
+skinparam backgroundColor white
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam activity {
+    BackgroundColor #F2F6FC
+    BorderColor #36597D
+    DiamondBackgroundColor #FFF2CC
+    DiamondBorderColor #997300
+}
+skinparam ArrowColor #36597D
+
+|Khách hàng|
+start
+:Mở menu;
+
+|Hệ thống BrewLite|
+:Hiển thị các sản phẩm đang được cung cấp;
+
+|Khách hàng|
+:Xem chi tiết sản phẩm;
+:Chọn size, topping và số lượng;
+
+|Hệ thống BrewLite|
+:Kiểm tra tùy chọn và tính giá;
+
+while (Tùy chọn và số lượng hợp lệ?) is (Không)
+    :Thông báo dữ liệu không hợp lệ;
+    |Khách hàng|
+    :Điều chỉnh tùy chọn và số lượng;
+    |Hệ thống BrewLite|
+    :Kiểm tra lại và tính giá;
+endwhile (Có)
+
+:Thêm sản phẩm vào giỏ hàng;
+
+|Khách hàng|
+:Xem, cập nhật hoặc xóa món trong giỏ;
+:Chọn đặt hàng;
+
+|Hệ thống BrewLite|
+:Kiểm tra phiên đăng nhập;
+
+if (Đã đăng nhập và JWT hợp lệ?) then (Có)
+else (Chưa / Hết hạn)
+    :Yêu cầu đăng nhập;
+
+    |Khách hàng|
+    :Nhập email và mật khẩu;
+
+    |Hệ thống BrewLite|
+    :Xác thực thông tin đăng nhập;
+
+    while (Đăng nhập thành công?) is (Không)
+        :Thông báo lỗi đăng nhập;
+
+        |Khách hàng|
+        if (Thử đăng nhập lại?) then (Có)
+            :Nhập lại email và mật khẩu;
+        else (Không)
+            :Dừng đặt hàng;
+            stop
+        endif
+
+        |Hệ thống BrewLite|
+        :Xác thực lại thông tin;
+    endwhile (Có)
+
+    :Cấp JWT và tiếp tục đặt hàng;
+endif
+
+:Kiểm tra giỏ hàng, sản phẩm,\
+tùy chọn và tồn kho;
+
+while (Giỏ hàng hợp lệ và đủ hàng?) is (Không)
+    :Thông báo giỏ trống, món hết hàng\
+hoặc số lượng không đủ;
+
+    |Khách hàng|
+    if (Tiếp tục mua hàng?) then (Có)
+        :Thêm, đổi, xóa món\
+hoặc điều chỉnh số lượng;
+    else (Không)
+        :Dừng đặt hàng;
+        stop
+    endif
+
+    |Hệ thống BrewLite|
+    :Kiểm tra lại giỏ hàng và tồn kho;
+endwhile (Có)
+
+:Tính lại tổng tiền theo giá trên hệ thống;
+
+if (Giá đã thay đổi?) then (Có)
+    :Thông báo giá mới;
+
+    |Khách hàng|
+    if (Đồng ý giá mới?) then (Có)
+    else (Không)
+        :Dừng đặt hàng;
+        stop
+    endif
+else (Không)
+endif
+
+|Khách hàng|
+:Nhập thông tin nhận đơn;
+
+|Hệ thống BrewLite|
+:Kiểm tra thông tin nhận đơn;
+
+while (Thông tin hợp lệ và đầy đủ?) is (Không)
+    :Hiển thị lỗi cụ thể;
+
+    |Khách hàng|
+    :Bổ sung hoặc sửa thông tin;
+
+    |Hệ thống BrewLite|
+    :Kiểm tra lại thông tin;
+endwhile (Có)
+
+:Hiển thị sản phẩm, tùy chọn,\
+số lượng và tổng tiền;
+
+|Khách hàng|
+:Xem lại thông tin đơn hàng;
+
+if (Xác nhận đặt hàng?) then (Có)
+else (Không)
+    :Dừng đặt hàng;
+    stop
+endif
+
+|Hệ thống BrewLite|
+:Kiểm tra JWT, dữ liệu, giá\
+và tồn kho lần cuối;
+
+if (Dữ liệu vẫn hợp lệ và đủ hàng?) then (Có)
+else (Không)
+    :Thông báo thay đổi hoặc hết hàng;\
+Giữ nguyên giỏ hàng;
+    |Khách hàng|
+    :Quay lại giỏ hàng để kiểm tra;
+    stop
+endif
+
+|Hệ thống BrewLite|
+:Kiểm tra mã chống tạo đơn trùng;
+
+if (Yêu cầu đã tạo đơn trước đó?) then (Có)
+    :Lấy lại đơn hàng đã tạo;
+else (Không)
+    :Tạo đơn với mã duy nhất;\
+Lưu sản phẩm, tùy chọn, số lượng,\
+đơn giá và tổng tiền tại thời điểm đặt;
+
+    if (Lưu đơn thành công?) then (Có)
+        :Ghi nhận đơn chờ thanh toán;
+    else (Không)
+        :Hoàn tác dữ liệu dở dang;\
+Thông báo tạo đơn thất bại;
+        stop
+    endif
+endif
+
+if (Đơn đã thanh toán thành công?) then (Có)
+    :Trả lại kết quả thanh toán đã lưu;
+else (Chưa)
+    repeat
+        |Hệ thống BrewLite|
+        :Hiển thị phương thức thanh toán:\
+Ví điện tử hoặc Thẻ mô phỏng;
+
+        |Khách hàng|
+        :Chọn phương thức thanh toán;
+        :Gửi yêu cầu thanh toán;
+
+        |Hệ thống BrewLite|
+        :Kiểm tra quyền sở hữu đơn,\
+điều kiện thanh toán và tổng tiền;
+
+        if (Yêu cầu thanh toán hợp lệ?) then (Có)
+        else (Không)
+            :Từ chối yêu cầu;\
+Hiển thị lý do;
+            stop
+        endif
+
+        :Kiểm tra và khóa xử lý\
+theo idempotency key;
+
+        if (Key đã có kết quả?) then (Có)
+            :Lấy lại kết quả đã ghi nhận;\
+Không tạo giao dịch mới;
+        else (Không)
+            if (Key đang được xử lý?) then (Có)
+                :Chờ và lấy kết quả của yêu cầu đang xử lý;\
+Không gửi thêm giao dịch;
+            else (Không)
+                :Ghi nhận phương thức và số tiền;\
+Gửi yêu cầu thanh toán;
+
+                |Dịch vụ thanh toán|
+                :Tiếp nhận yêu cầu;
+                :Xử lý thanh toán mô phỏng;
+                :Trả kết quả thành công hoặc thất bại;
+
+                |Hệ thống BrewLite|
+                :Lưu mã giao dịch, phương thức,\
+số tiền, thời gian và kết quả;
+            endif
+        endif
+
+        if (Thanh toán thành công?) then (Có)
+            :Cập nhật trạng thái thanh toán thành công;\
+Đồng bộ thông tin đơn hàng;
+        else (Không)
+            :Ghi nhận thanh toán thất bại;\
+Không đánh dấu đơn đã thanh toán;
+            :Hiển thị thông báo lỗi;
+
+            |Khách hàng|
+            if (Thử thanh toán lại?) then (Có)
+                |Hệ thống BrewLite|
+                :Tạo idempotency key mới\
+cho lần thanh toán mới;
+            else (Không)
+                |Khách hàng|
+                :Dừng thanh toán;
+                stop
+            endif
+        endif
+
+        |Hệ thống BrewLite|
+    repeat while (Đơn chưa thanh toán thành công?) is (Có) not (Không)
+endif
+
+:Hiển thị xác nhận thanh toán thành công;
+
+|Khách hàng|
+:Mở màn hình theo dõi đơn hàng;
+
+|Hệ thống BrewLite|
+:Kiểm tra quyền truy cập;
+:Hiển thị mã đơn, thời điểm đặt\
+và trạng thái hiện tại;
+
+|Khách hàng|
+:Xem trạng thái đơn hàng;
+stop
+
+@enduml

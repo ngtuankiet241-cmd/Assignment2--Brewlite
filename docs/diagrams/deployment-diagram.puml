@@ -5,10 +5,10 @@ skinparam roundcorner 8
 skinparam defaultFontName Arial
 skinparam packageStyle rectangle
 
-title UML Deployment Diagram ? Ki?n tr?c Tri?n khai Production BrewLite
+title UML Deployment Diagram - Kiến trúc Triển khai Production BrewLite
 
 cloud "Client Environment" {
-    node "Kh?ch h?ng / Nh?n vi?n\n[User Device: Smartphone / Laptop]" as ClientDevice <<device>> {
+    node "Khách hàng / Nhân viên\n[User Device: Smartphone / Laptop]" as ClientDevice <<device>> {
         node "Web Browser / PWA Shell" as Browser {
             component "Next.js Mobile-First UI\n(React Client / SPA)" as WebApp
             database "Local Storage\n(JWT Token, Cart State)" as ClientStorage
@@ -47,14 +47,7 @@ cloud "Production Cloud Infrastructure" as ProdCloud {
         }
 
         folder "Production Environment Variables & Secrets\n[Render Secret Management]" as RenderSecrets {
-            file ".env (Encrypted)" as EnvVars [
-                DATABASE_URL = postgres://...
-                JWT_SECRET = ****************
-                SEPAY_API_KEY = ****************
-                SEPAY_WEBHOOK_SECRET = **********
-                PORT = 3001
-                NODE_ENV = production
-            ]
+            file ".env (Encrypted)\n--\nDATABASE_URL = postgres://...\nJWT_SECRET = ****************\nSEPAY_API_KEY = ****************\nSEPAY_WEBHOOK_SECRET = **********\nPORT = 3001\nNODE_ENV = production" as EnvVars
         }
     }
 }
@@ -85,10 +78,10 @@ CIPipeline -[#purple,dashed]-> VercelNode : "CD: Deploy Web"
 CIPipeline -[#purple,dashed]-> ApiContainer : "CD: Deploy API"
 
 legend bottom
-    |= K? hi?u |= M? t? |
-    |<#blue>  | T??ng t?c Client - Server qua HTTPS / TLS 1.3 |
-    |<#darkgreen> | T??ng t?c v?i C?ng thanh to?n m? ph?ng SePay (Sandbox) |
-    |<#purple> | T? ??ng h?a CI/CD qua GitHub Actions |
-    |--| K?t n?i n?i b? m?ng b?o m?t (Private Network / TCP) |
+    |= Ký hiệu |= Mô tả |
+    |<#blue>  | Tương tác Client - Server qua HTTPS / TLS 1.3 |
+    |<#darkgreen> | Tương tác với Cổng thanh toán mô phỏng SePay (Sandbox) |
+    |<#purple> | Tự động hóa CI/CD qua GitHub Actions |
+    |--| Kết nối nội bộ mạng bảo mật (Private Network / TCP) |
 endlegend
 @enduml
