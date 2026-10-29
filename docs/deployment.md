@@ -8,7 +8,7 @@ Tài liệu này đặc tả chi tiết kiến trúc triển khai trên môi tr�
 
 Sơ đồ mô tả cấu trúc vật lý và logic của hệ thống BrewLite trên môi trường vận hành thực tế:
 
-![UML Deployment Diagram](../docs/diagrams/deployment-diagram.png)
+![UML Deployment Diagram](diagrams/deployment-diagram.png)
 
 *Mã nguồn sơ đồ:* [`docs/diagrams/deployment-diagram.puml`](diagrams/deployment-diagram.puml)
 

@@ -1,9 +1,10 @@
-﻿# 📐 Mô hình hóa Hệ thống (System Modeling) – Task 2
+# 📐 Mô hình hóa Hệ thống (System Modeling) – Task 2
 
-Tài liệu này tổng hợp 3 sơ đồ UML cốt lõi của hệ thống **BrewLite** theo quy định tại **Task 2** (Assignment 2):
+Tài liệu này tổng hợp các sơ đồ UML cốt lõi của hệ thống **BrewLite** theo quy định tại **Task 2** và **Task 3** (Assignment 2):
 1. **Task 2.1:** Sơ đồ Hoạt động (Activity Diagram) – Toàn bộ luồng nghiệp vụ end-to-end.
 2. **Task 2.2:** Sơ đồ Tuần tự (Sequence Diagram) – Use-case trọng tâm Đặt và thanh toán đơn hàng (UC-01).
 3. **Task 2.3:** Sơ đồ Lớp Lĩnh vực (Domain Class Diagram) – Mô hình thực thể và cấu trúc dữ liệu hệ thống.
+4. **Task 3.2:** Sơ đồ Triển khai (Deployment Diagram) – Cấu trúc vật lý và hạ tầng production.
 
 ---
 
@@ -11,7 +12,10 @@ Tài liệu này tổng hợp 3 sơ đồ UML cốt lõi của hệ thống **Br
 
 Sơ đồ mô tả chi tiết toàn bộ luồng nghiệp vụ từ khi khách hàng duyệt menu đến khi hoàn tất đơn hàng và theo dõi tiến độ pha chế.
 
-![Activity Diagram](activity-diagram.svg)
+- **File mã nguồn PlantUML:** [`activity-diagram.puml`](activity-diagram.puml)
+- **File ảnh kết xuất:** [`activity-diagram.png`](activity-diagram.png)
+
+![Activity Diagram](activity-diagram.png)
 
 ### 📌 Điểm nổi bật trong thiết kế:
 - **Phân làn trách nhiệm (Swimlanes):**
@@ -31,9 +35,9 @@ Sơ đồ mô tả chi tiết toàn bộ luồng nghiệp vụ từ khi khách h
 Sơ đồ thể hiện sự tương tác tuần tự qua các Lifeline cho use-case trọng tâm **UC-01: Đặt và thanh toán đơn hàng**.
 
 - **File mã nguồn PlantUML:** [`sequence-checkout.puml`](sequence-checkout.puml)
-- **File ảnh kết xuất Vector:** [`sequence-checkout.svg`](sequence-checkout.svg)
+- **File ảnh kết xuất:** [`sequence-checkout.png`](sequence-checkout.png)
 
-![Sequence Diagram](sequence-checkout.svg)
+![Sequence Diagram](sequence-checkout.png)
 
 ### 📌 Các Lifeline tham gia:
 1. `Customer (Khách hàng)`
@@ -101,22 +105,21 @@ Hệ thống được tổ chức thành 6 nhóm chức năng (Packages):
 - **`OptionType`:** `SIZE`, `TOPPING`.
 - **`LoyaltyType`:** `EARN`, `REDEEM`.
 
-
 ---
 
-## 5. Task 3.2 ? Deployment Diagram (S? ?? Tri?n khai Production)
+## 5. Task 3.2 – Deployment Diagram (Sơ đồ Triển khai Production)
 
-S? ?? m? t? c?u tr?c v?t l?, h? t?ng cloud, m?ng k?t n?i v? ranh gi?i m?i tr??ng cho h? th?ng BrewLite tr?n m?i tr??ng v?n h?nh th?c t?.
+Sơ đồ mô tả cấu trúc vật lý, hạ tầng cloud, mạng kết nối và ranh giới môi trường cho hệ thống BrewLite trên môi trường vận hành thực tế.
 
-- **File m? ngu?n PlantUML:** [`deployment-diagram.puml`](deployment-diagram.puml)
-- **File ?nh k?t xu?t:** [`deployment-diagram.png`](deployment-diagram.png)
-- **T?i li?u ??c t? chi ti?t:** [`docs/deployment.md`](../deployment.md)
+- **File mã nguồn PlantUML:** [`deployment-diagram.puml`](deployment-diagram.puml)
+- **File ảnh kết xuất:** [`deployment-diagram.png`](deployment-diagram.png)
+- **Tài liệu đặc tả chi tiết:** [`docs/deployment.md`](../deployment.md)
 
 ![Deployment Diagram](deployment-diagram.png)
 
-### ?? ?i?m nh?n k? thu?t:
-1. **Frontend Hosting:** Vercel Global Edge Network ph?c v? Next.js 14 PWA qua HTTPS / TLS 1.3 (port 443).
-2. **Backend API:** Render.com PaaS ch?y Linux Container (Node.js 20 LTS, NestJS 10) t?i c?ng n?i b? 3001, reverse proxy ra c?ng 443.
-3. **Database:** Render Managed PostgreSQL 16 g?n ??a l?u tr? b?n v?ng (Persistent Storage Disk) k?t n?i n?i b? c?ng 5432 b?o m?t qua SSL.
-4. **C?ng thanh to?n:** SePay Sandbox Gateway k?t n?i hai chi?u qua HTTPS API v? Webhook IPN (`POST /payments/ipn`).
-5. **CI/CD:** GitHub Actions t? ??ng ki?m th? (Lint, Type-check, Jest) v? trigger t? ??ng tri?n khai khi push v?o nh?nh `main`.
+### 📌 Điểm nhấn kỹ thuật:
+1. **Frontend Hosting:** Vercel Global Edge Network phục vụ Next.js 14 PWA qua HTTPS / TLS 1.3 (port 443).
+2. **Backend API:** Render.com PaaS chạy Linux Container (Node.js 20 LTS, NestJS 10) tại cổng nội bộ 3001, reverse proxy ra cổng 443.
+3. **Database:** Render Managed PostgreSQL 16 gắn đĩa lưu trữ bền vững (Persistent Storage Disk) kết nối nội bộ cổng 5432 bảo mật qua SSL.
+4. **Cổng thanh toán:** SePay Sandbox Gateway kết nối hai chiều qua HTTPS API và Webhook IPN (`POST /payments/ipn`).
+5. **CI/CD:** GitHub Actions tự động kiểm thử (Lint, Type-check, Jest) và trigger tự động triển khai khi push vào nhánh `main`.
