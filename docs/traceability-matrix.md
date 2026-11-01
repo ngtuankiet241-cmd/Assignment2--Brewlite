@@ -2,7 +2,7 @@
 
 Ma trận này ánh xạ từng yêu cầu chức năng (FR) trong [SRS](./requirements/srs.md) sang User Story/Use-case, sơ đồ thiết kế và component kiến trúc chịu trách nhiệm. Component ở đây là các khối logic dự kiến của kiến trúc Next.js – NestJS – PostgreSQL – SePay, không phải tên module/mã nguồn đã triển khai.
 
-> **Trạng thái sơ đồ:** Toàn bộ sơ đồ tham chiếu (**AD-01**, **SD-01**, **CD-01**) đã được hoàn thiện và lưu trữ tại thư mục [docs/diagrams/](./diagrams). Danh mục component bên dưới đại diện cho các khối kiến trúc logic trong hệ thống Next.js – NestJS – PostgreSQL – SePay.
+> **Trạng thái sơ đồ:** Toàn bộ sơ đồ tham chiếu (**AD-01**, **SD-01**, **CD-01**, **DD-01**) đã được hoàn thiện và lưu trữ tại thư mục [docs/diagrams/](./diagrams). Danh mục component bên dưới đại diện cho các khối kiến trúc logic trong hệ thống Next.js – NestJS – PostgreSQL – SePay.
 
 ## Danh mục sơ đồ
 

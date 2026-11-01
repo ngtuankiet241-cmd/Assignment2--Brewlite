@@ -26,7 +26,7 @@ Kèm theo các **Tiêu chí chấp nhận (Acceptance Criteria - AC)** định l
     - Mặc định hệ thống tự chọn Size tiêu chuẩn (Size M).
     - Giá tiền hiển thị tự động cộng/trừ chênh lệch tương ứng theo từng kích cỡ (ví dụ: Size S -5.000đ, Size L +5.000đ).
 
-### US-03: Tùy biến Topping và tính toán giá động (Ánh xạ: FR-03, FR-04)
+### US-03: Tùy biến Topping và tính toán giá động (Ánh xạ: FR-03)
 - **User Story:** Là **Khách hàng**, tôi muốn **thêm các loại topping cho ly nước và thấy tổng tiền cập nhật tự động**, để **ly nước thêm phần ngon miệng và kiểm soát được chi phí trước khi thêm vào giỏ**.
 - **Tiêu chí chấp nhận (Acceptance Criteria):**
   - **AC1 (Tùy chọn Topping):**

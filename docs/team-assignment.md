@@ -10,10 +10,10 @@ Dự án môn **Công nghệ Phần mềm** gồm 6 thành viên, được tổ 
 |:---:|---|:---:|---|---|
 | 1 | **Kiệt** | 3124410175 | **Team Leader / Project Manager** | Quản lý tiến độ, điều phối Task, thiết lập Repository, Bối cảnh/Stakeholder/Rủi ro, Tổng hợp báo cáo LaTeX & Docs |
 | 2 | **Luân** | 3124410204 | **Fullstack Developer** | Phụ trách SRS Sản phẩm & Giỏ hàng, Code giao diện Next.js, Class Diagram |
-| 3 | **Hùng** | | **Backend / DevOps Engineer** | Phụ trách SRS Auth & Thanh toán SePay, Thiết kế API NestJS & Database Prisma, Deployment |
-| 4 | **Triệu** | | **System Analyst / Designer** | Vẽ Sơ đồ Use-case tổng quát, Hỗ trợ Sequence Diagram, Thiết kế UI |
+| 3 | **Hùng** | 3124410107 | **Backend / DevOps Engineer** | Phụ trách SRS Auth & Thanh toán SePay, Thiết kế API NestJS & Database Prisma, Deployment |
+| 4 | **Triệu** | 3124410376 | **System Analyst / Designer** | Vẽ Sơ đồ Use-case tổng quát, Hỗ trợ Sequence Diagram, Thiết kế UI |
 | 5 | **Lượng** | 3124410207 | **System Analyst / Backend** | Đặc tả chi tiết Use-case trọng tâm UC-01, Sequence Diagram cho checkout |
-| 6 | **Kha** | | **QA / Business Analyst** | Rà soát Checklist chất lượng SRS, Yêu cầu Dữ liệu & Lưu trữ, Activity Diagram, Kiểm thử |
+| 6 | **Kha** | 3124410136 | **QA / Business Analyst** | Rà soát Checklist chất lượng SRS, Yêu cầu Dữ liệu & Lưu trữ, Activity Diagram, Kiểm thử |
 
 ---
 
@@ -37,7 +37,7 @@ Dự án môn **Công nghệ Phần mềm** gồm 6 thành viên, được tổ 
 
 ---
 
-### Giai đoạn 3: Task 3 – Thiết kế Kiến trúc (2 điểm)
+### Giai đoạn 3: Task 3 – Thiết kế Kiến trúc (2 điểm) ✅ [HOÀN THÀNH]
 - **Hùng & Kiệt:** Viết mô tả kiến trúc phân tầng (Next.js PWA, NestJS Domain, PostgreSQL), viết các hồ sơ quyết định kiến trúc (ADR) trong `docs/architecture/adr/`.
 - **Hùng:** Vẽ **Deployment Diagram** môi trường Production (HTTPS, Cloud host, Docker container, persistent DB storage).
 - **Luân & Kha:** Cập nhật Ma trận truy vết (`traceability-matrix.md`) ánh xạ từ FR sang Diagram và Component.
