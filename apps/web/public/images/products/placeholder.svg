@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+    <linearGradient id="coffeeBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FBF7F0"/>
+      <stop offset="100%" stop-color="#EDDCCB"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" rx="32" fill="url(#coffeeBg)"/>
+  <g transform="translate(100, 100)">
+    <circle cx="100" cy="100" r="80" fill="#DEC1A7" opacity="0.3"/>
+    <path d="M60 130 C60 155, 140 155, 140 130 L140 70 L60 70 Z" fill="#8C5D39" stroke="#523420" stroke-width="4"/>
+    <ellipse cx="100" cy="70" rx="40" ry="12" fill="#AF7C54" stroke="#523420" stroke-width="4"/>
+    <path d="M140 85 C160 85, 165 115, 140 120" fill="none" stroke="#523420" stroke-width="5" stroke-linecap="round"/>
+    <path d="M85 50 Q90 35 85 20 M100 50 Q105 35 100 20 M115 50 Q120 35 115 20" fill="none" stroke="#DEC1A7" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <text x="200" y="315" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="#6F472B" text-anchor="middle">BrewLite Coffee</text>
+</svg>
+

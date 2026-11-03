@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad5" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F7F3EE"/>
+      <stop offset="100%" stop-color="#E5D9CB"/>
+    </linearGradient>
+    <linearGradient id="americanoGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#341A0B"/>
+      <stop offset="60%" stop-color="#593019"/>
+      <stop offset="100%" stop-color="#7A4626"/>
+    </linearGradient>
+    <linearGradient id="glassReflection5" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.35"/>
+      <stop offset="15%" stop-color="#FFFFFF" stop-opacity="0.05"/>
+      <stop offset="85%" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.25"/>
+    </linearGradient>
+    <filter id="shadow5" x="-20%" y="-10%" width="140%" height="130%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#341A0B" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <rect width="400" height="400" rx="32" fill="url(#bgGrad5)"/>
+
+  <g opacity="0.06" fill="#341A0B">
+    <circle cx="90" cy="80" r="20"/>
+    <circle cx="315" cy="95" r="15"/>
+    <circle cx="75" cy="310" r="18"/>
+    <circle cx="325" cy="320" r="20"/>
+  </g>
+
+  <!-- Cup Base Shadow -->
+  <ellipse cx="200" cy="335" rx="65" ry="14" fill="#341A0B" opacity="0.18"/>
+
+  <!-- Glass container -->
+  <g filter="url(#shadow5)">
+    <!-- Base Glass -->
+    <path d="M145,110 L158,310 Q160,325 200,325 Q240,325 242,310 L255,110 Z" fill="#FFFFFF" opacity="0.95"/>
+    
+    <!-- Americano liquid (slightly translucent coffee tone) -->
+    <path d="M147,132 L158,310 Q160,325 200,325 Q240,325 242,310 L253,132 Q200,140 147,132 Z" fill="url(#americanoGrad)"/>
+
+    <!-- Crema ring on surface -->
+    <ellipse cx="200" cy="132" rx="53" ry="10" fill="#91582F" opacity="0.8"/>
+    <ellipse cx="200" cy="132" rx="46" ry="7" fill="#42220F"/>
+
+    <!-- Distinct Floating Ice Cubes -->
+    <rect x="172" y="145" width="42" height="38" rx="8" transform="rotate(-10 172 145)" fill="#FFFFFF" opacity="0.4" stroke="#FFFFFF" stroke-width="1.8"/>
+    <rect x="195" y="180" width="38" height="36" rx="7" transform="rotate(16 195 180)" fill="#FFFFFF" opacity="0.32" stroke="#FFFFFF" stroke-width="1.8"/>
+    <rect x="165" y="220" width="36" height="34" rx="7" transform="rotate(-8 165 220)" fill="#FFFFFF" opacity="0.25" stroke="#FFFFFF" stroke-width="1.5"/>
+
+    <!-- Glass Reflection Highlights -->
+    <path d="M145,110 L158,310 Q160,325 200,325 Q240,325 242,310 L255,110 Z" fill="url(#glassReflection5)"/>
+
+    <!-- Glass Rim -->
+    <ellipse cx="200" cy="112" rx="55" ry="12" fill="#E8DEC8" stroke="#FFFFFF" stroke-width="3"/>
+    <ellipse cx="200" cy="112" rx="50" ry="9" fill="#3D1E0C"/>
+
+    <!-- Sleek Straw -->
+    <path d="M218,55 L208,135 L196,305" stroke="#0D9488" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.9"/>
+  </g>
+</svg>
+
