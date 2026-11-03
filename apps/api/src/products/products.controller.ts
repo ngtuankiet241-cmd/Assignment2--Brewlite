@@ -1,4 +1,3 @@
-
 import { Controller, Get, Param } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import {
@@ -8,9 +7,7 @@ import {
 
 @Controller('products')
 export class ProductsController {
-  constructor(
-    private readonly productsService: ProductsService,
-  ) {}
+  constructor(private readonly productsService: ProductsService) {}
 
   @Get()
   async findAll(): Promise<ApiResponseDto<ProductResponseDto[]>> {
