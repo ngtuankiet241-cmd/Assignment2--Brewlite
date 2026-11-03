@@ -14,6 +14,7 @@ export interface Product {
   category: ProductCategory;
   categoryName: string;
   isAvailable: boolean;
+  stock?: number;
   badge?: string; // e.g. "Bán chạy nhất", "Signature", "Gen Z yêu thích"
   rating?: number; // e.g. 4.9
   prepTimeMinutes?: number; // Estimated prep time
@@ -22,4 +23,3 @@ export interface Product {
 }
 
 export type ProductFilterCategory = 'all' | ProductCategory;
-
