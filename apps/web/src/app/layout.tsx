@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { CartProvider } from '@/context/CartContext';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -13,9 +14,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" className="h-full scroll-smooth">
+    <html lang="vi" className="h-full scroll-smooth" data-scroll-behavior="smooth">
       <body className="min-h-full flex flex-col bg-cream-100 text-coffee-950 antialiased selection:bg-coffee-200 selection:text-coffee-900">
-        {children}
+        <CartProvider>{children}</CartProvider>
       </body>
     </html>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Product, ProductFilterCategory } from '@/types/product';
+import { Product, ProductCategory, ProductFilterCategory } from '@/types/product';
 
 export type DemoMode = 'normal' | 'loading' | 'empty' | 'error';
 
@@ -20,17 +20,31 @@ interface BackendResponse {
   data: BackendProduct[];
 }
 
-/**
- * Helper tự động phân loại category ('traditional' | 'espresso' | 'tea')
- * và categoryName dựa trên từ khóa trong tên món.
- */
 export function detectCategory(name: string): {
-  category: 'traditional' | 'espresso' | 'tea';
+  category: ProductCategory;
   categoryName: string;
 } {
   const lower = (name || '').toLowerCase();
 
-  // Nhóm trà trái cây
+  if (lower.includes('đá xay') || lower.includes('frapp')) {
+    return {
+      category: 'blended',
+      categoryName: 'Đá xay',
+    };
+  }
+
+  if (
+    lower.includes('trà sữa') ||
+    lower.includes('milk tea') ||
+    lower.includes('bubble tea') ||
+    lower.includes('boba')
+  ) {
+    return {
+      category: 'milk-tea',
+      categoryName: 'Trà sữa',
+    };
+  }
+
   if (lower.includes('trà') || lower.includes('tea')) {
     return {
       category: 'tea',
@@ -38,7 +52,13 @@ export function detectCategory(name: string): {
     };
   }
 
-  // Nhóm cà phê pha máy (espresso, latte, cappuccino, americano)
+  if (lower.includes('matcha')) {
+    return {
+      category: 'specialty',
+      categoryName: 'Thức uống đặc biệt',
+    };
+  }
+
   if (
     lower.includes('espresso') ||
     lower.includes('latte') ||
