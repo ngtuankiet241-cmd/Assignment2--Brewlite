@@ -1,14 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import Image from 'next/image';
 import { Product, ProductFilterCategory } from '@/types/product';
 import ProductCard from './ProductCard';
 import { ProductGridSkeleton } from './ProductCardSkeleton';
 import ErrorState from './ErrorState';
 import EmptyState from './EmptyState';
-import { formatCurrencyVND } from '@/data/mockProducts';
 import { DemoMode } from '@/hooks/useProducts';
+import ProductConfigurator from './ProductConfigurator';
 
 interface ProductGridProps {
   products: Product[];
@@ -43,7 +42,10 @@ export default function ProductGrid({
     { key: 'all', label: 'Tất cả', icon: '✨' },
     { key: 'traditional', label: 'Cà phê truyền thống', icon: '☕' },
     { key: 'espresso', label: 'Cà phê pha máy', icon: '⚡' },
+    { key: 'milk-tea', label: 'Trà sữa', icon: '🧋' },
     { key: 'tea', label: 'Trà trái cây', icon: '🍑' },
+    { key: 'blended', label: 'Đá xay', icon: '🥤' },
+    { key: 'specialty', label: 'Món đặc biệt', icon: '🌿' },
   ];
 
   const hasActiveFilters = selectedCategory !== 'all' || searchQuery.trim() !== '';
@@ -105,7 +107,7 @@ export default function ProductGrid({
         <div className="mt-3.5 flex items-center justify-between gap-2">
           <div
             className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-2 pt-1 no-scrollbar sm:flex-wrap w-full"
-            role="tablist"
+            role="group"
             aria-label="Bộ lọc danh mục đồ uống"
           >
             {categories.map((cat) => {
@@ -114,14 +116,13 @@ export default function ProductGrid({
                 <button
                   key={cat.key}
                   type="button"
-                  role="tab"
                   onClick={() => onSelectCategory(cat.key)}
                   className={`inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coffee-600 ${
                     isActive
                       ? 'bg-coffee-800 text-cream-50 shadow-xs'
                       : 'border border-coffee-200/80 bg-white text-coffee-800 hover:bg-coffee-50'
                   }`}
-                  aria-selected={isActive}
+                  aria-pressed={isActive}
                 >
                   <span>{cat.icon}</span>
                   <span>{cat.label}</span>
@@ -208,123 +209,11 @@ export default function ProductGrid({
         </div>
       </div>
 
-      {/* Product Detail Modal */}
       {activeProduct && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-xs transition-opacity duration-200"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="modal-product-title"
-          onClick={() => setActiveProduct(null)}
-        >
-          <div
-            className="relative w-full max-w-md max-h-[92vh] overflow-y-auto rounded-3xl bg-white shadow-2xl border border-coffee-100 p-4 sm:p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Close Button */}
-            <button
-              type="button"
-              onClick={() => setActiveProduct(null)}
-              className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-coffee-900 shadow-xs backdrop-blur-xs transition hover:bg-coffee-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coffee-500"
-              aria-label="Đóng cửa sổ chi tiết"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-            {/* Modal Body */}
-            <div>
-              <div className="flex flex-col items-center sm:flex-row sm:items-start gap-3.5">
-                <div className="relative h-32 w-32 sm:h-36 sm:w-36 shrink-0 overflow-hidden rounded-2xl bg-cream-50">
-                  <Image
-                    src={activeProduct.imageUrl}
-                    alt={activeProduct.name}
-                    fill
-                    sizes="150px"
-                    className="object-contain p-2"
-                  />
-                  {activeProduct.badge && (
-                    <span className="absolute top-2 left-2 rounded-full bg-coffee-800 px-2 py-0.5 text-[9px] font-semibold text-cream-50">
-                      {activeProduct.badge}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex-1 text-center sm:text-left min-w-0">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-coffee-500">
-                    {activeProduct.categoryName}
-                  </span>
-                  <h3
-                    id="modal-product-title"
-                    className="text-base font-bold text-coffee-950 sm:text-xl break-words"
-                  >
-                    {activeProduct.name}
-                  </h3>
-                  <p className="mt-0.5 text-base font-extrabold text-coffee-800">
-                    {formatCurrencyVND(activeProduct.price)}
-                  </p>
-
-                  <div className="mt-2 flex items-center justify-center sm:justify-start gap-2 text-xs text-coffee-600">
-                    <span>⭐ <strong>{activeProduct.rating ?? 4.8}</strong></span>
-                    <span>•</span>
-                    <span>⏱️ <strong>{activeProduct.prepTimeMinutes ?? 3}p</strong> chuẩn bị</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Description */}
-              <div className="mt-3.5 border-t border-coffee-100 pt-2.5">
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-coffee-400">
-                  Mô tả hương vị
-                </h4>
-                <p className="mt-1 text-xs leading-relaxed text-coffee-800 break-words">
-                  {activeProduct.description}
-                </p>
-              </div>
-
-              {/* Sprint 1 Scope Notice */}
-              <div className="mt-3.5 rounded-2xl border border-amber-200 bg-amber-50/90 p-3 text-xs text-amber-900">
-                <div className="flex items-start gap-2">
-                  <span className="text-sm shrink-0">ℹ️</span>
-                  <div>
-                    <strong className="font-semibold">Phạm vi Sprint 1 (Task 4.3):</strong>
-                    <p className="mt-0.5 text-[11px] text-amber-800 leading-snug">
-                      Tính năng tùy chỉnh size/đường/đá và thanh toán không tiền mặt sẽ được phát triển trong <strong>Sprint 2</strong>.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="mt-4 flex flex-col-reverse sm:flex-row items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveProduct(null)}
-                  className="w-full sm:w-auto min-h-[44px] rounded-full border border-coffee-300 px-5 py-2 text-xs font-semibold text-coffee-800 transition hover:bg-coffee-50 active:scale-95"
-                >
-                  Đóng
-                </button>
-                <button
-                  type="button"
-                  disabled
-                  className="w-full sm:w-auto min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-full bg-zinc-200 px-5 py-2 text-xs font-semibold text-zinc-500 cursor-not-allowed"
-                  title="Tính năng đặt món sẽ có trong Sprint 2"
-                >
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                    />
-                  </svg>
-                  <span>Thêm vào giỏ (Sprint 2)</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ProductConfigurator
+          onClose={() => setActiveProduct(null)}
+          product={activeProduct}
+        />
       )}
     </section>
   );
