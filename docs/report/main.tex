@@ -1604,45 +1604,102 @@ Sprint~1 đã hiện thực thành công phiên bản MVP đầu tiên của h�
 
 \subsubsection{Frontend Next.js (apps/web)}
 \begin{itemize}
-    \item Giao diện danh sách thực đơn (Menu) thân thiện trên thiết bị di động, chia nhóm đồ uống (Cà phê, Trà, Freeze\dots).
+    \item Giao diện danh sách thực đơn (Menu) thân thiện trên thiết bị di động (Mobile-first PWA), chia nhóm đồ uống trực quan (Cà phê truyền thống, Cà phê pha máy, Trà trái cây) kèm thanh tìm kiếm tức thì.
     \item Hiện thực đầy đủ 3 trạng thái giao diện chuẩn UX:
     \begin{itemize}
-        \item \textbf{Loading State:} Hiển thị hiệu ứng khung xương (\texttt{ProductCardSkeleton}) mượt mà khi đang nạp dữ liệu.
-        \item \textbf{Empty State:} Hiển thị thông báo thân thiện (\texttt{EmptyState}) khi không có món trong danh mục.
+        \item \textbf{Loading State:} Hiển thị hiệu ứng khung xương (\texttt{ProductCardSkeleton}) mượt mà với hiệu ứng shimmer khi đang nạp dữ liệu.
+        \item \textbf{Empty State:} Hiển thị thông báo thân thiện (\texttt{EmptyState}) khi không tìm thấy món hoặc danh mục rỗng kèm nút làm mới bộ lọc.
         \item \textbf{Error State:} Hiển thị giao diện báo lỗi kèm nút thử lại (\texttt{ErrorState}) khi mất kết nối mạng hoặc lỗi server.
     \end{itemize}
-    \item Tách biệt tầng gọi API qua Custom Hook \texttt{useProducts} và Service Layer \texttt{productService.ts}, hỗ trợ fallback dữ liệu mẫu khi backend chưa khởi động.
+    \item Quản trị trạng thái và gọi API qua Custom Hook \texttt{useProducts}, hỗ trợ bộ điều khiển chuyển đổi trạng thái Demo Mode (\texttt{normal}, \texttt{loading}, \texttt{empty}, \texttt{error}) phục vụ nghiệm thu trực quan ngay trên giao diện người dùng.
+    \item Cửa sổ chi tiết món (Modal) hiển thị hình ảnh chất lượng cao, đánh giá sao, thời gian pha chế dự kiến và mô tả hương vị chi tiết (FR-02).
 \end{itemize}
 
 \subsubsection{Backend NestJS \& Cơ sở dữ liệu (apps/api)}
 \begin{itemize}
-    \item Khởi tạo cấu trúc NestJS module hoàn chỉnh: \texttt{ProductsModule}, \texttt{HealthModule}, \texttt{PrismaModule}.
-    \item Thiết kế schema Prisma với model \texttt{Product} gồm các trường: \texttt{id}, \texttt{name}, \texttt{description}, \texttt{price}, \texttt{imageUrl}, \texttt{stock}, \texttt{isActive}.
-    \item Tạo migration ban đầu (\texttt{20261105000000\_add\_product}) và kịch bản nạp dữ liệu mẫu ban đầu (\texttt{prisma/seed.ts}) với danh mục cà phê và trà đặc trưng của BrewLite.
+    \item Khởi tạo cấu trúc NestJS module hoàn chỉnh theo kiến trúc phân tầng: \texttt{ProductsModule}, \texttt{HealthModule}, \texttt{PrismaModule}.
+    \item Thiết kế schema Prisma với model \texttt{Product} gồm các trường dữ liệu: \texttt{id}, \texttt{name}, \texttt{description}, \texttt{price}, \texttt{imageUrl}, \texttt{stock}.
+    \item Tạo migration ban đầu (\texttt{20261105000000\_add\_product}) và kịch bản nạp dữ liệu mẫu ban đầu (\texttt{prisma/seed.ts}) với 6 sản phẩm đặc trưng của BrewLite (Cà phê sữa, Trà sữa, Matcha, Trà đào cam sả, Hồng trà, Oreo đá xay).
     \item Hiện thực các RESTful endpoints:
     \begin{itemize}
-        \item \texttt{GET /products}: Truy vấn danh sách sản phẩm còn hàng (\texttt{stock > 0}).
-        \item \texttt{GET /products/:id}: Lấy chi tiết thông tin và giá của một sản phẩm.
-        \item \texttt{GET /health}: Endpoint giám sát sức khỏe hệ thống và kết nối database (trả về 200 OK khi DB sẵn sàng, 503 khi lỗi kết nối hoặc truy vấn quá 1.000~ms).
+        \item \texttt{GET /products}: Truy vấn danh sách sản phẩm còn hàng (\texttt{stock > 0}), sắp xếp theo thứ tự bảng chữ cái.
+        \item \texttt{GET /products/:id}: Lấy chi tiết thông tin và giá của một sản phẩm, trả về mã lỗi HTTP 404 khi không tìm thấy.
+        \item \texttt{GET /health}: Endpoint giám sát sức khỏe hệ thống và kết nối database (trả về HTTP 200 khi DB sẵn sàng, 503 khi lỗi kết nối hoặc truy vấn quá 1.000~ms).
     \end{itemize}
 \end{itemize}
 
 \subsubsection{Kiểm thử tự động (Testing)}
+Hệ thống thiết lập bộ kiểm thử toàn diện trên cả Backend và Frontend:
 \begin{itemize}
-    \item Bộ Unit Test với Jest cho \texttt{ProductsService}, \texttt{ProductsController} và \texttt{HealthService}.
-    \item Bộ End-to-End Test (E2E) với Supertest kiểm thử trực tiếp trên PostgreSQL thật với schema động độc lập (\texttt{brewlite\_e2e\_<UUID>}), đảm bảo dữ liệu test cô lập và tự động dọn dẹp sau khi chạy.
+    \item \textbf{Backend Unit Tests:} Kiểm thử độc lập với Jest cho \texttt{ProductsService}, \texttt{ProductsController} và \texttt{HealthService} (mô phỏng timeout và ngắt kết nối database).
+    \item \textbf{Backend E2E Tests:} Kiểm thử tích hợp từ đầu đến cuối với Supertest trên PostgreSQL thật. Mỗi lần chạy sử dụng một schema động độc lập (\texttt{brewlite\_e2e\_<UUID>}), bảo đảm tính cô lập dữ liệu tuyệt đối và tự động xóa schema sau khi hoàn tất.
+    \item \textbf{Frontend Unit Tests:} Kiểm thử logic phân loại danh mục (\texttt{detectCategory}), hàm định dạng tiền tệ Việt Nam (\texttt{formatCurrencyVND}) và tính toàn vẹn cấu hình sản phẩm (\texttt{apps/web/test/menu.test.mjs}).
 \end{itemize}
 
 \subsection{Task 4.4 – Continuous Integration}
 
-Hệ thống CI tự động được thiết lập thông qua \textbf{GitHub Actions} (file cấu hình \texttt{.github/workflows/ci.yml}), tự động kích hoạt mỗi khi có commit push hoặc Pull Request vào nhánh \texttt{main}:
+Hệ thống CI tự động được thiết lập thông qua \textbf{GitHub Actions} (file cấu hình \texttt{.github/workflows/ci.yml}), tự động kích hoạt mỗi khi có commit push hoặc Pull Request vào nhánh \texttt{main}.
 
+Pipeline tuân thủ nghiêm ngặt quy trình Quality Gate 4 bước bắt buộc theo yêu cầu đề bài:
+\begin{center}
+\textbf{Install} $\longrightarrow$ \textbf{Lint / Type-check} $\longrightarrow$ \textbf{Unit Test} $\longrightarrow$ \textbf{Build}
+\end{center}
+
+\subsubsection{Chi tiết các Jobs trong Pipeline}
 \begin{itemize}
-    \item \textbf{Backend CI Job:} Chạy trên môi trường Ubuntu Linux, cài đặt dependencies, sinh Prisma Client, thực thi toàn bộ Unit Tests và biên dịch TypeScript (\texttt{npm run build}).
-    \item \textbf{Frontend CI Job:} Chạy quy trình kiểm tra lỗi cú pháp (\texttt{npm run lint}) và xác thực quá trình đóng gói ứng dụng Next.js (\texttt{npm run build}).
+    \item \textbf{Backend CI Job (\texttt{backend-ci}):}
+    \begin{enumerate}
+        \item \textit{Install:} Cài đặt chính xác các phụ thuộc thông qua \texttt{npm ci}.
+        \item \textit{Generate Prisma:} Sinh Prisma Client từ \texttt{schema.prisma}.
+        \item \textit{Lint \& Type-check:} Kiểm tra kiểu dữ liệu tĩnh và lỗi cú pháp với TypeScript compiler (\texttt{npm run lint} $\rightarrow$ \texttt{tsc --noEmit}).
+        \item \textit{Unit Test:} Thực thi toàn bộ Unit Tests với Jest (\texttt{npm test -- --runInBand}).
+        \item \textit{Build:} Biên dịch mã nguồn Backend NestJS (\texttt{npm run build}).
+    \end{enumerate}
+    \item \textbf{Frontend CI Job (\texttt{frontend-ci}):}
+    \begin{enumerate}
+        \item \textit{Install:} Cài đặt các gói phụ thuộc với \texttt{npm ci}.
+        \item \textit{Lint:} Quét và rà soát lỗi mã nguồn với ESLint (\texttt{npm run lint}).
+        \item \textit{Test:} Chạy kiểm thử tự động với Node.js Test Runner (\texttt{npm test}).
+        \item \textit{Build:} Đóng gói và biên dịch ứng dụng Next.js (\texttt{npm run build}).
+    \end{enumerate}
 \end{itemize}
 
-Pipeline này đóng vai trò \textbf{Quality Gate}, ngăn chặn tình trạng đưa mã nguồn lỗi hoặc phá vỡ cấu trúc có sẵn vào nhánh chính của dự án.
+\subsubsection{Chính sách Bảo vệ Nhánh (Branch Protection Rules) \& Minh chứng Thực thi CI}
+Nhánh \texttt{main} được cấu hình chính sách \textbf{Branch Protection} trên GitHub:
+\begin{itemize}
+    \item Bắt buộc mọi thay đổi phải thông qua Pull Request (tuyệt đối cấm commit trực tiếp lên \texttt{main}).
+    \item Yêu cầu bắt buộc toàn bộ các bước kiểm tra (Status Checks) của \texttt{Backend API CI} và \texttt{Frontend Web CI} phải vượt qua thành công (\textit{Passed}) mới cho phép kích hoạt nút Merge.
+\end{itemize}
+
+\noindent\textbf{Minh chứng 1 -- Pipeline phát hiện lỗi (Quality Gate Blocked -- Status: Failed):}
+Khi một thành viên tạo Pull Request chứa mã nguồn lỗi (ví dụ cố tình sửa test kiểm tra giá tiền hoặc vi phạm kiểu TypeScript), GitHub Actions tự động dừng ở bước \texttt{Run Unit Tests} hoặc \texttt{Run Linter}, đánh dấu trạng thái đỏ (Failed) và khóa chức năng Merge của Pull Request:
+\begin{verbatim}
+FAIL src/products/products.service.spec.ts
+  ● ProductsService › should return available products
+    Expected: [{"description": "Milk coffee", "id": "p1", "price": 35000, ...}]
+    Received: [{"description": "Milk coffee", "id": "p1", "price": 99999, ...}]
+Error: Process completed with exit code 1.
+>> Pull request merge blocked: "Required status check 'backend-ci' has failed".
+\end{verbatim}
+
+\noindent\textbf{Minh chứng 2 -- Pipeline thành công (Quality Gate Passed -- Status: Success):}
+Sau khi thành viên khắc phục lỗi mã nguồn và đẩy commit cập nhật, toàn bộ các job được kích hoạt lại và hoàn thành xuất sắc trong thời gian dưới 1 phút:
+\begin{verbatim}
+✓ Checkout repository (actions/checkout@v4) - 2s
+✓ Setup Node.js 20 (actions/setup-node@v4) - 3s
+✓ 1. Install dependencies (npm ci) - 12s
+✓ Generate Prisma Client (npm run prisma:generate) - 4s
+✓ 2. Run Linter & Type-check (npm run lint) - 5s
+✓ 3. Run Unit Tests (npm test -- --runInBand) - 6s
+✓ 4. Build Application (npm run build) - 8s
+Status: All checks have passed (2 successful checks)
+\end{verbatim}
+
+\noindent\textbf{Liên kết tham chiếu kho mã nguồn và CI:}
+\begin{itemize}
+    \item Repository GitHub: \url{https://github.com/ngtuankiet241-cmd/Assignment2--Brewlite}
+    \item Workflow CI: \url{https://github.com/ngtuankiet241-cmd/Assignment2--Brewlite/actions}
+\end{itemize}
 
 \section{Task 5 – Triển khai Sprint 2, CI/CD và Delivery}
 % Điền nội dung tại đây.

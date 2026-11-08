@@ -1,4 +1,4 @@
-﻿# 📋 Bảng Phân công Nhiệm vụ & Theo dõi Tiến độ – BrewLite (Assignment 2)
+# 📋 Bảng Phân công Nhiệm vụ & Theo dõi Tiến độ – BrewLite (Assignment 2)
 
 Dự án môn **Công nghệ Phần mềm** gồm 6 thành viên, được tổ chức làm việc theo mô hình Agile/Scrum qua 5 Task chính từ Yêu cầu đến Triển khai.
 
@@ -44,7 +44,7 @@ Dự án môn **Công nghệ Phần mềm** gồm 6 thành viên, được tổ 
 
 ---
 
-### Giai đoạn 4: Task 4 – Triển khai Sprint 1 (2 điểm)
+### Giai đoạn 4: Task 4 – Triển khai Sprint 1 (2 điểm) ✅ [HOÀN THÀNH]
 - **Kiệt:** Quản lý GitHub Issue Board, milestone Sprint 1 và branch protection rules.
 - **Luân & Triệu:** Hiện thực giao diện Menu Next.js Mobile-first, trạng thái loading/empty/error.
 - **Hùng & Lượng:** Cung cấp API `GET /products`, `GET /products/:id`, database seed script và unit test.
