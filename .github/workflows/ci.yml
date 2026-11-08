@@ -8,7 +8,7 @@ on:
 
 jobs:
   backend-ci:
-    name: Backend API CI (Lint, Type-check, Test, Build)
+    name: Backend API CI (Install, Lint, Test, Build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -25,20 +25,23 @@ jobs:
           cache: npm
           cache-dependency-path: apps/api/package-lock.json
 
-      - name: Install dependencies
+      - name: 1. Install dependencies
         run: npm ci
 
       - name: Generate Prisma Client
         run: npm run prisma:generate
 
-      - name: Run Unit Tests
+      - name: 2. Run Linter & Type-check
+        run: npm run lint
+
+      - name: 3. Run Unit Tests
         run: npm test -- --runInBand
 
-      - name: Build Backend Application
+      - name: 4. Build Backend Application
         run: npm run build
 
   frontend-ci:
-    name: Frontend Web CI (Lint, Type-check, Build)
+    name: Frontend Web CI (Install, Lint, Test, Build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -55,11 +58,14 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
 
-      - name: Install dependencies
+      - name: 1. Install dependencies
         run: npm ci
 
-      - name: Run Linter
+      - name: 2. Run Linter
         run: npm run lint
 
-      - name: Build Next.js Application
+      - name: 3. Run Unit & Component Tests
+        run: npm test
+
+      - name: 4. Build Next.js Application
         run: npm run build

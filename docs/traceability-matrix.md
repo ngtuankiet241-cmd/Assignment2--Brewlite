@@ -34,31 +34,34 @@ Ma trận này ánh xạ từng yêu cầu chức năng (FR) trong [SRS](./requi
 | **DB-PAYMENT** | PostgreSQL: thông tin và mã giao dịch thanh toán. |
 | **PAY-SEPAY** | SePay Sandbox: xử lý giao dịch mô phỏng và gửi kết quả/IPN. |
 
-## Ánh xạ FR
+## Ánh xạ FR sang Thiết kế, Mã nguồn và Kiểm thử (Traceability Matrix)
 
-| Mã yêu cầu | User Story / Use-case | Diagram | Component |
-|---|---|---|---|
-| **FR-01** Xem menu sản phẩm | US-01 | AD-01, CD-01 (`Product`) | WEB-MENU, API-PRODUCT, DB-PRODUCT |
-| **FR-02** Xem chi tiết sản phẩm | US-02 | AD-01, CD-01 (`Product`) | WEB-PRODUCT, API-PRODUCT, DB-PRODUCT |
-| **FR-03** Chọn size và topping | US-03 | AD-01, CD-01 (`Product`, `OrderItem`) | WEB-PRODUCT, WEB-CART, API-PRODUCT |
-| **FR-04** Thêm sản phẩm vào giỏ | US-04 | AD-01, CD-01 (`OrderItem`) | WEB-CART |
-| **FR-05** Cập nhật giỏ hàng | US-05 | AD-01, CD-01 (`OrderItem`) | WEB-CART |
-| **FR-06** Xóa sản phẩm khỏi giỏ | US-06 | AD-01, CD-01 (`OrderItem`) | WEB-CART |
-| **FR-07** Kiểm tra giỏ trước khi đặt | US-07 (tiền điều kiện), UC-01 | AD-01, SD-01 | WEB-CART, WEB-CHECKOUT, API-PRODUCT, API-ORDER, DB-PRODUCT |
-| **FR-08** Nhập thông tin nhận đơn | US-07, UC-01 | AD-01, SD-01 | WEB-CHECKOUT, API-ORDER |
-| **FR-09** Xem lại thông tin đơn | US-07, UC-01 | AD-01, SD-01, CD-01 (`Order`, `OrderItem`) | WEB-CHECKOUT, API-ORDER, DB-ORDER |
-| **FR-10** Tạo đơn hàng | US-08, UC-01 | AD-01, SD-01, CD-01 (`Order`, `OrderItem`) | WEB-CHECKOUT, API-ORDER, DB-ORDER, DB-PRODUCT |
-| **FR-11** Theo dõi trạng thái đơn | US-09 | AD-01, SD-01, SM-01, CD-01 (`Order`) | WEB-ORDER, API-ORDER, DB-ORDER |
-| **FR-12** Cập nhật trạng thái đơn | US-10 | AD-01, SM-01, CD-01 (`Order`, `User`) | API-ORDER-STATUS, API-AUTH, DB-ORDER, DB-USER |
-| **FR-13** Xem lịch sử đơn hàng | US-14 | CD-01 (`User`, `Order`) | WEB-ORDER, API-ORDER, API-AUTH, DB-ORDER, DB-USER |
-| **FR-14** Đăng ký tài khoản | US-13 | CD-01 (`User`) | WEB-AUTH, API-AUTH, DB-USER |
-| **FR-15** Đăng nhập tài khoản | US-13 | SD-01 (xác thực khi checkout), CD-01 (`User`) | WEB-AUTH, API-AUTH, DB-USER |
-| **FR-16** Đăng xuất tài khoản | US-13 | CD-01 (`User`) | WEB-AUTH |
-| **FR-17** Xác thực truy cập bằng JWT | UC-01 (bước xác thực) | SD-01, CD-01 (`User`) | API-AUTH |
-| **FR-18** Chọn phương thức thanh toán | US-11, UC-01 | AD-01, SD-01, CD-01 (`Payment`) | WEB-CHECKOUT, API-PAYMENT |
-| **FR-19** Xử lý thanh toán mô phỏng | US-12, UC-01 | SD-01, CD-01 (`Payment`, `Order`) | API-PAYMENT, PAY-SEPAY, DB-PAYMENT |
-| **FR-20** Xác nhận kết quả thanh toán | US-12, UC-01 | SD-01, CD-01 (`Payment`, `Order`) | PAY-SEPAY, API-PAYMENT, DB-PAYMENT, DB-ORDER |
-| **FR-21** Ngăn chặn thanh toán trùng lặp | US-12, UC-01 | SD-01, CD-01 (`Payment`) | API-PAYMENT, DB-PAYMENT |
+Bảng ma trận truy vết tuân thủ định dạng chuẩn 5 cột theo quy định tại **Mục 8.1 (Assignment 2)**:
+
+| Mã yêu cầu | Use-case / User Story | Thiết kế / Sơ đồ | Mã nguồn / API (Code) | Ca kiểm thử (Test ID) |
+|---|---|---|---|---|
+| **FR-01** Xem menu sản phẩm | US-01 | AD-01, CD-01 (`Product`) | `GET /products`<br>`apps/web/src/components/menu/ProductGrid.tsx`<br>`apps/api/src/products/products.controller.ts` | `E2E-PROD-01`<br>`E2E-PROD-02`<br>`UT-PROD-01`<br>`UT-WEB-01` -> `05` |
+| **FR-02** Xem chi tiết sản phẩm | US-02 | AD-01, CD-01 (`Product`) | `GET /products/:id`<br>Modal chi tiết trong `ProductGrid.tsx`<br>`apps/api/src/products/products.controller.ts` | `E2E-PROD-05`<br>`E2E-PROD-06`<br>`UT-PROD-02` |
+| **FR-03** Chọn size và topping | US-03 | AD-01, CD-01 (`Product`, `OrderItem`) | *Sprint 2:* `ProductCustomizerModal.tsx`, `API-PRODUCT` | *Sprint 2:* `INT-PROD-03` |
+| **FR-04** Thêm sản phẩm vào giỏ | US-04 | AD-01, CD-01 (`OrderItem`) | *Sprint 2:* `useCart.ts`, `CartDrawer.tsx` | *Sprint 2:* `UT-CART-01` |
+| **FR-05** Cập nhật giỏ hàng | US-05 | AD-01, CD-01 (`OrderItem`) | *Sprint 2:* `useCart.ts` (`updateQuantity`) | *Sprint 2:* `UT-CART-02` |
+| **FR-06** Xóa sản phẩm khỏi giỏ | US-06 | AD-01, CD-01 (`OrderItem`) | *Sprint 2:* `useCart.ts` (`removeItem`) | *Sprint 2:* `UT-CART-03` |
+| **FR-07** Kiểm tra giỏ trước khi đặt | US-07 (tiền điều kiện), UC-01 | AD-01, SD-01 | *Sprint 2:* `CheckoutPage.tsx`, `POST /orders/validate` | *Sprint 2:* `INT-ORD-01` |
+| **FR-08** Nhập thông tin nhận đơn | US-07, UC-01 | AD-01, SD-01 | *Sprint 2:* `OrderForm.tsx`, `POST /orders` | *Sprint 2:* `INT-ORD-02` |
+| **FR-09** Xem lại thông tin đơn | US-07, UC-01 | AD-01, SD-01, CD-01 (`Order`, `OrderItem`) | *Sprint 2:* `OrderReview.tsx`, `GET /orders/:id/summary` | *Sprint 2:* `INT-ORD-03` |
+| **FR-10** Tạo đơn hàng | US-08, UC-01 | AD-01, SD-01, CD-01 (`Order`, `OrderItem`) | *Sprint 2:* `POST /orders`, `OrdersService.create` | *Sprint 2:* `E2E-ORD-01`, `INT-ORD-04` |
+| **FR-11** Theo dõi trạng thái đơn | US-09 | AD-01, SD-01, SM-01, CD-01 (`Order`) | *Sprint 2:* `GET /orders/:id/status`, `OrderStatus.tsx` | *Sprint 2:* `E2E-ORD-02` |
+| **FR-12** Cập nhật trạng thái đơn | US-10 | AD-01, SM-01, CD-01 (`Order`, `User`) | *Sprint 2:* `PATCH /orders/:id/status` (Admin/Barista) | *Sprint 2:* `INT-ORD-05` |
+| **FR-13** Xem lịch sử đơn hàng | US-14 | CD-01 (`User`, `Order`) | *Sprint 2:* `GET /orders/history`, `OrderHistory.tsx` | *Sprint 2:* `INT-ORD-06` |
+| **FR-14** Đăng ký tài khoản | US-13 | CD-01 (`User`) | *Sprint 2:* `POST /auth/register`, `RegisterForm.tsx` | *Sprint 2:* `E2E-AUTH-01` |
+| **FR-15** Đăng nhập tài khoản | US-13 | SD-01, CD-01 (`User`) | *Sprint 2:* `POST /auth/login`, `LoginForm.tsx` | *Sprint 2:* `E2E-AUTH-02` |
+| **FR-16** Đăng xuất tài khoản | US-13 | CD-01 (`User`) | *Sprint 2:* Client token removal, `AuthService.logout` | *Sprint 2:* `UT-AUTH-03` |
+| **FR-17** Xác thực truy cập bằng JWT | UC-01 (xác thực) | SD-01, CD-01 (`User`) | *Sprint 2:* `JwtAuthGuard`, `JwtStrategy` | *Sprint 2:* `INT-AUTH-01` |
+| **FR-18** Chọn phương thức thanh toán | US-11, UC-01 | AD-01, SD-01, CD-01 (`Payment`) | *Sprint 2:* `PaymentMethodSelector.tsx` | *Sprint 2:* `UT-PAY-01` |
+| **FR-19** Xử lý thanh toán mô phỏng | US-12, UC-01 | SD-01, CD-01 (`Payment`, `Order`) | *Sprint 2:* `POST /payments/sepay/checkout`, SePay Gateway | *Sprint 2:* `INT-PAY-01` |
+| **FR-20** Xác nhận kết quả thanh toán | US-12, UC-01 | SD-01, CD-01 (`Payment`, `Order`) | *Sprint 2:* `POST /payments/sepay/webhook-ipn` | *Sprint 2:* `INT-PAY-02` |
+| **FR-21** Ngăn chặn thanh toán trùng lặp | US-12, UC-01 | SD-01, CD-01 (`Payment`) | *Sprint 2:* Idempotency Key Guard, `PaymentsService` | *Sprint 2:* `INT-PAY-03` |
+| **NFR-HEALTH** Giám sát trạng thái hệ thống | Tiêu chí Sprint 1 | CD-01, Deployment Diagram | `GET /health`<br>`apps/api/src/health/health.controller.ts` | `E2E-HEALTH-01`<br>`E2E-HEALTH-02`<br>`UT-HEALTH-01` |
 
 ## Ghi chú truy vết
 
