@@ -20,6 +20,7 @@ describe('PaymentsService', () => {
   };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentsService,
