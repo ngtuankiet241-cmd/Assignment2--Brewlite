@@ -65,3 +65,4 @@ describe('Cart Business Logic Specifications (Sprint 2 MVP)', () => {
     assert.equal(getCartItemUnitPrice(discountedItem), 0);
   });
 });
+

@@ -93,3 +93,4 @@ describe('Orders & Checkout Flow (E2E)', () => {
     expect(statusRes.body.status).toEqual('PAID');
   });
 });
+
