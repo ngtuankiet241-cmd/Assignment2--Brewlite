@@ -11,6 +11,7 @@ import {
 import type { AddCartItemInput, CartItem, Topping } from '@/types/cart';
 import { getCartItemUnitPrice } from '@/types/cart';
 import { CartContext, type CartContextValue } from './CartStore';
+import FloatingCartButton from '@/components/cart/FloatingCartButton';
 
 const CART_STORAGE_KEY = 'brewlite-cart-v1';
 
@@ -98,7 +99,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [storageError, setStorageError] = useState<string | null>(null);
+  const [showAddedNotification, setShowAddedNotification] = useState(false);
+  const notificationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const itemsRef = useRef(items);
+
+  useEffect(() => () => {
+    if (notificationTimer.current !== null) {
+      clearTimeout(notificationTimer.current);
+    }
+  }, []);
+
+  const notifyItemAdded = useCallback(() => {
+    if (notificationTimer.current !== null) {
+      clearTimeout(notificationTimer.current);
+    }
+    setShowAddedNotification(true);
+    notificationTimer.current = setTimeout(() => {
+      setShowAddedNotification(false);
+      notificationTimer.current = null;
+    }, 2500);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -158,6 +178,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
     if (matchingIndex < 0) {
       commitItems([...currentItems, newItem]);
+      notifyItemAdded();
       return;
     }
 
@@ -172,7 +193,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       ),
     };
     commitItems(nextItems);
-  }, [commitItems]);
+    if (nextItems[matchingIndex].quantity > matchingItem.quantity) {
+      notifyItemAdded();
+    }
+  }, [commitItems, notifyItemAdded]);
 
   const updateQuantity = useCallback((itemId: string, quantity: number) => {
     commitItems(
@@ -220,5 +244,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     updateQuantity,
   ]);
 
-  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+  return (
+    <CartContext.Provider value={value}>
+      {children}
+      <FloatingCartButton showAddedNotification={showAddedNotification} />
+    </CartContext.Provider>
+  );
 }
