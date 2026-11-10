@@ -14,12 +14,6 @@ interface BackendProduct {
   stock: number;
 }
 
-interface BackendResponse {
-  success: boolean;
-  message: string;
-  data: BackendProduct[];
-}
-
 export function detectCategory(name: string): {
   category: ProductCategory;
   categoryName: string;
@@ -134,21 +128,41 @@ export function useProducts() {
           throw new Error(`Máy chủ phản hồi lỗi HTTP ${res.status}: ${res.statusText || 'Yêu cầu không thành công'}`);
         }
 
-        const resJson: BackendResponse = await res.json();
+        const resJson: unknown = await res.json();
 
-        if (!resJson || !Array.isArray(resJson.data)) {
-          throw new Error('Dữ liệu phản hồi từ Backend không đúng cấu trúc { success, data: [] }');
+        const rawList: BackendProduct[] = Array.isArray(resJson)
+          ? (resJson as BackendProduct[])
+          : Array.isArray((resJson as Record<string, unknown>)?.data)
+            ? ((resJson as Record<string, unknown>).data as BackendProduct[])
+            : [];
+
+        if (rawList.length === 0 && !Array.isArray(resJson) && !Array.isArray((resJson as Record<string, unknown>)?.data)) {
+          throw new Error('Dữ liệu phản hồi từ Backend không đúng cấu trúc sản phẩm');
         }
 
         // Map dữ liệu từ Backend sang model hiển thị Product của Frontend
-        const mappedProducts: Product[] = resJson.data.map((item: BackendProduct, index: number) => {
+        const mappedProducts: Product[] = rawList.map((item: BackendProduct, index: number) => {
           const { category, categoryName } = detectCategory(item.name);
+          const hasValidImage =
+            typeof item.imageUrl === 'string' &&
+            (item.imageUrl.startsWith('http://') ||
+              item.imageUrl.startsWith('https://') ||
+              item.imageUrl.startsWith('/'));
+
+          const safeImageUrl = hasValidImage
+            ? item.imageUrl
+            : category === 'tea'
+              ? '/images/products/tra-dao.svg'
+              : category === 'espresso'
+                ? '/images/products/americano.svg'
+                : '/images/products/ca-phe-sua.svg';
+
           return {
             id: String(item.id),
             name: item.name,
             description: item.description,
             price: Number(item.price) || 0,
-            imageUrl: item.imageUrl || '/images/products/placeholder.svg',
+            imageUrl: safeImageUrl,
             category,
             categoryName,
             isAvailable: typeof item.stock === 'number' ? item.stock > 0 : true,

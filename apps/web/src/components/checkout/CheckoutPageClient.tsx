@@ -98,6 +98,10 @@ export default function CheckoutPageClient() {
               className="inline-flex min-h-11 items-center justify-center rounded-full bg-coffee-800 px-6 text-sm font-bold text-white transition hover:bg-coffee-700"
               href="/menu"
             >
+
+
+
+
               Tiếp tục đặt món
             </Link>
           </div>
@@ -434,7 +438,7 @@ export default function CheckoutPageClient() {
         {/* Cột phải: Xem lại giỏ hàng & nút đặt */}
         <aside aria-label="Xem lại đơn hàng" className="h-fit space-y-4 rounded-2xl border border-coffee-200/80 bg-white p-5 shadow-2xs">
           <h2 className="text-base font-bold text-coffee-950">Món đã chọn ({itemCount} ly)</h2>
-          
+
           <div className="max-h-64 divide-y divide-coffee-100 overflow-y-auto pr-1 text-sm">
             {items.map((item) => {
               const unitPrice = getCartItemUnitPrice(item);
