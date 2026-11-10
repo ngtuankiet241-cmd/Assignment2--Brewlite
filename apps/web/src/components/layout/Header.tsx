@@ -2,13 +2,16 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useCart } from '@/context/useCart';
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { itemCount } = useCart();
 
   const navLinks = [
     { href: '/', label: 'Trang chủ' },
     { href: '/menu', label: 'Thực đơn' },
+    { href: '/cart', label: `Giỏ hàng${itemCount > 0 ? ` (${itemCount})` : ''}` },
     { href: '/#about', label: 'Về BrewLite' },
   ];
 
@@ -57,6 +60,22 @@ export default function Header() {
 
         {/* Right Action: Desktop & Mobile */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <Link
+            aria-label={`Giỏ hàng, ${itemCount} sản phẩm`}
+            className="relative inline-flex h-9 items-center gap-1.5 rounded-full border border-coffee-200 bg-white px-3 text-xs font-semibold text-coffee-900 transition hover:bg-coffee-50"
+            href="/cart"
+          >
+            <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 3h2l2.2 11.2a2 2 0 002 1.6h8.7a2 2 0 002-1.6L21 7H6M10 21h.01M18 21h.01" />
+            </svg>
+            <span>Giỏ</span>
+            {itemCount > 0 && (
+              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-coffee-800 px-1.5 py-0.5 text-[10px] text-white">
+                {itemCount}
+              </span>
+            )}
+          </Link>
+
           <span className="hidden lg:inline-flex items-center gap-1.5 rounded-full bg-coffee-50 px-3 py-1 text-xs font-semibold text-coffee-700 border border-coffee-200">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             100% Cashless

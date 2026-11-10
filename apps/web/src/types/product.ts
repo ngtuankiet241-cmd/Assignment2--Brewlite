@@ -3,7 +3,13 @@
  * Designed for easy mapping to NestJS API DTOs/Entities in subsequent sprints.
  */
 
-export type ProductCategory = 'traditional' | 'espresso' | 'tea' | 'specialty';
+export type ProductCategory =
+  | 'traditional'
+  | 'espresso'
+  | 'milk-tea'
+  | 'tea'
+  | 'blended'
+  | 'specialty';
 
 export interface Product {
   id: string;
