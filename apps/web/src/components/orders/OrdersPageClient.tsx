@@ -104,11 +104,15 @@ export default function OrdersPageClient() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
-      setIsLoggedIn(false);
-      setLoading(false);
+      setTimeout(() => {
+        setLoading(false);
+      }, 0);
       return;
     }
-    setIsLoggedIn(true);
+
+    setTimeout(() => {
+      setIsLoggedIn(true);
+    }, 0);
 
     fetch(`${apiUrl}/orders/history`, {
       headers: {

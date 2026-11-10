@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useCart } from '@/context/useCart';
 import { getCartItemUnitPrice } from '@/types/cart';
@@ -172,8 +171,9 @@ export default function CheckoutPageClient() {
                   }
                   clearCart();
                   setIsPaid(true);
-                } catch (e: any) {
-                  setError(e.message || 'Mô phỏng thanh toán thất bại');
+                } catch (e: unknown) {
+                  const error = e as Error;
+                  setError(error.message || 'Mô phỏng thanh toán thất bại');
                 } finally {
                   setSimulatingPayment(false);
                 }
@@ -293,8 +293,9 @@ export default function CheckoutPageClient() {
       // Nếu thanh toán tiền mặt tại quầy
       clearCart();
       setIsPaid(true);
-    } catch (err: any) {
-      setError(err.message || 'Không thể tạo đơn hàng. Vui lòng thử lại.');
+    } catch (err: unknown) {
+      const error = err as Error;
+      setError(error.message || 'Không thể tạo đơn hàng. Vui lòng thử lại.');
     } finally {
       setSubmitting(false);
     }
