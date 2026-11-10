@@ -244,12 +244,12 @@
             & ThS. Từ Lãng Phiêu\\[8pt]
         \textbf{Sinh viên thực hiện:}
             & \begin{tabular}[t]{@{}lll@{}}
-                Kiệt & (Nhóm trưởng) & -- MSSV \\
-                Luân & (Thành viên)  & -- MSSV \\
-                Hùng & (Thành viên)  & -- MSSV \\
-                Triệu & (Thành viên) & -- MSSV \\
-                Lượng & (Thành viên) & -- MSSV \\
-                Kha & (Thành viên)   & -- MSSV \\
+                Kiệt & (Nhóm trưởng) & -- 3124410175 \\
+                Luân & (Thành viên)  & -- 3124410204 \\
+                Hùng & (Thành viên)  & -- 3124410107 \\
+                Triệu & (Thành viên) & -- 3124410376 \\
+                Lượng & (Thành viên) & -- 3124410207 \\
+                Kha & (Thành viên)   & -- 3124410136 \\
               \end{tabular}
     \end{tabular}\par
 
@@ -1672,27 +1672,35 @@ Nhánh \texttt{main} được cấu hình chính sách \textbf{Branch Protection
 \end{itemize}
 
 \noindent\textbf{Minh chứng 1 -- Pipeline phát hiện lỗi (Quality Gate Blocked -- Status: Failed):}
-Khi một thành viên tạo Pull Request chứa mã nguồn lỗi (ví dụ cố tình sửa test kiểm tra giá tiền hoặc vi phạm kiểu TypeScript), GitHub Actions tự động dừng ở bước \texttt{Run Unit Tests} hoặc \texttt{Run Linter}, đánh dấu trạng thái đỏ (Failed) và khóa chức năng Merge của Pull Request:
+Khi một thành viên tạo Pull Request chứa mã nguồn lỗi (Pull Request \#6 mở bởi thành viên Kiệt), hệ thống GitHub Actions tự động kích hoạt kiểm định Quality Gate và phát hiện lỗi tại bước \texttt{Frontend Web CI} (Process completed with exit code 1), lập tức đánh dấu trạng thái đỏ (Failed) và khóa chức năng Merge của Pull Request nhằm bảo vệ an toàn cho nhánh \texttt{main}:
+
+\begin{figure}[H]
+    \centering
+    \reportimage[width=0.95\linewidth]{assets/ci-quality-gate-fail-pr6.png}
+    \caption{Minh chứng CI phát hiện lỗi và kích hoạt cơ chế Quality Gate chặn Pull Request \#6}
+    \label{fig:ci-fail}
+\end{figure}
+
 \begin{verbatim}
-FAIL src/products/products.service.spec.ts
-  ● ProductsService › should return available products
-    Expected: [{"description": "Milk coffee", "id": "p1", "price": 35000, ...}]
-    Received: [{"description": "Milk coffee", "id": "p1", "price": 99999, ...}]
-Error: Process completed with exit code 1.
->> Pull request merge blocked: "Required status check 'backend-ci' has failed".
+FAIL apps/web (Frontend Web CI)
+  ● Process completed with exit code 1.
+>> Pull request merge blocked: "Required status check 'frontend-ci' has failed".
 \end{verbatim}
 
 \noindent\textbf{Minh chứng 2 -- Pipeline thành công (Quality Gate Passed -- Status: Success):}
-Sau khi thành viên khắc phục lỗi mã nguồn và đẩy commit cập nhật, toàn bộ các job được kích hoạt lại và hoàn thành xuất sắc trong thời gian dưới 1 phút:
+Sau khi thành viên rà soát lỗi theo thông báo từ CI log, khắc phục mã nguồn và đồng bộ lại (\textit{synchronize}) Pull Request \#6, toàn bộ các job kiểm định (\texttt{Backend API CI} và \texttt{Frontend Web CI}) đều hoàn thành xuất sắc trong thời gian 34 giây, kích hoạt trạng thái xanh (Passed) cho phép hợp nhất an toàn vào nhánh \texttt{main}:
+
+\begin{figure}[H]
+    \centering
+    \reportimage[width=0.95\linewidth]{assets/ci-quality-gate-pass-pr6.png}
+    \caption{Minh chứng CI kiểm định thành công sau khi sửa lỗi trên Pull Request \#6 (Quality Gate Passed)}
+    \label{fig:ci-pass}
+\end{figure}
+
 \begin{verbatim}
-✓ Checkout repository (actions/checkout@v4) - 2s
-✓ Setup Node.js 20 (actions/setup-node@v4) - 3s
-✓ 1. Install dependencies (npm ci) - 12s
-✓ Generate Prisma Client (npm run prisma:generate) - 4s
-✓ 2. Run Linter & Type-check (npm run lint) - 5s
-✓ 3. Run Unit Tests (npm test -- --runInBand) - 6s
-✓ 4. Build Application (npm run build) - 8s
-Status: All checks have passed (2 successful checks)
+✓ Backend API CI (Install, Lint, Test, Build) - 31s
+✓ Frontend Web CI (Install, Lint, Test, Build) - 24s
+Status: All checks have passed (Success - Total duration: 34s)
 \end{verbatim}
 
 \noindent\textbf{Liên kết tham chiếu kho mã nguồn và CI:}
@@ -1838,6 +1846,13 @@ Pipeline tuân thủ nghiêm ngặt chuỗi tiến trình 7 bước tuần tự:
     \item \textbf{Cơ chế dừng pipeline và phục hồi khẩn cấp (Rollback on Failure):}
     Nếu bước triển khai hoặc bước Smoke Test thất bại, Job \texttt{rollback-on-failure} sẽ được kích hoạt tức thời nhờ điều kiện \texttt{if: failure()}. Hệ thống gửi cảnh báo lỗi nghiêm trọng về trung tâm thông báo, dừng việc định tuyến lưu lượng và tự động kích hoạt webhook rollback đưa ứng dụng về phiên bản ổn định liền trước.
 \end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \reportimage[width=0.95\linewidth]{assets/cd-pipeline-full-success.png}
+    \caption{Minh chứng toàn bộ 7 giai đoạn của CD Pipeline GitHub Actions thực thi thành công hoàn chỉnh (Merge PR \#9)}
+    \label{fig:cd-success}
+\end{figure}
 
 \subsection{Task 5.4 – Triển khai và bàn giao}
 

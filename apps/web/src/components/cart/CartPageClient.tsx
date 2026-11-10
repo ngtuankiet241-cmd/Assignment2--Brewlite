@@ -168,14 +168,12 @@ export default function CartPageClient() {
                 {formatCurrencyVND(subtotal)}
               </span>
             </div>
-            <button
-              className="mt-5 min-h-12 w-full cursor-not-allowed rounded-full bg-coffee-200 px-4 text-sm font-bold text-coffee-600"
-              disabled
-              title="Thanh toán sẽ được triển khai ở bước tiếp theo."
-              type="button"
+            <Link
+              className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-coffee-800 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-coffee-700 active:scale-[0.98]"
+              href="/checkout"
             >
-              Thanh toán (sắp ra mắt)
-            </button>
+              Tiến hành đặt hàng →
+            </Link>
             <p className="mt-3 text-center text-[10px] leading-relaxed text-coffee-500">
               Giỏ hàng được lưu trên thiết bị này. Phí và thanh toán sẽ được xác nhận ở bước đặt hàng.
             </p>

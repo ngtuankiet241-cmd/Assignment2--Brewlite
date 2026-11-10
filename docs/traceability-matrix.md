@@ -46,10 +46,10 @@ Bảng ma trận truy vết tuân thủ định dạng chuẩn 5 cột theo quy 
 | **FR-04** Thêm sản phẩm vào giỏ | US-04 | AD-01, CD-01 (`OrderItem`) | *Sprint 2:* `useCart.ts`, `CartDrawer.tsx` | *Sprint 2:* `UT-CART-01` |
 | **FR-05** Cập nhật giỏ hàng | US-05 | AD-01, CD-01 (`OrderItem`) | *Sprint 2:* `useCart.ts` (`updateQuantity`) | *Sprint 2:* `UT-CART-02` |
 | **FR-06** Xóa sản phẩm khỏi giỏ | US-06 | AD-01, CD-01 (`OrderItem`) | *Sprint 2:* `useCart.ts` (`removeItem`) | *Sprint 2:* `UT-CART-03` |
-| **FR-07** Kiểm tra giỏ trước khi đặt | US-07 (tiền điều kiện), UC-01 | AD-01, SD-01 | *Sprint 2:* `CheckoutPage.tsx`, `POST /orders/validate` | *Sprint 2:* `INT-ORD-01` |
-| **FR-08** Nhập thông tin nhận đơn | US-07, UC-01 | AD-01, SD-01 | *Sprint 2:* `OrderForm.tsx`, `POST /orders` | *Sprint 2:* `INT-ORD-02` |
-| **FR-09** Xem lại thông tin đơn | US-07, UC-01 | AD-01, SD-01, CD-01 (`Order`, `OrderItem`) | *Sprint 2:* `OrderReview.tsx`, `GET /orders/:id/summary` | *Sprint 2:* `INT-ORD-03` |
-| **FR-10** Tạo đơn hàng | US-08, UC-01 | AD-01, SD-01, CD-01 (`Order`, `OrderItem`) | *Sprint 2:* `POST /orders`, `OrdersService.create` | *Sprint 2:* `E2E-ORD-01`, `INT-ORD-04` |
+| **FR-07** Kiểm tra giỏ trước khi đặt | US-07 (tiền điều kiện), UC-01 | AD-01, SD-01 | `apps/web/src/components/checkout/CheckoutPageClient.tsx`<br>`apps/web/src/app/checkout/page.tsx` | `UT-CART-01` -> `04` |
+| **FR-08** Nhập thông tin nhận đơn | US-07, UC-01 | AD-01, SD-01 | `apps/web/src/components/checkout/CheckoutPageClient.tsx` (Form thông tin khách hàng, bàn) | `UT-CART-04` |
+| **FR-09** Xem lại thông tin đơn | US-07, UC-01 | AD-01, SD-01, CD-01 (`Order`, `OrderItem`) | `apps/web/src/components/checkout/CheckoutPageClient.tsx` (Tóm tắt đơn hàng, size, topping) | `UT-CART-01` -> `04` |
+| **FR-10** Tạo đơn hàng | US-08, UC-01 | AD-01, SD-01, CD-01 (`Order`, `OrderItem`) | `POST /orders`<br>`apps/api/src/orders/orders.controller.ts`<br>`apps/web/src/components/checkout/CheckoutPageClient.tsx` | `INT-ORD-01`<br>`UT-ORD-01` |
 | **FR-11** Theo dõi trạng thái đơn | US-09 | AD-01, SD-01, SM-01, CD-01 (`Order`) | *Sprint 2:* `GET /orders/:id/status`, `OrderStatus.tsx` | *Sprint 2:* `E2E-ORD-02` |
 | **FR-12** Cập nhật trạng thái đơn | US-10 | AD-01, SM-01, CD-01 (`Order`, `User`) | *Sprint 2:* `PATCH /orders/:id/status` (Admin/Barista) | *Sprint 2:* `INT-ORD-05` |
 | **FR-13** Xem lịch sử đơn hàng | US-14 | CD-01 (`User`, `Order`) | *Sprint 2:* `GET /orders/history`, `OrderHistory.tsx` | *Sprint 2:* `INT-ORD-06` |
@@ -57,7 +57,7 @@ Bảng ma trận truy vết tuân thủ định dạng chuẩn 5 cột theo quy 
 | **FR-15** Đăng nhập tài khoản | US-13 | SD-01, CD-01 (`User`) | `POST /auth/login`<br>`apps/api/src/auth/auth.service.ts` | `UT-AUTH-02`<br>`UT-AUTH-03` |
 | **FR-16** Đăng xuất tài khoản | US-13 | CD-01 (`User`) | Phía Client xóa token xác thực | `UT-AUTH-03` |
 | **FR-17** Xác thực truy cập bằng JWT | UC-01 (xác thực) | SD-01, CD-01 (`User`) | `JwtAuthGuard`, `AuthService.verifyToken`<br>`apps/api/src/common/guards/jwt-auth.guard.ts` | `UT-AUTH-02` |
-| **FR-18** Chọn phương thức thanh toán | US-11, UC-01 | AD-01, SD-01, CD-01 (`Payment`) | *Sprint 2:* `PaymentMethodSelector.tsx` | *Sprint 2:* `UT-PAY-01` |
+| **FR-18** Chọn phương thức thanh toán | US-11, UC-01 | AD-01, SD-01, CD-01 (`Payment`) | `POST /payments/sepay/checkout`<br>`apps/web/src/components/checkout/CheckoutPageClient.tsx` (QR/Tiền mặt) | `UT-PAY-01` -> `03` |
 | **FR-19** Xử lý thanh toán mô phỏng | US-12, UC-01 | SD-01, CD-01 (`Payment`, `Order`) | *Sprint 2:* `POST /payments/sepay/checkout`, SePay Gateway | *Sprint 2:* `INT-PAY-01` |
 | **FR-20** Xác nhận kết quả thanh toán | US-12, UC-01 | SD-01, CD-01 (`Payment`, `Order`) | *Sprint 2:* `POST /payments/sepay/webhook-ipn` | *Sprint 2:* `INT-PAY-02` |
 | **FR-21** Ngăn chặn thanh toán trùng lặp | US-12, UC-01 | SD-01, CD-01 (`Payment`) | *Sprint 2:* Idempotency Key Guard, `PaymentsService` | *Sprint 2:* `INT-PAY-03` |

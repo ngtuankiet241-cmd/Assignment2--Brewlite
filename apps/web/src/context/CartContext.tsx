@@ -218,6 +218,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     commitItems(itemsRef.current.filter((item) => item.id !== itemId));
   }, [commitItems]);
 
+  const clearCart = useCallback(() => {
+    commitItems([]);
+  }, [commitItems]);
+
   const value = useMemo<CartContextValue>(() => {
     const itemCount = items.reduce((total, item) => total + item.quantity, 0);
     const subtotal = items.reduce(
@@ -234,9 +238,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       addItem,
       updateQuantity,
       removeItem,
+      clearCart,
     };
   }, [
     addItem,
+    clearCart,
     hydrated,
     items,
     removeItem,
