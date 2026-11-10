@@ -1,50 +1,32 @@
-# Multi-stage Dockerfile for NestJS API (Production-grade)
-# Stage 1: Build stage
-FROM node:20-alpine AS builder
+FROM node:22-bookworm-slim
 
 WORKDIR /app
 
-# Install build dependencies
-COPY package*.json ./
-COPY prisma ./prisma/
+# Cài thư viện hệ thống cần thiết cho Prisma và wget cho healthcheck
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl ca-certificates wget \
+    && rm -rf /var/lib/apt/lists/*
 
+# Cài dependencies
+COPY package*.json ./
 RUN npm ci
 
-# Generate Prisma Client
+# Sao chép source code
+COPY prisma ./prisma
+COPY tsconfig*.json nest-cli.json ./
+COPY src ./src
+
+# Tạo Prisma Client và build NestJS
 RUN npx prisma generate
-
-# Copy source code and build
-COPY . .
 RUN npm run build
-
-# Stage 2: Production runner stage
-FROM node:20-alpine AS runner
-
-WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3001
-
-# Create non-root system user for security
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nestjs
-
-# Copy package manifests and production dependencies
-COPY package*.json ./
-COPY prisma ./prisma/
-
-RUN npm ci --omit=dev && npx prisma generate
-
-# Copy built application from builder stage
-COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
-
-# Switch to non-root user
-USER nestjs
 
 EXPOSE 3001
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
 
-CMD ["node", "dist/main.js"]
-
+# Chạy ứng dụng đã build (hỗ trợ cả dist/src/main.js và dist/main.js)
+CMD ["sh", "-c", "if [ -f dist/src/main.js ]; then node dist/src/main.js; else node dist/main.js; fi"]
