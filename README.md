@@ -110,12 +110,34 @@ cp .env.example .env
 ```
 Chỉnh sửa `DATABASE_URL` và `JWT_SECRET` trong tệp `.env` cho phù hợp với máy của bạn.
 
-### 3. Khởi chạy bằng Docker Compose
-Khởi chạy toàn bộ dịch vụ (Database, Backend, Frontend) chỉ với một lệnh:
+### 3. Khởi chạy Dịch vụ Cục bộ
+
+#### Bước 3.1: Khởi động Cơ sở dữ liệu PostgreSQL
 ```bash
 docker compose up -d
 ```
+Cơ sở dữ liệu PostgreSQL 16 sẽ sẵn sàng tại cổng `5432`.
 
-- **Frontend Next.js:** `http://localhost:3000`
+#### Bước 3.2: Cài đặt và Chạy Backend NestJS (apps/api)
+```bash
+cd apps/api
+npm install
+npm run prisma:generate
+npm run prisma:seed
+npm run start:dev
+```
 - **Backend NestJS API:** `http://localhost:3001`
 - **Health Check Endpoint:** `http://localhost:3001/health`
+- **Chạy Unit Tests:** `npm test`
+- **Chạy E2E Tests:** `npm run test:e2e`
+
+#### Bước 3.3: Cài đặt và Chạy Frontend Next.js (apps/web)
+Mở một terminal mới:
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+- **Frontend Next.js:** `http://localhost:3000`
+- **Màn hình Thực đơn:** `http://localhost:3000/menu`
+- **Chạy Tests:** `npm test`

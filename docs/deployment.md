@@ -99,7 +99,7 @@ NEXT_PUBLIC_APP_NAME=BrewLite
 |---|---|---|
 | **Next.js PWA Client** | Vercel Edge / CDN | Thư mục `apps/web`, cấu hình `apps/web/next.config.mjs` |
 | **NestJS API Service** | Render Docker Container | Thư mục `apps/api`, `Dockerfile`, `apps/api/src/main.ts` |
-| **Health Check Endpoint** | API Container Route | `apps/api/src/common/controllers/health.controller.ts` |
+| **Health Check Endpoint** | API Container Route | `apps/api/src/health/health.controller.ts` |
 | **Database Connection & ORM** | Render Managed PostgreSQL | Schema `apps/api/prisma/schema.prisma`, `PrismaService` |
 | **Payment & IPN Webhook** | SePay Sandbox Integration | `apps/api/src/payments/payments.service.ts` |
 | **CI/CD Pipeline** | GitHub Actions | Kịch bản tự động hóa `.github/workflows/ci.yml` |

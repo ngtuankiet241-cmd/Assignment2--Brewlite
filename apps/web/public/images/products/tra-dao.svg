@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad6" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF8F0"/>
+      <stop offset="100%" stop-color="#FCE1CE"/>
+    </linearGradient>
+    <linearGradient id="teaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#C2410C"/>
+      <stop offset="50%" stop-color="#EA580C"/>
+      <stop offset="100%" stop-color="#F97316"/>
+    </linearGradient>
+    <linearGradient id="peachGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF08A"/>
+      <stop offset="60%" stop-color="#FBBF24"/>
+      <stop offset="100%" stop-color="#F87171"/>
+    </linearGradient>
+    <linearGradient id="glassReflection6" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.4"/>
+      <stop offset="15%" stop-color="#FFFFFF" stop-opacity="0.08"/>
+      <stop offset="85%" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.25"/>
+    </linearGradient>
+    <filter id="shadow6" x="-20%" y="-10%" width="140%" height="130%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#9A3412" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <rect width="400" height="400" rx="32" fill="url(#bgGrad6)"/>
+
+  <!-- Background decorative dots -->
+  <g opacity="0.1" fill="#EA580C">
+    <circle cx="85" cy="85" r="18"/>
+    <circle cx="330" cy="100" r="22"/>
+    <circle cx="70" cy="315" r="16"/>
+  </g>
+
+  <!-- Cup Base Shadow -->
+  <ellipse cx="200" cy="335" rx="65" ry="14" fill="#7C2D12" opacity="0.16"/>
+
+  <!-- Glass container -->
+  <g filter="url(#shadow6)">
+    <!-- Base Glass -->
+    <path d="M145,110 L158,310 Q160,325 200,325 Q240,325 242,310 L255,110 Z" fill="#FFFFFF" opacity="0.95"/>
+
+    <!-- Peach Tea Liquid Body -->
+    <path d="M147,132 L158,310 Q160,325 200,325 Q240,325 242,310 L253,132 Q200,140 147,132 Z" fill="url(#teaGrad)"/>
+
+    <!-- Peach Slice 1 (Submerged) -->
+    <path d="M165,220 C185,200 215,200 230,225 C215,245 180,240 165,220 Z" fill="url(#peachGrad)" opacity="0.9"/>
+    <!-- Peach Slice 2 (Upper) -->
+    <path d="M175,160 C195,145 220,150 235,170 C215,185 190,180 175,160 Z" fill="url(#peachGrad)" opacity="0.95"/>
+
+    <!-- Mint Leaves on top -->
+    <path d="M185,120 C170,110 175,95 190,105 C205,115 200,130 185,120 Z" fill="#15803D"/>
+    <path d="M195,115 C210,105 220,115 210,128 C200,135 190,125 195,115 Z" fill="#22C55E"/>
+
+    <!-- Clear Ice Cubes -->
+    <rect x="168" y="145" width="40" height="36" rx="8" transform="rotate(-12 168 145)" fill="#FFFFFF" opacity="0.45" stroke="#FFFFFF" stroke-width="1.8"/>
+    <rect x="200" y="185" width="36" height="34" rx="7" transform="rotate(14 200 185)" fill="#FFFFFF" opacity="0.38" stroke="#FFFFFF" stroke-width="1.8"/>
+
+    <!-- Glass Reflection Highlights -->
+    <path d="M145,110 L158,310 Q160,325 200,325 Q240,325 242,310 L255,110 Z" fill="url(#glassReflection6)"/>
+
+    <!-- Glass Rim -->
+    <ellipse cx="200" cy="112" rx="55" ry="12" fill="#FED7AA" stroke="#FFFFFF" stroke-width="3"/>
+    <ellipse cx="200" cy="112" rx="50" ry="9" fill="#9A3412"/>
+
+    <!-- Cheerful Peach Straw -->
+    <path d="M218,55 L208,135 L196,305" stroke="#E11D48" stroke-width="8" stroke-linecap="round" fill="none" opacity="0.9"/>
+  </g>
+</svg>
+

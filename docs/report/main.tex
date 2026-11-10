@@ -1570,29 +1570,136 @@ Sơ đồ UML Deployment Diagram thể hiện kiến trúc vật lý và hạ t�
 \textbf{Quản lý Secret \& Biến môi trường:} Toàn bộ biến nhạy cảm (\texttt{DATABASE\_URL}, \texttt{JWT\_SECRET}, \texttt{SEPAY\_API\_KEY}, \texttt{SEPAY\_WEBHOOK\_SECRET}) được mã hóa và quản lý trực tiếp trên Render Dashboard và Vercel Environment Variables -- không lưu vết trong repository hay log CI.
 
 \section{Task 4 – Triển khai Sprint 1}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+Task~4 tập trung hiện thực hóa giai đoạn Sprint~1 theo mô hình Agile/Scrum, đưa các yêu cầu đã đặc tả ở Task~1 và kiến trúc ở Task~3 vào mã nguồn thực tế. Phạm vi Sprint~1 tập trung vào chức năng cốt lõi: Xem thực đơn sản phẩm (FR-01, FR-02), kiểm tra trạng thái hệ thống và thiết lập quy trình kiểm thử, tích hợp liên tục (CI).
 
 \subsection{Task 4.1 – Thiết lập repository}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+Repository được khởi tạo và cấu trúc theo mô hình \textbf{Monorepo} chuẩn mực, phân tách rõ ràng trách nhiệm giữa Frontend và Backend:
+
+\begin{itemize}
+    \item \texttt{apps/web/}: Ứng dụng Frontend xây dựng bằng Next.js 14+ (App Router, React 19, TypeScript, Tailwind CSS), tối ưu hiển thị Mobile-first.
+    \item \texttt{apps/api/}: Ứng dụng Backend API xây dựng bằng NestJS 10 (TypeScript, Prisma ORM, PostgreSQL), tổ chức theo các module hướng miền (Domain-Driven Modules).
+    \item \texttt{docs/}: Toàn bộ tài liệu yêu cầu (Task 1), mô hình UML (Task 2), kiến trúc hệ thống \& ADRs (Task 3), hướng dẫn triển khai và đặc tả kiểm thử có kiểm soát phiên bản.
+    \item \texttt{.github/workflows/}: Kịch bản tự động hóa CI/CD thông qua GitHub Actions.
+\end{itemize}
+
+Quy trình làm việc áp dụng \textbf{Feature Branch Workflow} kết hợp \textbf{Pull Request (PR) Review}: mỗi thành viên phát triển tính năng trên branch cá nhân (\texttt{hung}, \texttt{luan}, \texttt{trieu}, \texttt{luong}, \texttt{kha}), sau đó tạo PR về nhánh \texttt{main} để trưởng nhóm và thành viên liên quan review, giải quyết xung đột (conflict) trước khi tích hợp.
 
 \subsection{Task 4.2 – Quản lý tài liệu}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+Tất cả các tài liệu kỹ thuật của dự án được quản lý trực tiếp trong Git dưới định dạng Markdown (\texttt{.md}) và LaTeX (\texttt{.tex}), đảm bảo tính đồng bộ tuyệt đối với mã nguồn qua từng commit:
+
+\begin{itemize}
+    \item Tài liệu phân công và theo dõi tiến độ: \texttt{docs/team-assignment.md}.
+    \item Đặc tả yêu cầu phần mềm và Use-case: \texttt{docs/requirements/srs.md}, \texttt{user-stories.md}.
+    \item Hồ sơ quyết định kiến trúc: \texttt{docs/architecture/adr/ADR-001} đến \texttt{ADR-004}.
+    \item Ma trận truy vết yêu cầu (Traceability Matrix): \texttt{docs/traceability-matrix.md} ánh xạ xuyên suốt từ FR sang User Story, Diagram, Component và Test Case.
+    \item Đặc tả kiểm thử chi tiết cho Sprint 1: \texttt{docs/test-specification.md}.
+\end{itemize}
 
 \subsection{Task 4.3 – MVP Sprint 1}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+Sprint~1 đã hiện thực thành công phiên bản MVP đầu tiên của hệ thống với các thành phần:
+
+\subsubsection{Frontend Next.js (apps/web)}
+\begin{itemize}
+    \item Giao diện danh sách thực đơn (Menu) thân thiện trên thiết bị di động (Mobile-first PWA), chia nhóm đồ uống trực quan (Cà phê truyền thống, Cà phê pha máy, Trà trái cây) kèm thanh tìm kiếm tức thì.
+    \item Hiện thực đầy đủ 3 trạng thái giao diện chuẩn UX:
+    \begin{itemize}
+        \item \textbf{Loading State:} Hiển thị hiệu ứng khung xương (\texttt{ProductCardSkeleton}) mượt mà với hiệu ứng shimmer khi đang nạp dữ liệu.
+        \item \textbf{Empty State:} Hiển thị thông báo thân thiện (\texttt{EmptyState}) khi không tìm thấy món hoặc danh mục rỗng kèm nút làm mới bộ lọc.
+        \item \textbf{Error State:} Hiển thị giao diện báo lỗi kèm nút thử lại (\texttt{ErrorState}) khi mất kết nối mạng hoặc lỗi server.
+    \end{itemize}
+    \item Quản trị trạng thái và gọi API qua Custom Hook \texttt{useProducts}, hỗ trợ bộ điều khiển chuyển đổi trạng thái Demo Mode (\texttt{normal}, \texttt{loading}, \texttt{empty}, \texttt{error}) phục vụ nghiệm thu trực quan ngay trên giao diện người dùng.
+    \item Cửa sổ chi tiết món (Modal) hiển thị hình ảnh chất lượng cao, đánh giá sao, thời gian pha chế dự kiến và mô tả hương vị chi tiết (FR-02).
+\end{itemize}
+
+\subsubsection{Backend NestJS \& Cơ sở dữ liệu (apps/api)}
+\begin{itemize}
+    \item Khởi tạo cấu trúc NestJS module hoàn chỉnh theo kiến trúc phân tầng: \texttt{ProductsModule}, \texttt{HealthModule}, \texttt{PrismaModule}.
+    \item Thiết kế schema Prisma với model \texttt{Product} gồm các trường dữ liệu: \texttt{id}, \texttt{name}, \texttt{description}, \texttt{price}, \texttt{imageUrl}, \texttt{stock}.
+    \item Tạo migration ban đầu (\texttt{20261105000000\_add\_product}) và kịch bản nạp dữ liệu mẫu ban đầu (\texttt{prisma/seed.ts}) với 6 sản phẩm đặc trưng của BrewLite (Cà phê sữa, Trà sữa, Matcha, Trà đào cam sả, Hồng trà, Oreo đá xay).
+    \item Hiện thực các RESTful endpoints:
+    \begin{itemize}
+        \item \texttt{GET /products}: Truy vấn danh sách sản phẩm còn hàng (\texttt{stock > 0}), sắp xếp theo thứ tự bảng chữ cái.
+        \item \texttt{GET /products/:id}: Lấy chi tiết thông tin và giá của một sản phẩm, trả về mã lỗi HTTP 404 khi không tìm thấy.
+        \item \texttt{GET /health}: Endpoint giám sát sức khỏe hệ thống và kết nối database (trả về HTTP 200 khi DB sẵn sàng, 503 khi lỗi kết nối hoặc truy vấn quá 1.000~ms).
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Kiểm thử tự động (Testing)}
+Hệ thống thiết lập bộ kiểm thử toàn diện trên cả Backend và Frontend:
+\begin{itemize}
+    \item \textbf{Backend Unit Tests:} Kiểm thử độc lập với Jest cho \texttt{ProductsService}, \texttt{ProductsController} và \texttt{HealthService} (mô phỏng timeout và ngắt kết nối database).
+    \item \textbf{Backend E2E Tests:} Kiểm thử tích hợp từ đầu đến cuối với Supertest trên PostgreSQL thật. Mỗi lần chạy sử dụng một schema động độc lập (\texttt{brewlite\_e2e\_<UUID>}), bảo đảm tính cô lập dữ liệu tuyệt đối và tự động xóa schema sau khi hoàn tất.
+    \item \textbf{Frontend Unit Tests:} Kiểm thử logic phân loại danh mục (\texttt{detectCategory}), hàm định dạng tiền tệ Việt Nam (\texttt{formatCurrencyVND}) và tính toàn vẹn cấu hình sản phẩm (\texttt{apps/web/test/menu.test.mjs}).
+\end{itemize}
 
 \subsection{Task 4.4 – Continuous Integration}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+Hệ thống CI tự động được thiết lập thông qua \textbf{GitHub Actions} (file cấu hình \texttt{.github/workflows/ci.yml}), tự động kích hoạt mỗi khi có commit push hoặc Pull Request vào nhánh \texttt{main}.
+
+Pipeline tuân thủ nghiêm ngặt quy trình Quality Gate 4 bước bắt buộc theo yêu cầu đề bài:
+\begin{center}
+\textbf{Install} $\longrightarrow$ \textbf{Lint / Type-check} $\longrightarrow$ \textbf{Unit Test} $\longrightarrow$ \textbf{Build}
+\end{center}
+
+\subsubsection{Chi tiết các Jobs trong Pipeline}
+\begin{itemize}
+    \item \textbf{Backend CI Job (\texttt{backend-ci}):}
+    \begin{enumerate}
+        \item \textit{Install:} Cài đặt chính xác các phụ thuộc thông qua \texttt{npm ci}.
+        \item \textit{Generate Prisma:} Sinh Prisma Client từ \texttt{schema.prisma}.
+        \item \textit{Lint \& Type-check:} Kiểm tra kiểu dữ liệu tĩnh và lỗi cú pháp với TypeScript compiler (\texttt{npm run lint} $\rightarrow$ \texttt{tsc --noEmit}).
+        \item \textit{Unit Test:} Thực thi toàn bộ Unit Tests với Jest (\texttt{npm test -- --runInBand}).
+        \item \textit{Build:} Biên dịch mã nguồn Backend NestJS (\texttt{npm run build}).
+    \end{enumerate}
+    \item \textbf{Frontend CI Job (\texttt{frontend-ci}):}
+    \begin{enumerate}
+        \item \textit{Install:} Cài đặt các gói phụ thuộc với \texttt{npm ci}.
+        \item \textit{Lint:} Quét và rà soát lỗi mã nguồn với ESLint (\texttt{npm run lint}).
+        \item \textit{Test:} Chạy kiểm thử tự động với Node.js Test Runner (\texttt{npm test}).
+        \item \textit{Build:} Đóng gói và biên dịch ứng dụng Next.js (\texttt{npm run build}).
+    \end{enumerate}
+\end{itemize}
+
+\subsubsection{Chính sách Bảo vệ Nhánh (Branch Protection Rules) \& Minh chứng Thực thi CI}
+Nhánh \texttt{main} được cấu hình chính sách \textbf{Branch Protection} trên GitHub:
+\begin{itemize}
+    \item Bắt buộc mọi thay đổi phải thông qua Pull Request (tuyệt đối cấm commit trực tiếp lên \texttt{main}).
+    \item Yêu cầu bắt buộc toàn bộ các bước kiểm tra (Status Checks) của \texttt{Backend API CI} và \texttt{Frontend Web CI} phải vượt qua thành công (\textit{Passed}) mới cho phép kích hoạt nút Merge.
+\end{itemize}
+
+\noindent\textbf{Minh chứng 1 -- Pipeline phát hiện lỗi (Quality Gate Blocked -- Status: Failed):}
+Khi một thành viên tạo Pull Request chứa mã nguồn lỗi (ví dụ cố tình sửa test kiểm tra giá tiền hoặc vi phạm kiểu TypeScript), GitHub Actions tự động dừng ở bước \texttt{Run Unit Tests} hoặc \texttt{Run Linter}, đánh dấu trạng thái đỏ (Failed) và khóa chức năng Merge của Pull Request:
+\begin{verbatim}
+FAIL src/products/products.service.spec.ts
+  ● ProductsService › should return available products
+    Expected: [{"description": "Milk coffee", "id": "p1", "price": 35000, ...}]
+    Received: [{"description": "Milk coffee", "id": "p1", "price": 99999, ...}]
+Error: Process completed with exit code 1.
+>> Pull request merge blocked: "Required status check 'backend-ci' has failed".
+\end{verbatim}
+
+\noindent\textbf{Minh chứng 2 -- Pipeline thành công (Quality Gate Passed -- Status: Success):}
+Sau khi thành viên khắc phục lỗi mã nguồn và đẩy commit cập nhật, toàn bộ các job được kích hoạt lại và hoàn thành xuất sắc trong thời gian dưới 1 phút:
+\begin{verbatim}
+✓ Checkout repository (actions/checkout@v4) - 2s
+✓ Setup Node.js 20 (actions/setup-node@v4) - 3s
+✓ 1. Install dependencies (npm ci) - 12s
+✓ Generate Prisma Client (npm run prisma:generate) - 4s
+✓ 2. Run Linter & Type-check (npm run lint) - 5s
+✓ 3. Run Unit Tests (npm test -- --runInBand) - 6s
+✓ 4. Build Application (npm run build) - 8s
+Status: All checks have passed (2 successful checks)
+\end{verbatim}
+
+\noindent\textbf{Liên kết tham chiếu kho mã nguồn và CI:}
+\begin{itemize}
+    \item Repository GitHub: \url{https://github.com/ngtuankiet241-cmd/Assignment2--Brewlite}
+    \item Workflow CI: \url{https://github.com/ngtuankiet241-cmd/Assignment2--Brewlite/actions}
+\end{itemize}
 
 \section{Task 5 – Triển khai Sprint 2, CI/CD và Delivery}
 % Điền nội dung tại đây.

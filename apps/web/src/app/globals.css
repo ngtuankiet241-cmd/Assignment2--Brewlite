@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fbf7f0;
+  --foreground: #20130a;
+
+  --coffee-50: #fdfaf6;
+  --coffee-100: #f6eee5;
+  --coffee-200: #eddccb;
+  --coffee-300: #dec1a7;
+  --coffee-400: #c79e7c;
+  --coffee-500: #af7c54;
+  --coffee-600: #8c5d39;
+  --coffee-700: #6f472b;
+  --coffee-800: #523420;
+  --coffee-900: #382315;
+  --coffee-950: #20130a;
+
+  --cream-50: #fffdfa;
+  --cream-100: #fbf7f0;
+  --cream-200: #f5ede0;
+  --cream-300: #ede0cd;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-coffee-50: var(--coffee-50);
+  --color-coffee-100: var(--coffee-100);
+  --color-coffee-200: var(--coffee-200);
+  --color-coffee-300: var(--coffee-300);
+  --color-coffee-400: var(--coffee-400);
+  --color-coffee-500: var(--coffee-500);
+  --color-coffee-600: var(--coffee-600);
+  --color-coffee-700: var(--coffee-700);
+  --color-coffee-800: var(--coffee-800);
+  --color-coffee-900: var(--coffee-900);
+  --color-coffee-950: var(--coffee-950);
+
+  --color-cream-50: var(--cream-50);
+  --color-cream-100: var(--cream-100);
+  --color-cream-200: var(--cream-200);
+  --color-cream-300: var(--cream-300);
+}
+
+html {
+  scroll-behavior: smooth;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* Hide scrollbar for mobile horizontal category tabs */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
