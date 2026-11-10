@@ -1445,7 +1445,7 @@ Sơ đồ Tuần tự đặc tả chi tiết sự tương tác theo trình tự 
 
 \subsection{Task 2.3 – Class diagram}
 
-Sơ đồ Lớp mô tả cấu trúc các đối tượng nghiệp vụ, thuộc tính, kiểu dữ liệu, phương thức và quan hệ trong hệ thống BrewLite theo mô hình miền (Domain Model).
+Sơ đồ Lớp mô tả cấu trúc các đối tượng nghiệp vụ, thuộc tính, kiểu dữ liệu, phương thức và quan hệ trong hệ thống BrewLite theo mô hình miền (Domain Model). Toàn bộ mã nguồn PlantUML của sơ đồ lớp được lưu trữ tại \texttt{docs/diagrams/class-diagram.puml}.
 
 \subsubsection{Sơ đồ lớp tổng quát}
 
@@ -1926,6 +1926,7 @@ Buổi họp Retrospective được chủ trì bởi Kiệt (Scrum Master / Team
 \begin{itemize}[leftmargin=10pt]
     \item Dịch vụ đám mây miễn phí trên Render có độ trễ khởi động nguội (\textit{cold-start}) khoảng 30--40 giây trong lần truy cập đầu tiên sau thời gian nhàn rỗi.
     \item Việc đồng bộ schema Prisma trong một số nhánh phát triển ban đầu gặp xung đột nhỏ do các thành viên tạo migration cùng lúc.
+    \item Trong Sprint 1, một số commit còn thiếu thành phần phạm vi (\textit{scope}) theo chuẩn Conventional Commits (ví dụ viết \texttt{feat: add ...} thay vì \texttt{feat(api): add ...}).
 \end{itemize} \\
 \hline
 \textbf{3. Bài học kinh nghiệm (Key Takeaways)} & \textbf{4. Kế hoạch hành động (Action Items)} \\
@@ -1937,6 +1938,7 @@ Buổi họp Retrospective được chủ trì bởi Kiệt (Scrum Master / Team
 \begin{itemize}[leftmargin=10pt]
     \item Thiết lập cronjob tự động "ping" định kỳ vào endpoint \texttt{GET /health} mỗi 10 phút để hạn chế tình trạng sleep của container Render miễn phí.
     \item Thống nhất quy ước chỉ duy nhất một thành viên phụ trách sinh migration Prisma chính thức trước khi merge vào \texttt{main}.
+    \item Thiết lập checklist kiểm tra nghiêm ngặt trước khi tạo Pull Request, cam kết chuẩn hóa 100\% cú pháp Conventional Commits (\texttt{<type>(<scope>): <mô tả>}) từ Sprint 2 trở đi.
 \end{itemize} \\
 \hline
 \end{tabularx}
