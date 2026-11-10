@@ -12,6 +12,8 @@ export default function Header() {
     { href: '/', label: 'Trang chủ' },
     { href: '/menu', label: 'Thực đơn' },
     { href: '/cart', label: `Giỏ hàng${itemCount > 0 ? ` (${itemCount})` : ''}` },
+    { href: '/orders', label: 'Đơn của tôi' },
+    { href: '/login', label: 'Đăng nhập' },
     { href: '/#about', label: 'Về BrewLite' },
   ];
 

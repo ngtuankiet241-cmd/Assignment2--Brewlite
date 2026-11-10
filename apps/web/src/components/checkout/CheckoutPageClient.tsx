@@ -251,10 +251,15 @@ export default function CheckoutPageClient() {
         }),
       };
 
-      // Gửi yêu cầu tạo đơn hàng POST /orders
+      // Gửi yêu cầu tạo đơn hàng POST /orders (kèm JWT nếu đã đăng nhập)
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const orderHeaders: HeadersInit = { 'Content-Type': 'application/json' };
+      if (token) {
+        orderHeaders['Authorization'] = `Bearer ${token}`;
+      }
       const orderRes = await fetch(`${apiUrl}/orders`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: orderHeaders,
         body: JSON.stringify(orderPayload),
       });
 
