@@ -29,3 +29,4 @@ export async function GET() {
   // Fallback an toàn bảo đảm trang luôn có sản phẩm hiển thị, không bao giờ bị lỗi
   return NextResponse.json(MOCK_PRODUCTS);
 }
+
