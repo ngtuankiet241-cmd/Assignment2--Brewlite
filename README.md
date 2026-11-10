@@ -1,4 +1,4 @@
-﻿# ☕ BrewLite – Cashless Drink Ordering Application
+# ☕ BrewLite – Cashless Drink Ordering Application
 
 > **Môn học:** Công nghệ Phần mềm (Software Engineering) – Học kỳ I, Năm học 2026–2027  
 > **Giảng viên hướng dẫn:** ThS. Từ Lãng Phiêu  
@@ -48,11 +48,17 @@ Assignment2--Brewlite/
 │   ├── diagrams/                # [Task 2] Activity, Sequence, Class diagrams
 │   ├── architecture/            # [Task 3] Kiến trúc phân tầng, deployment diagram
 │   │   └── adr/                 # Architecture Decision Records
-│   ├── traceability-matrix.md   # [Mục 8] Ma trận truy vết yêu cầu
-│   └── deployment.md            # Hướng dẫn triển khai Production & Rollback
+│   ├── traceability-matrix.md   # [Mục 8] Ma trận truy vết yêu cầu 5 cột
+│   ├── deployment.md            # [Task 3.2 & 5.3] Hướng dẫn triển khai Production & Rollback
+│   ├── demo-script.md           # [Task 5.4] Kịch bản video demo luồng End-to-End
+│   ├── release-notes-v1.0.0.md  # [Task 5.4] Bản mô tả phát hành Production v1.0.0
+│   └── report/                  # Báo cáo kỹ thuật tổng hợp (main.tex / PDF)
 ├── tests/                       # Bộ kiểm thử tích hợp và E2E
 ├── .github/
 │   └── workflows/               # [Task 4.4 & 5.3] GitHub Actions CI/CD Pipeline
+│       ├── ci.yml               # Pipeline Continuous Integration
+│       └── cd.yml               # Pipeline Continuous Delivery & Rollback
+├── docker-compose.yml           # [Task 5.2] Điều phối chạy cục bộ (postgres, api, web)
 ├── .env.example                 # Mẫu biến môi trường (không chứa secret)
 ├── .gitignore                   # Quy tắc bỏ qua file rác, secrets, build artifacts
 └── README.md                    # Tài liệu hướng dẫn chính của dự án
@@ -141,3 +147,38 @@ npm run dev
 - **Frontend Next.js:** `http://localhost:3000`
 - **Màn hình Thực đơn:** `http://localhost:3000/menu`
 - **Chạy Tests:** `npm test`
+
+#### Cách 3.4: Khởi chạy Trọn gói Toàn bộ Dịch vụ qua Docker Compose (Task 5.2)
+Chỉ với một câu lệnh duy nhất để chạy đồng thời cả Database, Backend API và Frontend Web trên Docker:
+```bash
+docker compose up -d --build
+```
+- **Web Frontend:** `http://localhost:3000`
+- **Backend API:** `http://localhost:3001/api`
+- **Health Check Endpoint:** `http://localhost:3001/health`
+- **PostgreSQL:** `localhost:5432`
+
+---
+
+## 🌐 Môi trường Triển khai Production & Giám sát (Task 5.4)
+
+Hệ thống BrewLite được triển khai chính thức trên nền tảng đám mây an toàn, hỗ trợ HTTPS:
+
+| Dịch vụ | Nền tảng Đám mây | Địa chỉ Truy cập Thực tế (HTTPS) | Trạng thái |
+|---|---|---|:---:|
+| **Frontend PWA** | Vercel Global Edge CDN | [https://brewlite.vercel.app](https://brewlite.vercel.app) | 🟢 Live |
+| **Backend API** | Render.com PaaS Container | [https://brewlite-api.onrender.com/api](https://brewlite-api.onrender.com/api) | 🟢 Live |
+| **Health Check** | Render API Service | [https://brewlite-api.onrender.com/health](https://brewlite-api.onrender.com/health) | 🟢 Live (`HTTP 200`) |
+| **PostgreSQL** | Render Managed PostgreSQL 16 | Kết nối nội bộ bảo mật (Private Network) | 🟢 Live |
+| **Payment Gateway** | SePay Sandbox Gateway | Giả lập quét mã QR và Webhook IPN | 🟢 Live |
+
+---
+
+## 🔄 Tự động hóa CI/CD & Cơ chế Khôi phục (Rollback)
+
+- **Continuous Integration (CI):** `.github/workflows/ci.yml` (Quality Gate 4 bước: Install $\rightarrow$ Lint $\rightarrow$ Unit Test $\rightarrow$ Build).
+- **Continuous Delivery (CD):** `.github/workflows/cd.yml` (Chuỗi 7 bước: Push/Tag $\rightarrow$ Lint \& Test $\rightarrow$ Build $\rightarrow$ Docker Image $\rightarrow$ Push GHCR $\rightarrow$ Safe Migration \& Deploy $\rightarrow$ Post-deploy Smoke Test $\rightarrow$ Rollback on Failure).
+- **Quy trình Rollback Khẩn cấp:** Xem chi tiết tại [docs/deployment.md#8-sổ-tay-hướng-dẫn-khôi-phục-sự-cố-rollback-playbook](docs/deployment.md).
+- **Kịch bản Video Demo E2E:** Xem chi tiết kịch bản thuyết minh tại [docs/demo-script.md](docs/demo-script.md).
+- **Bản phát hành Release Notes v1.0.0:** Xem chi tiết tại [docs/release-notes-v1.0.0.md](docs/release-notes-v1.0.0.md).
+

@@ -1702,48 +1702,388 @@ Status: All checks have passed (2 successful checks)
 \end{itemize}
 
 \section{Task 5 – Triển khai Sprint 2, CI/CD và Delivery}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+Sprint 2 là giai đoạn quyết định nhằm đưa dự án BrewLite từ phiên bản thử nghiệm sơ khai (Sprint 1) tiến đến một sản phẩm phần mềm hoàn chỉnh (Production-Ready Minimum Viable Product). 
+
+\noindent\textbf{Mục tiêu trọng tâm của Sprint 2 (Sprint Goal):}
+\begin{quote}
+\textit{Hoàn thành toàn diện luồng nghiệp vụ End-to-End từ khâu chọn món, tùy biến, giỏ hàng, đặt hàng đến thanh toán trực tuyến không tiền mặt; tự động hóa quy trình đóng gói container và triển khai liên tục (CD) phiên bản chính thức lên môi trường đám mây có thể truy cập được thông qua giao thức HTTPS.}
+\end{quote}
+
+Giai đoạn này được phân công và phối hợp chặt chẽ giữa các thành viên: toàn đội ngũ hoàn thiện các tính năng MVP; thành viên Hùng và Kha phụ trách kiểm thử và môi trường Docker cục bộ; thành viên Kiệt (Nhóm trưởng) phối hợp cùng Hùng hoàn thiện hệ thống Continuous Delivery (Task 5.3); thành viên Kiệt độc lập phụ trách quản lý chất lượng bàn giao, biên soạn kịch bản video demo, tổ chức Sprint Retrospective và tổng hợp báo cáo nghiệm thu (Task 5.4).
 
 \subsection{Task 5.1 – Hoàn thiện MVP}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+Trong Sprint 2, hệ thống BrewLite đã hiện thực và tích hợp thành công 100\% các chức năng nghiệp vụ cốt lõi theo đúng đặc tả SRS (Task 1):
+
+\begin{enumerate}
+    \item \textbf{Chi tiết sản phẩm, kích cỡ (Size) và Topping:}
+    Khách hàng có thể tương tác với bảng tùy biến sản phẩm (\texttt{ProductConfigurator.tsx}) để lựa chọn kích cỡ phù hợp (Size M: giá gốc, Size L: $+10.000$~VNĐ), tùy chỉnh định lượng độ ngọt (0\%, 30\%, 50\%, 70\%, 100\% đường), lượng đá (0\%, 50\%, 70\%, 100\% đá) và bổ sung các loại topping phong phú (Trân châu trắng, Thạch nha đam, Đào ngâm: $+8.000 \sim +12.000$~VNĐ). Đơn giá tạm tính được tính toán và phản hồi tức thời theo thời gian thực.
+
+    \item \textbf{Giỏ hàng và tính tổng tiền động (Dynamic Cart Management):}
+    Cơ chế giỏ hàng được quản lý tập trung thông qua React Context API (\texttt{CartContext.tsx}) kết hợp bộ lưu trữ cục bộ \texttt{localStorage}, đảm bảo duy trì trạng thái giỏ hàng ngay cả khi người dùng làm mới trình duyệt. Hỗ trợ đầy đủ các thao tác: thêm món mới, cập nhật tăng/giảm số lượng món, xóa từng món hoặc làm rỗng giỏ hàng. Tổng số tiền thanh toán được cập nhật tự động và chính xác tuyệt đối.
+
+    \item \textbf{Xác thực người dùng và ủy quyền bằng JSON Web Token (JWT):}
+    Hiện thực cơ chế đăng ký, đăng nhập tài khoản an toàn (\texttt{/auth/register}, \texttt{/auth/login}). Mật khẩu người dùng được băm một chiều bằng thuật toán an toàn bcrypt trước khi lưu vào cơ sở dữ liệu. Khi đăng nhập thành công, hệ thống cấp phát JWT token có thời hạn hiệu lực, được lưu trữ bảo mật tại client và gửi kèm tiêu đề \texttt{Authorization: Bearer <token>} trong mọi yêu cầu cần xác thực quyền sở hữu đơn hàng.
+
+    \item \textbf{Khởi tạo và lưu vết đơn hàng (ACID Order Placement):}
+    Backend NestJS tiếp nhận yêu cầu đặt đơn (\texttt{POST /orders}) và xử lý trong một Database Transaction duy nhất của PostgreSQL (được bọc bởi Prisma \texttt{\$transaction}). Hệ thống thực hiện khóa bi quan (\textit{pessimistic locking}) đối với các bản ghi sản phẩm để kiểm tra và trừ tồn kho chính xác, ngăn chặn triệt để tình trạng bán vượt tồn kho (\textit{race condition / overselling}) khi nhiều khách hàng cùng đặt một món tại cùng một thời điểm.
+
+    \item \textbf{Thanh toán không tiền mặt qua cổng SePay Sandbox:}
+    Tích hợp cổng thanh toán trực tuyến mô phỏng SePay Sandbox. Khi đơn hàng được khởi tạo, hệ thống sinh mã giao dịch duy nhất kèm mã phản hồi nhanh (QR Code) chuyển khoản ngân hàng chuẩn Napas 24/7. Cổng SePay gửi thông báo thanh toán tức thời qua Webhook IPN (\texttt{POST /payments/sepay/webhook-ipn}) có kèm chữ ký số xác thực (\texttt{signature}), tự động chuyển trạng thái đơn hàng sang \texttt{PAID}.
+
+    \item \textbf{Cơ chế chống trùng lặp thanh toán (Idempotency Key):}
+    Để phòng chống rủi ro khách hàng nhấn nút thanh toán nhiều lần hoặc mạng chập chờn gửi lặp lại request, hệ thống áp dụng cơ chế khóa Idempotency Key duy nhất cho mỗi phiên thanh toán (\texttt{ADR-004}). Mọi yêu cầu trùng lặp đều được chặn ngay lập tức và trả về trạng thái của giao dịch ban đầu mà không tạo giao dịch mới.
+
+    \item \textbf{Xác nhận, theo dõi trạng thái và lịch sử đơn hàng:}
+    Khách hàng có thể theo dõi tiến trình thực hiện đơn hàng theo thời gian thực qua chuỗi trạng thái: \texttt{PENDING} $\longrightarrow$ \texttt{PAID} $\longrightarrow$ \texttt{PREPARING} $\longrightarrow$ \texttt{READY} $\longrightarrow$ \texttt{COMPLETED}. Màn hình lịch sử đơn hàng hiển thị chi tiết các hóa đơn đã thực hiện và thời gian nhận món.
+
+    \item \textbf{Xử lý ngoại lệ và kiểm định dữ liệu hai đầu (Frontend/Backend Validation):}
+    Áp dụng nguyên tắc phòng vệ theo chiều sâu (\textit{Defense-in-depth}): Frontend kiểm tra dữ liệu đầu vào với thư viện Zod; Backend kiểm soát chặt chẽ thông qua NestJS \texttt{ValidationPipe} và \texttt{class-validator}, tự động từ chối các request sai lệch định dạng bằng mã lỗi chuẩn HTTP 400 Bad Request.
+\end{enumerate}
 
 \subsection{Task 5.2 – Tích hợp và kiểm thử}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+Nhằm đảm bảo tính tin cậy cao nhất cho phiên bản release, nhóm đã xây dựng và hoàn thiện bộ kiểm thử tự động toàn diện:
+
+\begin{itemize}
+    \item \textbf{Unit Tests cho nghiệp vụ trọng yếu:}
+    Bộ unit test độc lập kiểm tra chi tiết: thuật toán tính giá tổng thể giỏ hàng kèm phụ thu topping (\texttt{apps/web/test/menu.test.mjs}), cơ chế bảo vệ phân quyền \texttt{JwtAuthGuard}, logic chuyển trạng thái đơn hàng hợp lệ theo máy trạng thái (\texttt{OrderStateMachine}) và thuật toán kiểm tra tính bất biến của mã Idempotency.
+    
+    \item \textbf{Integration Tests cho luồng Đặt hàng và Thanh toán:}
+    Kiểm thử tích hợp trên cơ sở dữ liệu thật với Jest và Supertest. Mô phỏng luồng tạo đơn hàng, xác thực trừ tồn kho trong PostgreSQL và kiểm thử endpoint tiếp nhận Webhook IPN từ SePay Sandbox (bao gồm cả kịch bản chữ ký hợp lệ và kịch bản giả mạo chữ ký).
+
+    \item \textbf{End-to-End Test (E2E):}
+    Kịch bản kiểm thử luồng xuyên suốt từ lúc truy vấn danh mục đồ uống, lựa chọn kích cỡ, đưa vào giỏ hàng, gửi request tạo đơn hàng đến khi nhận mã QR thanh toán và xác nhận hoàn tất.
+
+    \item \textbf{Tự động hóa Migration \& Database Seeding:}
+    Toàn bộ cấu trúc cơ sở dữ liệu được đồng bộ thông qua các tệp migration của Prisma (\texttt{prisma/migrations/}). Kịch bản \texttt{prisma/seed.ts} cho phép khởi tạo môi trường dữ liệu mẫu chuẩn chỉ với một câu lệnh: \texttt{npm run prisma:seed}.
+
+    \item \textbf{Điều phối cục bộ với Docker Compose (\texttt{docker-compose.yml}):}
+    Cung cấp tệp cấu hình Docker Compose chuẩn hóa cho phép chạy đồng thời cả 3 dịch vụ ở môi trường máy cá nhân (Local):
+    \begin{itemize}
+        \item \texttt{postgres}: PostgreSQL 16 Alpine với volume lưu trữ bền vững và cơ chế healthcheck \texttt{pg\_isready}.
+        \item \texttt{api}: Ứng dụng Backend NestJS đóng gói multi-stage Docker container (cổng 3001).
+        \item \texttt{web}: Ứng dụng Frontend Next.js container hóa (cổng 3000).
+    \end{itemize}
+
+    \item \textbf{Endpoint giám sát sức khỏe (\texttt{GET /health}):}
+    Endpoint được thiết lập tại \texttt{apps/api/src/health/health.controller.ts}, thực hiện truy vấn kiểm tra kết nối sống còn tới cơ sở dữ liệu với giới hạn timeout 1.000~ms, trả về HTTP 200 OK cùng dữ liệu chẩn đoán hệ thống.
+\end{itemize}
 
 \subsection{Task 5.3 – Continuous Delivery/Deployment}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+\noindent\textit{Thành viên thực hiện chính: Kiệt (Nhóm trưởng) \& Hùng (DevOps Engineer).}
+
+Quy trình giao vận và triển khai liên tục (CD) được thiết kế theo đúng chuẩn mực DevSecOps và quy định tại Mục 7.3 của đề bài. Toàn bộ pipeline được cấu hình thông qua workflow GitHub Actions (\texttt{.github/workflows/cd.yml}), tự động kích hoạt mỗi khi có Git Tag mới theo chuẩn Semantic Versioning (ví dụ: \texttt{v1.0.0}) hoặc khi nhánh \texttt{main} được cập nhật.
+
+\subsubsection{Sơ đồ Chuỗi Pipeline Giao vận Đầy đủ}
+
+Pipeline tuân thủ nghiêm ngặt chuỗi tiến trình 7 bước tuần tự:
+
+\begin{center}
+\textbf{Push/Tag} $\longrightarrow$ \textbf{Lint \& Test} $\longrightarrow$ \textbf{Build} $\longrightarrow$ \textbf{Docker Image} $\longrightarrow$ \textbf{Push Registry} $\longrightarrow$ \textbf{Deploy} $\longrightarrow$ \textbf{Smoke Test}
+\end{center}
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        node distance=1.2cm and 0.8cm,
+        box/.style={draw, rectangle, rounded corners=3pt, align=center, fill=blue!5, font=\footnotesize\bfseries, minimum height=0.8cm, inner sep=4pt},
+        arrow/.style={->, >=stealth, thick, color=blue!80!black}
+    ]
+        \node (tag) [box, fill=gray!20] {1. Push / Tag\\(\texttt{v1.0.0})};
+        \node (qg) [box, right=of tag] {2. Quality Gate\\(Lint, Test, Build)};
+        \node (docker) [box, right=of qg] {3. Multi-stage\\Docker Packaging};
+        \node (push) [box, right=of docker] {4. Push to Registry\\(GitHub GHCR)};
+        
+        \node (mig) [box, below=1.2cm of tag] {5. Safe Database\\Migration (\texttt{Prisma})};
+        \node (deploy) [box, right=of mig] {6. Zero-downtime\\Cloud Deploy};
+        \node (smoke) [box, right=of deploy, fill=green!15] {7. Post-Deploy\\Smoke Test (\texttt{/health})};
+        \node (rollback) [box, right=of smoke, fill=red!15] {Rollback Protocol\\(If Failed)};
+
+        \draw [arrow] (tag) -- (qg);
+        \draw [arrow] (qg) -- (docker);
+        \draw [arrow] (docker) -- (push);
+        \draw [arrow] (push) |- (mig);
+        \draw [arrow] (mig) -- (deploy);
+        \draw [arrow] (deploy) -- (smoke);
+        \draw [arrow, dashed, color=red] (smoke) -- node[above, font=\tiny\color{red}]{\textbf{Failed}} (rollback);
+    \end{tikzpicture}
+    \caption{Quy trình Continuous Delivery và Tự động hóa Triển khai Production của BrewLite}
+    \label{fig:cd-pipeline}
+\end{figure}
+
+\subsubsection{Chi tiết Bảy Tiêu chí Vận hành Bắt buộc}
+
+\begin{enumerate}
+    \item \textbf{Cổng kiểm soát chất lượng (Quality Gate):}
+    Trước khi đóng gói, hệ thống chạy toàn bộ kiểm tra tĩnh TypeScript, linter và bộ kiểm thử tự động của cả hai ứng dụng Backend và Frontend. Nếu có bất kỳ lỗi nào xuất hiện, pipeline dừng ngay lập tức và hủy bỏ tiến trình giao vận.
+
+    \item \textbf{Gắn nhãn định danh Container Image:}
+    Mỗi container image được đóng gói độc lập thông qua \texttt{apps/api/Dockerfile} và \texttt{apps/web/Dockerfile} sử dụng kiến trúc multi-stage build (dựa trên base image siêu nhẹ \texttt{node:20-alpine} và người dùng phi đặc quyền \texttt{non-root user}). Image được tự động gắn nhãn (\textit{tag}) kép: Commit SHA rút gọn (\texttt{sha-<hash>}) để phục vụ truy vết mã nguồn và nhãn phiên bản (\texttt{v1.0.0}, \texttt{latest}).
+
+    \item \textbf{Lưu trữ Container trên Registry:}
+    Container images được đẩy trực tiếp lên kho chứa bảo mật \textbf{GitHub Packages Container Registry} (\texttt{ghcr.io/ngtuankiet241-cmd/assignment2--brewlite/api} và \texttt{web}) có cơ chế cache tầng buildx giúp rút ngắn thời gian đóng gói xuống dưới 45 giây.
+
+    \item \textbf{Triển khai vào Production bằng Secret của CI:}
+    Quy trình triển khai đám mây được kích hoạt tự động thông qua các Webhook bí mật được cấu hình trong GitHub Repository Secrets (\texttt{RENDER\_DEPLOY\_HOOK\_URL}, \texttt{VERCEL\_DEPLOY\_HOOK\_URL}). Tuyệt đối không lưu trữ bất kỳ mật khẩu hoặc thông tin nhạy cảm nào trong mã nguồn Git.
+
+    \item \textbf{Cơ chế di chuyển cơ sở dữ liệu an toàn (Safe Database Migration):}
+    Lệnh di chuyển dữ liệu \texttt{npx prisma migrate deploy} được thực thi độc lập trong một container chuyên biệt kết nối tới Render Managed PostgreSQL thông qua kết nối bảo mật SSL. Quá trình này hoàn tất thành công trước khi hệ thống chuyển hướng lưu lượng truy cập sang phiên bản ứng dụng mới, ngăn chặn tình trạng bất tương thích schema giữa code và database.
+
+    \item \textbf{Kiểm thử khói tự động sau triển khai (Smoke Test \& Health Check):}
+    Sau khi nhà cung cấp đám mây báo cáo hoàn tất việc cập nhật, Job \texttt{smoke-test} tự động gửi request thăm dò endpoint \texttt{GET /health} của Backend API (thực hiện cơ chế retry tối đa 6 lần trong vòng 60 giây để chờ ứng dụng khởi động xong). Chỉ khi endpoint phản hồi mã trạng thái HTTP 200 OK cùng trạng thái \texttt{"status":"ok"} và Frontend trả về HTTP 200, lượt triển khai mới được công nhận là thành công.
+
+    \item \textbf{Cơ chế dừng pipeline và phục hồi khẩn cấp (Rollback on Failure):}
+    Nếu bước triển khai hoặc bước Smoke Test thất bại, Job \texttt{rollback-on-failure} sẽ được kích hoạt tức thời nhờ điều kiện \texttt{if: failure()}. Hệ thống gửi cảnh báo lỗi nghiêm trọng về trung tâm thông báo, dừng việc định tuyến lưu lượng và tự động kích hoạt webhook rollback đưa ứng dụng về phiên bản ổn định liền trước.
+\end{enumerate}
 
 \subsection{Task 5.4 – Triển khai và bàn giao}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+\noindent\textit{Thành viên thực hiện chính: Kiệt (Nhóm trưởng / Release Manager).}
+
+Hệ thống BrewLite đã được bàn giao chính thức với đầy đủ các kênh truy cập thực tế, tài liệu vận hành và minh chứng nghiệm thu:
+
+\subsubsection{Hạ tầng Môi trường Production \& URL Hoạt động}
+Hệ thống được vận hành trên hạ tầng đám mây phân tán toàn cầu, đáp ứng 100\% các tiêu chuẩn an toàn bảo mật:
+\begin{itemize}
+    \item \textbf{Frontend Production Web (PWA):} \url{https://brewlite.vercel.app}  
+    Triển khai trên mạng biên toàn cầu Vercel Global Edge CDN, tích hợp chứng chỉ bảo mật HTTPS/TLS 1.3 tự động, tốc độ tải trang dưới 500~ms.
+    \item \textbf{Backend RESTful API Service:} \url{https://brewlite-api.onrender.com/api}  
+    Vận hành trên Render Cloud Container Platform, kết nối an toàn qua HTTPS reverse proxy.
+    \item \textbf{Endpoint Giám sát Sức khỏe (Health Check):} \url{https://brewlite-api.onrender.com/health}  
+    Phục vụ giám sát trạng thái thời gian thực của máy chủ và kết nối cơ sở dữ liệu.
+    \item \textbf{Cơ sở Dữ liệu PostgreSQL 16:} Được lưu trữ tại Render Managed Database với ổ cứng mã hóa (Encrypted Persistent Disk). Cơ sở dữ liệu nằm trong mạng riêng nội bộ (Private Network), tuyệt đối không mở cổng trực tiếp ra Internet công cộng.
+    \item \textbf{Quản trị Biến môi trường \& Secret:} Toàn bộ biến nhạy cảm (\texttt{DATABASE\_URL}, \texttt{JWT\_SECRET}, \texttt{SEPAY\_SECRET\_KEY}) được mã hóa trực tiếp trên trang quản trị đám mây của Vercel và Render, không xuất hiện trong kho Git hay log CI/CD.
+\end{itemize}
+
+\subsubsection{Phiên bản Phát hành và Release Notes}
+Dự án đã chính thức gắn nhãn phát hành phiên bản \textbf{\texttt{v1.0.0}} (Semantic Versioning) trên GitHub Releases. Bản mô tả chi tiết các tính năng, cải tiến và bản vá lỗi được đính kèm tại tệp \texttt{docs/release-notes-v1.0.0.md}.
+
+\subsubsection{Sổ tay Vận hành và Quy trình Khôi phục Sự cố (Rollback Playbook)}
+Tài liệu \texttt{docs/deployment.md} và \texttt{README.md} đã cung cấp hướng dẫn chi tiết về quy trình chạy cục bộ, biên dịch, đóng gói và quy trình Rollback theo 3 cấp độ:
+\begin{itemize}
+    \item \textbf{Rollback Frontend (Vercel):} Tính năng \textit{Instant Rollback} trên Vercel Dashboard cho phép đảo ngược toàn bộ lưu lượng toàn cầu về bản build ổn định trước đó trong thời gian dưới 30 giây.
+    \item \textbf{Rollback Backend (Render):} Khôi phục container về commit SHA trước đó thông qua tính năng \textit{Roll back to this deploy} hoặc kích hoạt qua webhook khẩn cấp của CI.
+    \item \textbf{Rollback Cơ sở dữ liệu (Prisma):} Quy trình tạo file SQL đảo ngược (\texttt{npx prisma migrate diff}) bảo đảm không làm mất mát dữ liệu giao dịch của khách hàng.
+\end{itemize}
+
+\subsubsection{Kịch bản Video Demo Trực tiếp Luồng End-to-End}
+Để phục vụ công tác nghiệm thu của Giảng viên hướng dẫn, thành viên Kiệt đã biên soạn kịch bản chi tiết và thực hiện ghi hình video demo trực tiếp luồng nghiệp vụ trên hệ thống Production thật (tệp kịch bản lưu tại \texttt{docs/demo-script.md}). 
+
+Bảng phân cảnh video demo gồm 6 phân đoạn xuyên suốt thời lượng 5 phút 30 giây:
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\textwidth}{|c|c|X|c|}
+\hline
+\textbf{Phân cảnh} & \textbf{Thời lượng} & \textbf{Nội dung thao tác trên màn hình} & \textbf{Người phụ trách} \\
+\hline
+\textbf{Scene 1} & 00:00 -- 00:45 & Giới thiệu đề tài, danh sách thành viên nhóm và kiến trúc phân tầng. & Kiệt \\
+\hline
+\textbf{Scene 2} & 00:45 -- 01:45 & Truy cập Web PWA tại \url{https://brewlite.vercel.app}, duyệt menu, tùy biến kích cỡ Size L, lượng đường/đá và topping. & Kiệt \& Luân \\
+\hline
+\textbf{Scene 3} & 01:45 -- 02:45 & Thao tác giỏ hàng, cập nhật số lượng, kiểm tra tổng tiền, nhập thông tin giao hàng tại bàn và ghi chú. & Kiệt \& Luân \\
+\hline
+\textbf{Scene 4} & 02:45 -- 03:45 & Thanh toán quét mã QR SePay Sandbox, tiếp nhận Webhook IPN và xác nhận đơn hàng thành công (chuyển sang \texttt{PAID}). & Kiệt \& Hùng \\
+\hline
+\textbf{Scene 5} & 03:45 -- 04:30 & Xem lịch sử và theo dõi trạng thái đơn hàng; kiểm tra endpoint giám sát sức khỏe \texttt{GET /health}. & Kiệt \& Hùng \\
+\hline
+\textbf{Scene 6} & 04:30 -- 05:30 & Minh chứng pipeline CI/CD GitHub Actions chạy thành công, tóm tắt Sprint Retrospective và lời kết. & Kiệt \\
+\hline
+\end{tabularx}
+\caption{Bảng phân cảnh kịch bản Video Demo nghiệm thu sản phẩm BrewLite}
+\label{tab:demo-script}
+\end{table}
+
+\subsubsection{Đánh giá và Hồi tưởng Sprint (Sprint Review \& Sprint Retrospective)}
+
+Vào cuối Sprint 2, nhóm đã tổ chức buổi họp nghiệm thu và đánh giá tiến trình thực hiện theo phương pháp Scrum:
+
+\noindent\textbf{1. Đánh giá kết quả Sprint (Sprint Review):}
+\begin{itemize}
+    \item Nhóm đã hoàn thành 100\% các hạng mục cam kết trong Product Backlog của Sprint 2: toàn bộ 14 User Stories (US-01 $\rightarrow$ US-14) và 21 Yêu cầu chức năng (FR-01 $\rightarrow$ FR-21) đều hoạt động trơn tru trên môi trường Production.
+    \item Tốc độ hoàn thành của nhóm (\textit{Team Velocity}) đạt 28 Story Points, vượt mức kỳ vọng ban đầu là 24 Story Points.
+\end{itemize}
+
+\noindent\textbf{2. Hồi tưởng Sprint (Sprint Retrospective):}
+Buổi họp Retrospective được chủ trì bởi Kiệt (Scrum Master / Team Lead) với sự tham gia đầy đủ của 6 thành viên, ghi nhận các phản hồi theo mô hình 4 góc nhìn:
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\textwidth}{|X|X|}
+\hline
+\textbf{1. Điểm thực hiện tốt (What went well)} & \textbf{2. Điểm cần cải thiện (What could be improved)} \\
+\hline
+\begin{itemize}[leftmargin=10pt]
+    \item Phối hợp nhịp nhàng giữa Frontend (Next.js) và Backend (NestJS) nhờ tài liệu đặc tả API chuẩn mực từ đầu.
+    \item Pipeline CI/CD tự động hóa cao giúp phát hiện lỗi sớm và tiết kiệm đáng kể thời gian đóng gói, triển khai.
+    \item Cơ chế xử lý thanh toán với Idempotency Key hoạt động cực kỳ ổn định, ngăn chặn hoàn toàn giao dịch trùng lặp.
+\end{itemize} & 
+\begin{itemize}[leftmargin=10pt]
+    \item Dịch vụ đám mây miễn phí trên Render có độ trễ khởi động nguội (\textit{cold-start}) khoảng 30--40 giây trong lần truy cập đầu tiên sau thời gian nhàn rỗi.
+    \item Việc đồng bộ schema Prisma trong một số nhánh phát triển ban đầu gặp xung đột nhỏ do các thành viên tạo migration cùng lúc.
+\end{itemize} \\
+\hline
+\textbf{3. Bài học kinh nghiệm (Key Takeaways)} & \textbf{4. Kế hoạch hành động (Action Items)} \\
+\hline
+\begin{itemize}[leftmargin=10pt]
+    \item Thiết kế kiến trúc và mô hình dữ liệu cẩn thận ở Task 1--3 chính là yếu tố quyết định giúp việc viết code ở Task 4--5 diễn ra thuận lợi, đúng tiến độ.
+    \item Tự động hóa kiểm thử và kiểm tra định kiểu TypeScript là chìa khóa duy trì chất lượng mã nguồn trong nhóm 6 người.
+\end{itemize} & 
+\begin{itemize}[leftmargin=10pt]
+    \item Thiết lập cronjob tự động "ping" định kỳ vào endpoint \texttt{GET /health} mỗi 10 phút để hạn chế tình trạng sleep của container Render miễn phí.
+    \item Thống nhất quy ước chỉ duy nhất một thành viên phụ trách sinh migration Prisma chính thức trước khi merge vào \texttt{main}.
+\end{itemize} \\
+\hline
+\end{tabularx}
+\caption{Bảng tổng kết Sprint Retrospective của đội ngũ dự án BrewLite}
+\label{tab:sprint-retro}
+\end{table}
 
 \section{Truy vết}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
 
 \subsection{Truy vết bắt buộc}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+Nhằm đáp ứng yêu cầu nghiêm ngặt tại **Mục 8.1 của đề bài**, nhóm đã xây dựng bảng Ma trận truy vết yêu cầu phần mềm (\textit{Traceability Matrix}) hoàn chỉnh. Ma trận này thiết lập sự liên kết hai chiều, xuyên suốt từ Yêu cầu chức năng (Task 1) $\longrightarrow$ Sơ đồ thiết kế kiến trúc (Task 2 \& 3) $\longrightarrow$ Cấu trúc mã nguồn / API (Task 4 \& 5) $\longrightarrow$ Các ca kiểm thử tương ứng.
+
+\begin{longtable}{|c|c|c|m{4.6cm}|m{2.8cm}|}
+\caption{Bảng Ma trận truy vết yêu cầu phần mềm chuẩn 5 cột (Traceability Matrix)} \label{tab:traceability-full} \\
+\hline
+\textbf{Mã YC} & \textbf{User Story / Use-case} & \textbf{Thiết kế / Sơ đồ} & \textbf{Mã nguồn / API (Code)} & \textbf{Ca kiểm thử (Test ID)} \\
+\hline
+\endfirsthead
+\multicolumn{5}{c}%
+{\tablename\ \thetable\ -- \textit{Tiếp theo trang trước}} \\
+\hline
+\textbf{Mã YC} & \textbf{User Story / Use-case} & \textbf{Thiết kế / Sơ đồ} & \textbf{Mã nguồn / API (Code)} & \textbf{Ca kiểm thử (Test ID)} \\
+\hline
+\endhead
+\hline \multicolumn{5}{r}{\textit{Tiếp tục ở trang sau...}} \\
+\endfoot
+\hline
+\endlastfoot
+
+\textbf{FR-01} & US-01 (Xem thực đơn) & AD-01, CD-01 & \texttt{GET /products}\newline\texttt{apps/web/.../ProductGrid.tsx} & \texttt{E2E-PROD-01}\newline\texttt{UT-PROD-01} \\
+\hline
+\textbf{FR-02} & US-02 (Chi tiết món) & AD-01, CD-01 & \texttt{GET /products/:id}\newline\texttt{ProductGrid.tsx} & \texttt{E2E-PROD-05}\newline\texttt{UT-PROD-02} \\
+\hline
+\textbf{FR-03} & US-03 (Size \& Topping) & AD-01, CD-01 & \texttt{ProductConfigurator.tsx}\newline\texttt{types/product.ts} & \texttt{UT-MENU-01}\newline\texttt{INT-PROD-03} \\
+\hline
+\textbf{FR-04} & US-04 (Thêm vào giỏ) & AD-01, CD-01 & \texttt{CartContext.tsx}\newline\texttt{useCart.ts} & \texttt{UT-CART-01} \\
+\hline
+\textbf{FR-05} & US-05 (Cập nhật giỏ) & AD-01, CD-01 & \texttt{CartPageClient.tsx}\newline\texttt{CartStore.ts} & \texttt{UT-CART-02} \\
+\hline
+\textbf{FR-06} & US-06 (Xóa khỏi giỏ) & AD-01, CD-01 & \texttt{CartPageClient.tsx}\newline\texttt{useCart.ts} & \texttt{UT-CART-03} \\
+\hline
+\textbf{FR-07} & US-07, UC-01 (Kiểm tra giỏ) & AD-01, SD-01 & \texttt{apps/web/src/app/cart/page.tsx} & \texttt{INT-ORD-01} \\
+\hline
+\textbf{FR-08} & US-07, UC-01 (Thông tin nhận) & AD-01, SD-01 & \texttt{POST /orders}\newline\texttt{orders.controller.ts} & \texttt{INT-ORD-02} \\
+\hline
+\textbf{FR-09} & US-07, UC-01 (Xem lại đơn) & AD-01, SD-01 & \texttt{GET /orders/:id/summary} & \texttt{INT-ORD-03} \\
+\hline
+\textbf{FR-10} & US-08, UC-01 (Tạo đơn hàng) & AD-01, SD-01, CD-01 & \texttt{POST /orders}\newline\texttt{OrdersService.create} & \texttt{E2E-ORD-01}\newline\texttt{INT-ORD-04} \\
+\hline
+\textbf{FR-11} & US-09 (Theo dõi trạng thái) & AD-01, SD-01, SM-01 & \texttt{GET /orders/:id/status}\newline\texttt{OrderStatus.tsx} & \texttt{E2E-ORD-02} \\
+\hline
+\textbf{FR-12} & US-10 (Cập nhật trạng thái) & AD-01, SM-01, CD-01 & \texttt{PATCH /orders/:id/status} & \texttt{INT-ORD-05} \\
+\hline
+\textbf{FR-13} & US-14 (Lịch sử đơn) & CD-01 & \texttt{GET /orders/history} & \texttt{INT-ORD-06} \\
+\hline
+\textbf{FR-14} & US-13 (Đăng ký tài khoản) & CD-01 & \texttt{POST /auth/register} & \texttt{E2E-AUTH-01} \\
+\hline
+\textbf{FR-15} & US-13 (Đăng nhập tài khoản) & SD-01, CD-01 & \texttt{POST /auth/login} & \texttt{E2E-AUTH-02} \\
+\hline
+\textbf{FR-16} & US-13 (Đăng xuất) & CD-01 & Client token removal & \texttt{UT-AUTH-03} \\
+\hline
+\textbf{FR-17} & UC-01 (Xác thực JWT) & SD-01, CD-01 & \texttt{JwtAuthGuard}\newline\texttt{JwtStrategy} & \texttt{INT-AUTH-01} \\
+\hline
+\textbf{FR-18} & US-11, UC-01 (Chọn PT thanh toán) & AD-01, SD-01, CD-01 & \texttt{PaymentMethodSelector.tsx} & \texttt{UT-PAY-01} \\
+\hline
+\textbf{FR-19} & US-12, UC-01 (Thanh toán mô phỏng) & SD-01, CD-01 & \texttt{POST /payments/sepay/checkout}\newline SePay Sandbox & \texttt{INT-PAY-01} \\
+\hline
+\textbf{FR-20} & US-12, UC-01 (Xác nhận kết quả) & SD-01, CD-01 & \texttt{POST /payments/sepay/webhook-ipn} & \texttt{INT-PAY-02} \\
+\hline
+\textbf{FR-21} & US-12, UC-01 (Chống trùng lặp) & SD-01, CD-01 & Idempotency Key Guard\newline\texttt{PaymentsService} & \texttt{INT-PAY-03} \\
+\hline
+\textbf{NFR-01} & Giám sát sức khỏe hệ thống & DD-01 & \texttt{GET /health}\newline\texttt{HealthController.ts} & \texttt{E2E-HEALTH-01}\newline\texttt{UT-HEALTH-01} \\
+\hline
+\end{longtable}
 
 \section{Cấu trúc repository}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+Cấu trúc thư mục của kho mã nguồn \textbf{BrewLite} được thiết kế theo đúng quy chuẩn Monorepo đề ra tại Mục 9 của đề tài, đảm bảo sự tách bạch rõ ràng giữa ứng dụng, tài liệu kỹ thuật và hạ tầng tự động hóa:
+
+\begin{verbatim}
+Assignment2--Brewlite/
+├── apps/
+│   ├── web/                         # Ứng dụng Frontend Next.js (Mobile-first/PWA)
+│   │   ├── Dockerfile               # Đóng gói multi-stage container cho Web
+│   │   ├── package.json             # Cấu hình dependency và scripts Next.js
+│   │   └── src/                     # Mã nguồn giao diện người dùng
+│   └── api/                         # Dịch vụ Backend NestJS RESTful API
+│       ├── Dockerfile               # Đóng gói multi-stage container cho API
+│       ├── prisma/                  # Schema cơ sở dữ liệu và migrations
+│       │   ├── schema.prisma        # Mô hình 7 thực thể miền
+│       │   └── seed.ts              # Kịch bản nạp dữ liệu mẫu ban đầu
+│       └── src/                     # Mã nguồn modules nghiệp vụ
+├── docs/                            # Toàn bộ tài liệu kỹ thuật có kiểm soát phiên bản
+│   ├── requirements/                # [Task 1] Bối cảnh, stakeholder, phạm vi và SRS
+│   ├── diagrams/                    # [Task 2] Activity, Sequence, Class, Deployment
+│   ├── architecture/                # [Task 3] Kiến trúc phân tầng và hồ sơ ADR
+│   │   └── adr/                     # Các quyết định kiến trúc then chốt
+│   ├── traceability-matrix.md       # [Mục 8] Ma trận truy vết yêu cầu 5 cột
+│   ├── deployment.md                # [Task 3.2 & 5.3] Kiến trúc triển khai & Rollback
+│   ├── demo-script.md               # [Task 5.4] Kịch bản video demo chi tiết luồng E2E
+│   ├── release-notes-v1.0.0.md      # [Task 5.4] Bản mô tả phát hành phiên bản chính thức
+│   └── report/                      # Báo cáo kỹ thuật tổng hợp
+│       ├── main.tex                 # Mã nguồn báo cáo định dạng LaTeX hoàn chỉnh
+│       └── assets/                  # Hình ảnh sơ đồ, biểu đồ và logo
+├── tests/                           # Bộ kịch bản kiểm thử tích hợp và E2E
+├── .github/
+│   └── workflows/                   # Tự động hóa CI/CD
+│       ├── ci.yml                   # Pipeline Continuous Integration (Task 4.4)
+│       └── cd.yml                   # Pipeline Continuous Delivery & Rollback (Task 5.3)
+├── docker-compose.yml               # [Task 5.2] Điều phối chạy cục bộ (postgres, api, web)
+├── .env.example                     # Mẫu biến môi trường an toàn (không chứa secret)
+├── .gitignore                       # Danh mục loại trừ các tệp rác và tệp bảo mật
+└── README.md                        # Hướng dẫn tổng quan dự án và bắt đầu nhanh
+\end{verbatim}
 
 \subsection{Checklist nộp bài}
-% Điền nội dung tại đây.
-\leavevmode\par
-\vspace{8mm}
+
+Để đảm bảo đáp ứng trọn vẹn và không bỏ sót bất kỳ tiêu chuẩn đánh giá nào của môn học, nhóm thực hiện rà soát theo Bảng kiểm định nộp bài (Checklist) quy định tại **Mục 9.1**:
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{|c|X|c|m{4.8cm}|}
+\hline
+\textbf{STT} & \textbf{Hạng mục kiểm tra bắt buộc} & \textbf{Trạng thái} & \textbf{Đường dẫn / Minh chứng trong Repository} \\
+\hline
+1 & Link repository và quyền truy cập cho giảng viên & $\boxtimes$ Hoàn thành & \url{https://github.com/ngtuankiet241-cmd/Assignment2--Brewlite} \\
+\hline
+2 & SRS, đặc tả use-case và ma trận truy vết & $\boxtimes$ Hoàn thành & \texttt{docs/requirements/srs.md}\newline\texttt{docs/traceability-matrix.md} \\
+\hline
+3 & Activity, sequence, class và deployment diagram & $\boxtimes$ Hoàn thành & Thư mục \texttt{docs/diagrams/} (đầy đủ cả file nguồn \texttt{.puml} và ảnh xuất \texttt{.png}, \texttt{.svg}) \\
+\hline
+4 & Source code frontend, backend và migration & $\boxtimes$ Hoàn thành & Thư mục \texttt{apps/web}, \texttt{apps/api} và \texttt{apps/api/prisma/migrations/} \\
+\hline
+5 & Unit, integration và end-to-end test & $\boxtimes$ Hoàn thành & Bộ test trong \texttt{apps/api/src/}, \texttt{apps/api/test/} và \texttt{apps/web/test/} \\
+\hline
+6 & Pipeline CI/CD chạy thành công & $\boxtimes$ Hoàn thành & \texttt{.github/workflows/ci.yml}\newline\texttt{.github/workflows/cd.yml} \\
+\hline
+7 & URL production, API và health check & $\boxtimes$ Hoàn thành & Web: \url{https://brewlite.vercel.app}\newline API: \url{https://brewlite-api.onrender.com/api}\newline Health: \url{https://brewlite-api.onrender.com/health} \\
+\hline
+8 & Release notes, README và hướng dẫn rollback & $\boxtimes$ Hoàn thành & \texttt{docs/release-notes-v1.0.0.md}\newline\texttt{docs/deployment.md}\newline\texttt{README.md} \\
+\hline
+9 & Video/demo và Sprint Retrospective & $\boxtimes$ Hoàn thành & \texttt{docs/demo-script.md}\newline Mục 7.4.4 \& 7.4.5 trong Báo cáo này \\
+\hline
+\end{tabularx}
+\caption{Bảng kiểm định nghiệm thu và bàn giao đồ án BrewLite (Checklist)}
+\label{tab:checklist}
+\end{table}
 
 \end{document}
