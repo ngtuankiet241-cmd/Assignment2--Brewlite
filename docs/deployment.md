@@ -102,6 +102,97 @@ NEXT_PUBLIC_APP_NAME=BrewLite
 | **Health Check Endpoint** | API Container Route | `apps/api/src/health/health.controller.ts` |
 | **Database Connection & ORM** | Render Managed PostgreSQL | Schema `apps/api/prisma/schema.prisma`, `PrismaService` |
 | **Payment & IPN Webhook** | SePay Sandbox Integration | `apps/api/src/payments/payments.service.ts` |
-| **CI/CD Pipeline** | GitHub Actions | Kịch bản tự động hóa `.github/workflows/ci.yml` |
+| **CI/CD Pipeline** | GitHub Actions | Kịch bản tự động hóa `.github/workflows/ci.yml`, `.github/workflows/cd.yml` |
 | **Local Orchestration** | Local Docker Engine | Tệp điều phối `docker-compose.yml` |
+
+---
+
+## 6. Tự động hóa Giao vận & Triển khai Liên tục (CD Pipeline – Task 5.3)
+
+Quy trình Continuous Delivery (CD) được thiết kế và điều phối bởi **Kiệt (Lead)** và **Hùng (DevOps)** thông qua GitHub Actions (`.github/workflows/cd.yml`), tự động kích hoạt mỗi khi có tag phiên bản mới (`v*.*.*`) hoặc mã nguồn được sáp nhập vào nhánh `main`.
+
+### 6.1 Sơ đồ Chuỗi Pipeline Đầy đủ (End-to-End CD Stages)
+
+```text
+[Push / Tag]
+     │
+     ▼
+[Stage 1: Quality Gate] ─── (Lint & Type-check + Unit Tests + Application Build)
+     │
+     ▼
+[Stage 2 & 3: Docker Packaging] ─── (Multi-stage Build -> Tag SHA / SemVer -> Push GHCR)
+     │
+     ▼
+[Stage 4: Safe DB Migration] ─── (Zero-downtime Prisma Migration: prisma migrate deploy)
+     │
+     ▼
+[Stage 5: Production Deployment] ─── (Trigger Render PaaS API & Vercel Edge Web via Hooks)
+     │
+     ▼
+[Stage 6: Post-Deploy Smoke Test] ─── (Curl GET /health & Verify Frontend HTTPS 200 OK)
+     │
+     ├── (Nếu thành công) ──> [Hoàn tất Triển khai & Cập nhật Release Notes]
+     └── (Nếu thất bại)   ──> [Stage 7: Rollback Protocol Tức thì & Cảnh báo Sự cố]
+```
+
+### 6.2 Bảy Tiêu chí Vận hành Bắt buộc của Pipeline CD
+1. **Quality Gate:** Tuyệt đối không cho phép đóng gói container nếu Unit Test hoặc Lint thất bại.
+2. **Container Versioning:** Image được gắn nhãn kép: commit SHA rút gọn (`sha-xxxxxxx`) và phiên bản ngữ nghĩa (`v1.0.0`).
+3. **Container Registry:** Image được lưu trữ bảo mật tại GitHub Packages (`ghcr.io/ngtuankiet241-cmd/assignment2--brewlite/api` và `web`).
+4. **Bảo mật Secret:** Khóa API, Webhook token và Connection String được lưu trữ trong GitHub Repository Secrets (`RENDER_DEPLOY_HOOK_URL`, `PRODUCTION_DATABASE_URL`).
+5. **Safe Migration:** Di chuyển cấu trúc dữ liệu (`prisma migrate deploy`) thực thi độc lập trước khi kích hoạt container mới để tránh xung đột schema.
+6. **Smoke Testing tự động:** Tự động gửi request kiểm tra tính sống còn qua endpoint `/health` (tối đa 6 lần thử lại trong 60 giây).
+7. **Rollback tự động:** Tự động dừng chuỗi thực thi và kích hoạt kịch bản khôi phục phiên bản trước khi Smoke test không đạt yêu cầu.
+
+---
+
+## 7. Danh mục Môi trường Vận hành Thực tế (Production Delivery – Task 5.4)
+
+| Thành phần | Nền tảng Đám mây | Địa chỉ Truy cập (HTTPS) | Trạng thái Nghiệm thu |
+|---|---|---|:---:|
+| **Frontend PWA** | Vercel Global Edge CDN | [https://brewlite.vercel.app](https://brewlite.vercel.app) | 🟢 Đang hoạt động |
+| **Backend REST API** | Render.com Web Service | [https://brewlite-api.onrender.com/api](https://brewlite-api.onrender.com/api) | 🟢 Đang hoạt động |
+| **Giám sát Sức khỏe** | Render API Health Check | [https://brewlite-api.onrender.com/health](https://brewlite-api.onrender.com/health) | 🟢 Đang hoạt động (`status: ok`) |
+| **Cơ sở Dữ liệu** | Render Managed PostgreSQL 16 | Kết nối mạng nội bộ riêng (Private Service Network) | 🟢 Đang hoạt động (ACID) |
+| **Cổng Thanh toán** | SePay Sandbox Gateway | Giả lập quét mã QR và Webhook IPN thời gian thực | 🟢 Đang hoạt động |
+
+---
+
+## 8. Sổ tay Hướng dẫn Khôi phục Sự cố (Rollback Playbook)
+
+Khi phát hiện sự cố nghiêm trọng sau triển khai (lỗi chức năng thanh toán, crash server hoặc latency vượt ngưỡng), đội ngũ áp dụng quy trình Rollback khẩn cấp theo các cấp độ:
+
+### 8.1 Rollback Giao diện Frontend (Vercel Instant Rollback)
+- **Thời gian khôi phục:** $< 30\text{ giây}$.
+- **Thao tác:**
+  1. Đăng nhập vào Vercel Dashboard $\rightarrow$ Dự án `brewlite`.
+  2. Chọn tab **Deployments**, tìm bản deployment ổn định gần nhất có trạng thái *Ready*.
+  3. Nhấp vào menu ba chấm ($\dots$) $\rightarrow$ Chọn **Instant Rollback**.
+  4. Toàn bộ lưu lượng toàn cầu (Global Traffic) sẽ được chuyển hướng tức thì về bản build cũ mà không cần chờ build lại.
+
+### 8.2 Rollback Backend API (Render Manual / Automated Rollback)
+- **Thời gian khôi phục:** $1 - 2\text{ phút}$.
+- **Thao tác qua GitHub Actions (Tự động):**
+  - Khi Job `smoke-test` thất bại, Job `rollback-on-failure` tự động kích hoạt webhook gọi Render API để redeploy commit SHA ổn định trước đó.
+- **Thao tác thủ công qua Dashboard:**
+  1. Đăng nhập vào Render Dashboard $\rightarrow$ Web Service `brewlite-api`.
+  2. Vào mục **Events** $\rightarrow$ Tìm commit hoạt động tốt gần nhất.
+  3. Chọn **Roll back to this deploy**. Render sẽ khởi động lại container dựa trên Docker image cũ đã cache.
+
+### 8.3 Rollback Cơ sở Dữ liệu (Prisma Migration Rollback)
+- **Nguyên tắc an toàn:** Không chạy lệnh rollback trực tiếp trên database đang có kết nối sống nếu có nguy cơ mất mát dữ liệu giao dịch của khách hàng.
+- **Quy trình xử lý:**
+  1. Khóa tạm thời truy cập ghi của ứng dụng (chuyển sang chế độ bảo trì nếu cần).
+  2. Tạo migration đảo ngược (Revert Migration) bằng mã SQL:
+     ```bash
+     cd apps/api
+     npx prisma migrate diff --from-schema-datamodel prisma/schema.prisma --to-migrations prisma/migrations --script > rollback.sql
+     ```
+  3. Rà soát kỹ nội dung file `rollback.sql` (bảo đảm không có lệnh `DROP TABLE` nguy hiểm với các bảng `Order`, `Payment`, `User`).
+  4. Thực thi file SQL khắc phục vào database:
+     ```bash
+     npx prisma db execute --file ./rollback.sql
+     ```
+  5. Đẩy commit sửa lỗi lên nhánh `main` để pipeline CD ghi nhận trạng thái schema chính xác.
+
 

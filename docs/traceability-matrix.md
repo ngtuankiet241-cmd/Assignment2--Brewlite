@@ -10,7 +10,7 @@ Ma trận này ánh xạ từng yêu cầu chức năng (FR) trong [SRS](./requi
 |---|---|---|---|
 | **AD-01** | Activity Diagram – Luồng đặt hàng | [activity-diagram.svg](./diagrams/activity-diagram.svg) ([.png](./diagrams/activity-diagram.png)) | Luồng nghiệp vụ từ xem menu đến nhận đơn; gồm các nhánh nghiệp vụ liên quan. |
 | **SD-01** | Sequence Diagram – Checkout (UC-01) | [sequence-checkout.svg](./diagrams/sequence-checkout.svg) ([.png](./diagrams/sequence-checkout.png), [.puml](./diagrams/sequence-checkout.puml)) | Tương tác Customer → Next.js → NestJS → PostgreSQL → SePay trong luồng đặt và thanh toán. |
-| **CD-01** | Class Diagram – Domain Model | [class-diagram-overall.png](./diagrams/class-diagram-overall.png) | Các lớp miền User, Product, Order, OrderItem, Payment, Promotion, LoyaltyTransaction và quan hệ giữa chúng. |
+| **CD-01** | Class Diagram – Domain Model | [class-diagram.svg](./diagrams/class-diagram.svg) ([.png](./diagrams/class-diagram-overall.png), [.puml](./diagrams/class-diagram.puml)) | Các lớp miền User, Product, Order, OrderItem, Payment, Promotion, LoyaltyTransaction và quan hệ giữa chúng. |
 | **SM-01** | State Machine – Order | Quy định tại SRS & Class Diagram | Các trạng thái đơn hàng và chuyển trạng thái hợp lệ theo FR-11/FR-12. |
 
 ## Danh mục component
@@ -53,10 +53,10 @@ Bảng ma trận truy vết tuân thủ định dạng chuẩn 5 cột theo quy 
 | **FR-11** Theo dõi trạng thái đơn | US-09 | AD-01, SD-01, SM-01, CD-01 (`Order`) | *Sprint 2:* `GET /orders/:id/status`, `OrderStatus.tsx` | *Sprint 2:* `E2E-ORD-02` |
 | **FR-12** Cập nhật trạng thái đơn | US-10 | AD-01, SM-01, CD-01 (`Order`, `User`) | *Sprint 2:* `PATCH /orders/:id/status` (Admin/Barista) | *Sprint 2:* `INT-ORD-05` |
 | **FR-13** Xem lịch sử đơn hàng | US-14 | CD-01 (`User`, `Order`) | *Sprint 2:* `GET /orders/history`, `OrderHistory.tsx` | *Sprint 2:* `INT-ORD-06` |
-| **FR-14** Đăng ký tài khoản | US-13 | CD-01 (`User`) | *Sprint 2:* `POST /auth/register`, `RegisterForm.tsx` | *Sprint 2:* `E2E-AUTH-01` |
-| **FR-15** Đăng nhập tài khoản | US-13 | SD-01, CD-01 (`User`) | *Sprint 2:* `POST /auth/login`, `LoginForm.tsx` | *Sprint 2:* `E2E-AUTH-02` |
-| **FR-16** Đăng xuất tài khoản | US-13 | CD-01 (`User`) | *Sprint 2:* Client token removal, `AuthService.logout` | *Sprint 2:* `UT-AUTH-03` |
-| **FR-17** Xác thực truy cập bằng JWT | UC-01 (xác thực) | SD-01, CD-01 (`User`) | *Sprint 2:* `JwtAuthGuard`, `JwtStrategy` | *Sprint 2:* `INT-AUTH-01` |
+| **FR-14** Đăng ký tài khoản | US-13 | CD-01 (`User`) | `POST /auth/register`<br>`apps/api/src/auth/auth.service.ts` | `UT-AUTH-01`<br>`UT-AUTH-04` |
+| **FR-15** Đăng nhập tài khoản | US-13 | SD-01, CD-01 (`User`) | `POST /auth/login`<br>`apps/api/src/auth/auth.service.ts` | `UT-AUTH-02`<br>`UT-AUTH-03` |
+| **FR-16** Đăng xuất tài khoản | US-13 | CD-01 (`User`) | Phía Client xóa token xác thực | `UT-AUTH-03` |
+| **FR-17** Xác thực truy cập bằng JWT | UC-01 (xác thực) | SD-01, CD-01 (`User`) | `JwtAuthGuard`, `AuthService.verifyToken`<br>`apps/api/src/common/guards/jwt-auth.guard.ts` | `UT-AUTH-02` |
 | **FR-18** Chọn phương thức thanh toán | US-11, UC-01 | AD-01, SD-01, CD-01 (`Payment`) | *Sprint 2:* `PaymentMethodSelector.tsx` | *Sprint 2:* `UT-PAY-01` |
 | **FR-19** Xử lý thanh toán mô phỏng | US-12, UC-01 | SD-01, CD-01 (`Payment`, `Order`) | *Sprint 2:* `POST /payments/sepay/checkout`, SePay Gateway | *Sprint 2:* `INT-PAY-01` |
 | **FR-20** Xác nhận kết quả thanh toán | US-12, UC-01 | SD-01, CD-01 (`Payment`, `Order`) | *Sprint 2:* `POST /payments/sepay/webhook-ipn` | *Sprint 2:* `INT-PAY-02` |

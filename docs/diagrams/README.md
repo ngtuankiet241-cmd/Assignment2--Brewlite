@@ -65,6 +65,9 @@ Sơ đồ thể hiện sự tương tác tuần tự qua các Lifeline cho use-c
 Sơ đồ lớp mô tả cấu trúc các đối tượng nghiệp vụ, thuộc tính, kiểu dữ liệu, phương thức và mối quan hệ (multiplicity) trong hệ thống BrewLite.
 
 ### 3.1 Sơ đồ lớp tổng quát (Overall Domain Class Diagram)
+- **File mã nguồn PlantUML:** [`class-diagram.puml`](class-diagram.puml)
+- **File ảnh kết xuất:** [`class-diagram-overall.png`](class-diagram-overall.png) (PNG) | [`class-diagram.svg`](class-diagram.svg) (SVG Vector)
+
 ![Class Diagram Overall](class-diagram-overall.png)
 
 Hệ thống được tổ chức thành 6 nhóm chức năng (Packages):

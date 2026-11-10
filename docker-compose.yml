@@ -1,18 +1,18 @@
-
 services:
   postgres:
     image: postgres:16-alpine
+    container_name: brewlite-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Hãy cấu hình POSTGRES_PASSWORD trong .env}
-      POSTGRES_DB: brewlite
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-brewlite}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d brewlite"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-brewlite}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -21,17 +21,34 @@ services:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
+    container_name: brewlite-api
     restart: unless-stopped
     ports:
       - "3001:3001"
     environment:
       NODE_ENV: production
       PORT: 3001
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/brewlite?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-brewlite}?schema=public
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-for-local-docker}
     depends_on:
       postgres:
         condition: service_healthy
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: brewlite-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    depends_on:
+      - api
 
 volumes:
   postgres_data:
