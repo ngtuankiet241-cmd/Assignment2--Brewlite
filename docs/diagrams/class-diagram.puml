@@ -1,0 +1,300 @@
+@startuml class-diagram
+title Sơ đồ Lớp Lĩnh vực (Domain Class Diagram) - Hệ thống BrewLite
+skinparam dpi 180
+skinparam monochrome false
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+
+skinparam package {
+    BackgroundColor #F8F9FA
+    BorderColor #6C757D
+    FontColor #212529
+    FontStyle bold
+}
+
+skinparam class {
+    BackgroundColor #FFFFFF
+    BorderColor #36597D
+    ArrowColor #36597D
+    HeaderBackgroundColor #E9ECEF
+}
+
+skinparam enum {
+    BackgroundColor #FFF3CD
+    BorderColor #856404
+    HeaderBackgroundColor #FFEBAA
+}
+
+' ==========================================
+' ENUMS
+' ==========================================
+package "Enums & Kiểu dữ liệu" #F4F6F9 {
+    enum Role {
+        CUSTOMER
+        BARISTA
+        ADMIN
+    }
+
+    enum OrderStatus {
+        PENDING
+        CONFIRMED
+        PREPARING
+        READY
+        COMPLETED
+        CANCELLED
+    }
+
+    enum PaymentStatus {
+        PENDING
+        SUCCESS
+        FAILED
+    }
+
+    enum PaymentMethod {
+        SEPAY_QR
+        WALLET
+        CARD
+        CASH
+    }
+
+    enum OptionType {
+        SIZE
+        TOPPING
+    }
+
+    enum LoyaltyType {
+        EARN
+        REDEEM
+    }
+
+    enum DiscountType {
+        PERCENTAGE
+        FIXED_AMOUNT
+    }
+}
+
+' ==========================================
+' USER DOMAIN
+' ==========================================
+package "Quản lý Người dùng (User Domain)" #EBF3FB {
+    class User {
+        - id: String [PK]
+        - email: String
+        - passwordHash: String
+        - fullName: String
+        - phone: String
+        - role: Role
+        - loyaltyPoints: Integer
+        - createdAt: DateTime
+        - updatedAt: DateTime
+        --
+        + register(dto: RegisterDto): User
+        + verifyPassword(password: String): Boolean
+        + updateProfile(fullName: String, phone: String): void
+        + getLoyaltyBalance(): Integer
+    }
+}
+
+' ==========================================
+' PRODUCT DOMAIN
+' ==========================================
+package "Sản phẩm & Tùy chọn (Product Domain)" #EAF7ED {
+    class Product {
+        - id: String [PK]
+        - name: String
+        - description: String
+        - price: Integer
+        - imageUrl: String
+        - stock: Integer
+        - isAvailable: Boolean
+        - createdAt: DateTime
+        - updatedAt: DateTime
+        --
+        + checkStock(requestedQty: Integer): Boolean
+        + updateStock(delta: Integer): void
+        + updateAvailability(status: Boolean): void
+    }
+
+    class ProductOption {
+        - id: String [PK]
+        - productId: String [FK]
+        - name: String
+        - type: OptionType
+        - additionalPrice: Integer
+        - isAvailable: Boolean
+        --
+        + calculateAdditionalPrice(): Integer
+    }
+}
+
+' ==========================================
+' CART DOMAIN
+' ==========================================
+package "Giỏ hàng (Cart Domain)" #FFF8E7 {
+    class Cart {
+        - id: String [PK]
+        - userId: String [FK]
+        - totalAmount: Integer
+        - createdAt: DateTime
+        - updatedAt: DateTime
+        --
+        + addItem(item: CartItem): void
+        + updateQuantity(cartItemId: String, quantity: Integer): void
+        + removeItem(cartItemId: String): void
+        + clear(): void
+        + calculateTotal(): Integer
+    }
+
+    class CartItem {
+        - id: String [PK]
+        - cartId: String [FK]
+        - productId: String [FK]
+        - quantity: Integer
+        - unitPrice: Integer
+        - itemTotal: Integer
+        --
+        + calculateItemTotal(): Integer
+    }
+
+    class CartItemOption {
+        - id: String [PK]
+        - cartItemId: String [FK]
+        - productOptionId: String [FK]
+        - optionName: String
+        - additionalPrice: Integer
+    }
+}
+
+' ==========================================
+' ORDER DOMAIN
+' ==========================================
+package "Đơn hàng & Chi tiết (Order Domain)" #F3E8FD {
+    class Order {
+        - id: String [PK]
+        - userId: String [FK]
+        - customerName: String
+        - customerPhone: String
+        - tableNumber: Integer
+        - notes: String
+        - totalAmount: Integer
+        - discountAmount: Integer
+        - finalAmount: Integer
+        - status: OrderStatus
+        - promotionId: String [FK]
+        - createdAt: DateTime
+        - updatedAt: DateTime
+        --
+        + createOrder(): Order
+        + updateStatus(newStatus: OrderStatus): void
+        + cancelOrder(reason: String): void
+        + applyPromotion(promo: Promotion): void
+        + calculateFinalAmount(): Integer
+    }
+
+    class OrderItem {
+        - id: String [PK]
+        - orderId: String [FK]
+        - productId: String [FK]
+        - productName: String
+        - unitPrice: Integer
+        - quantity: Integer
+        - size: String
+        - toppings: String
+        - itemTotal: Integer
+        --
+        .. Data Snapshotting ..
+        <i>Snapshot giá, size và topping</i>
+        <i>tại thời điểm chốt đơn</i>
+        + calculateSubtotal(): Integer
+    }
+}
+
+' ==========================================
+' PAYMENT DOMAIN
+' ==========================================
+package "Thanh toán (Payment Domain)" #FDEDEC {
+    class Payment {
+        - id: String [PK]
+        - orderId: String [FK]
+        - amount: Integer
+        - method: PaymentMethod
+        - status: PaymentStatus
+        - transactionRef: String
+        - idempotencyKey: String
+        - qrUrl: String
+        - paidAt: DateTime
+        - createdAt: DateTime
+        --
+        + createCheckout(dto: PaymentDto): Payment
+        + handleWebhook(ipnPayload: WebhookDto): Boolean
+        + verifyIdempotency(key: String): Boolean
+    }
+}
+
+' ==========================================
+' PROMOTION & LOYALTY DOMAIN
+' ==========================================
+package "Khuyến mãi & Tích điểm (Promotion & Loyalty Domain)" #E8F8F5 {
+    class Promotion {
+        - id: String [PK]
+        - code: String
+        - description: String
+        - discountType: DiscountType
+        - discountValue: Integer
+        - minOrderValue: Integer
+        - maxDiscount: Integer
+        - validFrom: DateTime
+        - validTo: DateTime
+        - isActive: Boolean
+        --
+        + isValid(orderTotal: Integer): Boolean
+        + calculateDiscount(orderTotal: Integer): Integer
+    }
+
+    class LoyaltyTransaction {
+        - id: String [PK]
+        - userId: String [FK]
+        - orderId: String [FK]
+        - points: Integer
+        - type: LoyaltyType
+        - description: String
+        - createdAt: DateTime
+        --
+        + logTransaction(): void
+    }
+}
+
+' ==========================================
+' RELATIONSHIPS & MULTIPLICITY
+' ==========================================
+User "1" --> "0..1" Cart : "sở hữu >"
+User "1" --> "0..*" Order : "tạo đơn >"
+User "1" --> "0..*" LoyaltyTransaction : "tích lũy / đổi điểm >"
+
+Product "1" *-- "0..*" ProductOption : "có các tùy chọn >"
+
+Cart "1" *-- "0..*" CartItem : "chứa >"
+CartItem --> "1" Product : "tham chiếu sản phẩm >"
+CartItem "1" *-- "0..*" CartItemOption : "chọn tùy chọn >"
+CartItemOption --> "1" ProductOption : "dựa trên >"
+
+Order "1" *-- "1..*" OrderItem : "gồm các mục >"
+OrderItem ..> Product : "snapshot dữ liệu từ"
+
+Order "1" --> "0..*" Payment : "thanh toán qua >"
+Order "0..*" --> "0..1" Promotion : "áp dụng mã giảm >"
+
+LoyaltyTransaction "0..*" --> "0..1" Order : "phát sinh từ đơn >"
+
+User ..> Role
+Order ..> OrderStatus
+Payment ..> PaymentStatus
+Payment ..> PaymentMethod
+ProductOption ..> OptionType
+LoyaltyTransaction ..> LoyaltyType
+Promotion ..> DiscountType
+
+@enduml
+
