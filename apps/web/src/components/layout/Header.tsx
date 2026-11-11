@@ -1,30 +1,65 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useCart } from '@/context/useCart';
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const menuId = useId();
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const pathname = usePathname();
   const { itemCount } = useCart();
 
   const navLinks = [
     { href: '/', label: 'Trang chủ' },
     { href: '/menu', label: 'Thực đơn' },
-    { href: '/cart', label: `Giỏ hàng${itemCount > 0 ? ` (${itemCount})` : ''}` },
     { href: '/orders', label: 'Đơn của tôi' },
-    { href: '/login', label: 'Đăng nhập' },
     { href: '/#about', label: 'Về BrewLite' },
   ];
 
+  const mobileLinks = [
+    ...navLinks.slice(0, 2),
+    { href: '/cart', label: `Giỏ hàng (${itemCount})` },
+    navLinks[2],
+    { href: '/login', label: 'Đăng nhập' },
+    navLinks[3],
+  ];
+
+  const focusClasses = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coffee-600 focus-visible:ring-offset-2';
+
+  useEffect(() => {
+    const desktop = window.matchMedia('(min-width: 1024px)');
+    const closeOnDesktop = () => {
+      if (desktop.matches) setIsMobileMenuOpen(false);
+    };
+    desktop.addEventListener('change', closeOnDesktop);
+    return () => desktop.removeEventListener('change', closeOnDesktop);
+  }, []);
+
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-coffee-200/80 bg-white/90 backdrop-blur-md">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-2.5 sm:px-6 lg:px-8">
+    <header
+      className="sticky top-0 z-40 w-full border-b border-coffee-200/80 bg-white/90 backdrop-blur-md"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && isMobileMenuOpen) {
+          setIsMobileMenuOpen(false);
+          menuButtonRef.current?.focus();
+        }
+      }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setIsMobileMenuOpen(false);
+        }
+      }}
+    >
+      <div className="mx-auto flex min-h-18 max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:px-8">
         {/* Brand Logo */}
         <Link
           href="/"
-          className="flex items-center gap-2 transition active:scale-95 shrink-0"
-          aria-label="BrewLite Homepage"
+          className={`flex w-fit shrink-0 items-center gap-2 rounded-xl transition active:scale-95 ${focusClasses}`}
+          aria-label="BrewLite – Trang chủ"
+          onClick={() => setIsMobileMenuOpen(false)}
         >
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-coffee-800 text-cream-100 shadow-2xs sm:h-9 sm:w-9 sm:rounded-2xl shrink-0">
             <svg
@@ -48,87 +83,88 @@ export default function Header() {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden items-center gap-6 md:flex" aria-label="Điều hướng chính">
+        <nav className="hidden items-center justify-center gap-1 lg:flex" aria-label="Điều hướng chính">
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="text-xs font-semibold text-coffee-800 transition hover:text-coffee-600 rounded-lg px-2 py-1"
+              aria-current={pathname === link.href ? 'page' : undefined}
+              className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-full px-3 text-sm font-semibold transition hover:bg-coffee-50 hover:text-coffee-950 ${focusClasses} ${pathname === link.href ? 'bg-coffee-50 text-coffee-950' : 'text-coffee-700'}`}
             >
               {link.label}
             </Link>
           ))}
         </nav>
 
-        {/* Right Action: Desktop & Mobile */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        {/* Desktop actions: cart appears only here in the desktop header. */}
+        <div className="hidden items-center justify-self-end gap-2 lg:flex">
           <Link
             aria-label={`Giỏ hàng, ${itemCount} sản phẩm`}
-            className="relative inline-flex h-9 items-center gap-1.5 rounded-full border border-coffee-200 bg-white px-3 text-xs font-semibold text-coffee-900 transition hover:bg-coffee-50"
+            aria-current={pathname === '/cart' ? 'page' : undefined}
+            className={`inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full border border-coffee-200 bg-white px-3 text-sm font-semibold text-coffee-900 transition hover:bg-coffee-50 ${focusClasses}`}
             href="/cart"
           >
             <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 3h2l2.2 11.2a2 2 0 002 1.6h8.7a2 2 0 002-1.6L21 7H6M10 21h.01M18 21h.01" />
             </svg>
-            <span>Giỏ</span>
-            {itemCount > 0 && (
-              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-coffee-800 px-1.5 py-0.5 text-[10px] text-white">
-                {itemCount}
-              </span>
-            )}
+            <span>Giỏ hàng</span>
+            <span aria-hidden="true" className="inline-flex min-h-6 min-w-6 items-center justify-center rounded-full bg-coffee-800 px-1.5 text-xs tabular-nums text-white">
+              {itemCount}
+            </span>
           </Link>
-
-          <span className="hidden lg:inline-flex items-center gap-1.5 rounded-full bg-coffee-50 px-3 py-1 text-xs font-semibold text-coffee-700 border border-coffee-200">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            100% Cashless
-          </span>
 
           <Link
-            href="/menu"
-            className="rounded-full bg-coffee-800 px-3 py-1.5 sm:px-4 sm:py-2 text-xs font-semibold text-cream-50 shadow-2xs transition hover:bg-coffee-700 active:scale-95"
+            href="/login"
+            className={`inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full bg-coffee-800 px-4 text-sm font-semibold text-cream-50 shadow-2xs transition hover:bg-coffee-700 active:scale-95 ${focusClasses}`}
           >
-            Menu
+            Đăng nhập
           </Link>
-
-          {/* Mobile Menu Hamburger */}
-          <button
-            type="button"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-coffee-200 bg-white text-coffee-900 shadow-2xs md:hidden"
-            aria-label={isMobileMenuOpen ? 'Đóng menu' : 'Mở menu điều hướng'}
-            aria-expanded={isMobileMenuOpen}
-          >
-            {isMobileMenuOpen ? (
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            ) : (
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            )}
-          </button>
         </div>
+
+        {/* Mobile Menu Hamburger */}
+        <button
+          ref={menuButtonRef}
+          type="button"
+          onClick={() => setIsMobileMenuOpen((open) => !open)}
+          className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-coffee-200 bg-white text-coffee-900 shadow-2xs transition hover:bg-coffee-50 lg:hidden ${focusClasses}`}
+          aria-label={isMobileMenuOpen ? 'Đóng menu' : 'Mở menu điều hướng'}
+          aria-expanded={isMobileMenuOpen}
+          aria-controls={menuId}
+        >
+          {isMobileMenuOpen ? (
+            <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          ) : (
+            <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          )}
+        </button>
       </div>
 
       {/* Mobile Drawer */}
-      {isMobileMenuOpen && (
-        <div className="border-b border-coffee-200 bg-white/95 px-4 pt-2 pb-4 md:hidden">
-          <nav className="flex flex-col space-y-1" aria-label="Menu di động">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold text-coffee-900 hover:bg-coffee-50 active:bg-coffee-100"
-              >
-                <span>{link.label}</span>
-                <span className="text-coffee-400">→</span>
-              </Link>
-            ))}
-          </nav>
+      <nav
+        id={menuId}
+        hidden={!isMobileMenuOpen}
+        className="max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-t border-coffee-200 bg-white/95 px-4 py-3 sm:px-6 lg:hidden"
+        aria-label="Điều hướng di động"
+      >
+        <div className="mx-auto flex max-w-7xl flex-col gap-1">
+          {mobileLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setIsMobileMenuOpen(false)}
+              aria-current={pathname === link.href ? 'page' : undefined}
+              className={`flex min-h-11 items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-coffee-900 hover:bg-coffee-50 active:bg-coffee-100 ${focusClasses} ${pathname === link.href ? 'bg-coffee-50' : ''}`}
+            >
+              <span>{link.label}</span>
+              <span aria-hidden="true" className="text-coffee-400">→</span>
+            </Link>
+          ))}
         </div>
-      )}
+      </nav>
     </header>
   );
 }
