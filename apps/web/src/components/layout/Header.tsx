@@ -2,8 +2,9 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCart } from '@/context/useCart';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -11,6 +12,14 @@ export default function Header() {
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
   const { itemCount } = useCart();
+  const { user, logout } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    logout();
+    setIsMobileMenuOpen(false);
+    router.replace('/menu');
+  };
 
   const navLinks = [
     { href: '/', label: 'Trang chủ' },
@@ -23,7 +32,7 @@ export default function Header() {
     ...navLinks.slice(0, 2),
     { href: '/cart', label: `Giỏ hàng (${itemCount})` },
     navLinks[2],
-    { href: '/login', label: 'Đăng nhập' },
+    ...(!user ? [{ href: '/login', label: 'Đăng nhập' }] : []),
     navLinks[3],
   ];
 
@@ -113,12 +122,23 @@ export default function Header() {
             </span>
           </Link>
 
-          <Link
-            href="/login"
-            className={`inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full bg-coffee-800 px-4 text-sm font-semibold text-cream-50 shadow-2xs transition hover:bg-coffee-700 active:scale-95 ${focusClasses}`}
-          >
-            Đăng nhập
-          </Link>
+          {user ? (
+            <>
+              <span className="hidden max-w-28 truncate text-sm font-semibold text-coffee-800 xl:block" title={user.email}>
+                Chào, {user.fullName}
+              </span>
+              <button type="button" onClick={handleLogout} className={`inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full border border-coffee-200 px-3 text-sm font-semibold text-coffee-800 transition hover:bg-coffee-50 ${focusClasses}`}>
+                Đăng xuất
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/login"
+              className={`inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-full bg-coffee-800 px-4 text-sm font-semibold text-cream-50 shadow-2xs transition hover:bg-coffee-700 active:scale-95 ${focusClasses}`}
+            >
+              Đăng nhập
+            </Link>
+          )}
         </div>
 
         {/* Mobile Menu Hamburger */}
@@ -151,6 +171,12 @@ export default function Header() {
         aria-label="Điều hướng di động"
       >
         <div className="mx-auto flex max-w-7xl flex-col gap-1">
+          {user && (
+            <div className="mb-2 border-b border-coffee-100 px-3 pb-3">
+              <p className="truncate text-sm font-bold text-coffee-900">{user.fullName}</p>
+              <p className="mt-1 truncate text-xs text-coffee-600">{user.email}</p>
+            </div>
+          )}
           {mobileLinks.map((link) => (
             <Link
               key={link.href}
@@ -163,6 +189,11 @@ export default function Header() {
               <span aria-hidden="true" className="text-coffee-400">→</span>
             </Link>
           ))}
+          {user && (
+            <button type="button" onClick={handleLogout} className={`mt-2 min-h-11 rounded-xl border border-coffee-200 px-3 py-2 text-left text-sm font-semibold text-coffee-800 hover:bg-coffee-50 ${focusClasses}`}>
+              Đăng xuất
+            </button>
+          )}
         </div>
       </nav>
     </header>

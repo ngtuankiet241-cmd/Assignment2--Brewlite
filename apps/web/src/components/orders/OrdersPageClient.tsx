@@ -1,5 +1,7 @@
 'use client';
 
+import { clearAuthSession } from '@/lib/auth';
+
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
@@ -123,8 +125,7 @@ export default function OrdersPageClient() {
       .then(async (res) => {
         if (!res.ok) {
           if (res.status === 401) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
+            clearAuthSession();
             setIsLoggedIn(false);
             return;
           }

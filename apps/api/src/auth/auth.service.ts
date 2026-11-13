@@ -95,7 +95,11 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
-    if (!dto.email || !dto.password || !dto.fullName) {
+    if (
+      typeof dto?.email !== 'string' || !dto.email.trim() ||
+      typeof dto.password !== 'string' || !dto.password ||
+      typeof dto.fullName !== 'string' || !dto.fullName.trim()
+    ) {
       throw new BadRequestException('Vui lòng cung cấp đầy đủ họ tên, email và mật khẩu');
     }
 
@@ -103,16 +107,17 @@ export class AuthService {
       throw new BadRequestException('Mật khẩu phải có tối thiểu 6 ký tự');
     }
 
-    const existingUser = await this.usersService.findByEmail(dto.email);
+    const email = dto.email.trim().toLowerCase();
+    const existingUser = await this.usersService.findByEmail(email);
     if (existingUser) {
       throw new ConflictException('Email này đã được đăng ký trong hệ thống');
     }
 
     const hashedPassword = this.hashPassword(dto.password);
     const user = await this.usersService.create({
-      email: dto.email,
+      email,
       password: hashedPassword,
-      fullName: dto.fullName,
+      fullName: dto.fullName.trim(),
       phone: dto.phone,
       role: Role.CUSTOMER,
     });
@@ -131,11 +136,14 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    if (!dto.email || !dto.password) {
+    if (
+      typeof dto?.email !== 'string' || !dto.email.trim() ||
+      typeof dto.password !== 'string' || !dto.password
+    ) {
       throw new BadRequestException('Vui lòng nhập email và mật khẩu');
     }
 
-    const user = await this.usersService.findByEmail(dto.email);
+    const user = await this.usersService.findByEmail(dto.email.trim().toLowerCase());
     if (!user) {
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
     }
