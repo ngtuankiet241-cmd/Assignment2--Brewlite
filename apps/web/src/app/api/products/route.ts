@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
-import { MOCK_PRODUCTS } from '@/data/mockProducts';
+import { parseProductsResponse } from '@/lib/productResponse';
+
+const responseHeaders = { 'Cache-Control': 'no-store' };
 
 export async function GET() {
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://brewlite-api.onrender.com';
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000); // 6s timeout
-
-    const res = await fetch(`${backendUrl}/products`, {
+    const res = await fetch(`${backendUrl.replace(/\/$/, '')}/products`, {
       cache: 'no-store',
       signal: controller.signal,
       headers: {
@@ -16,17 +17,28 @@ export async function GET() {
       },
     });
 
-    clearTimeout(timeout);
-
-    if (res.ok) {
-      const data = await res.json();
-      return NextResponse.json(data);
+    if (!res.ok) {
+      return NextResponse.json(
+        { success: false, message: 'Không thể tải thực đơn. Vui lòng thử lại.' },
+        { status: res.status, headers: responseHeaders },
+      );
     }
-  } catch (error) {
-    console.warn('Backend fetch failed or timed out, using fallback products:', error);
-  }
 
-  // Fallback an toàn bảo đảm trang luôn có sản phẩm hiển thị, không bao giờ bị lỗi
-  return NextResponse.json(MOCK_PRODUCTS);
+    const data: unknown = await res.json();
+    parseProductsResponse(data);
+    return NextResponse.json(data, { headers: responseHeaders });
+  } catch {
+    return NextResponse.json(
+      {
+        success: false,
+        message: controller.signal.aborted
+          ? 'Máy chủ phản hồi quá lâu. Vui lòng thử lại.'
+          : 'Không thể tải dữ liệu sản phẩm hợp lệ. Vui lòng thử lại.',
+      },
+      { status: controller.signal.aborted ? 504 : 502, headers: responseHeaders },
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 

@@ -2,18 +2,9 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Product, ProductCategory, ProductFilterCategory } from '@/types/product';
-import { MOCK_PRODUCTS } from '@/data/mockProducts';
+import { parseProductsResponse, type BackendProduct } from '@/lib/productResponse';
 
 export type DemoMode = 'normal' | 'loading' | 'empty' | 'error';
-
-interface BackendProduct {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  imageUrl: string;
-  stock: number;
-}
 
 export function detectCategory(name: string): {
   category: ProductCategory;
@@ -82,69 +73,33 @@ export function useProducts() {
   const [demoMode, setDemoMode] = useState<DemoMode>('normal');
   const [refreshIndex, setRefreshIndex] = useState<number>(0);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const activeDemoMode = process.env.NODE_ENV === 'development' ? demoMode : 'normal';
 
   useEffect(() => {
+    // Simulated states are derived below and never make a network request.
+    if (activeDemoMode !== 'normal') return;
+
     let ignore = false;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
 
     async function loadProducts() {
-      // 1. Loading Demo Mode
-      if (demoMode === 'loading') {
-        await new Promise((res) => setTimeout(res, 100));
-        if (!ignore) {
-          setError(null);
-          setLoading(true);
-        }
-        return;
-      }
-
-      // 2. Error Demo Mode
-      if (demoMode === 'error') {
-        await new Promise((res) => setTimeout(res, 250));
-        if (!ignore) {
-          setError('Lỗi kết nối máy chủ: Không thể tải danh sách đồ uống (500 Internal Server Error). Vui lòng thử lại.');
-          setLoading(false);
-        }
-        return;
-      }
-
-      // 3. Empty Demo Mode
-      if (demoMode === 'empty') {
-        await new Promise((res) => setTimeout(res, 200));
-        if (!ignore) {
-          setRawProducts([]);
-          setError(null);
-          setLoading(false);
-        }
-        return;
-      }
-
-      // 4. Normal Mode: Fetch API qua proxy nội bộ hoặc backend trực tiếp
       try {
-        let res: Response;
-        try {
-          res = await fetch('/api/products', { cache: 'no-store' });
-        } catch {
-          res = await fetch(`${apiUrl}/products`, { cache: 'no-store' });
-        }
+        const res = await fetch('/api/products', {
+          cache: 'no-store',
+          signal: controller.signal,
+          headers: { Accept: 'application/json' },
+        });
 
         if (!res.ok) {
-          throw new Error(`Máy chủ phản hồi lỗi HTTP ${res.status}: ${res.statusText || 'Yêu cầu không thành công'}`);
+          throw new Error(res.status === 504 || res.status === 408
+            ? 'Máy chủ phản hồi quá lâu. Vui lòng thử lại.'
+            : `Không thể tải thực đơn (HTTP ${res.status}). Vui lòng thử lại.`);
         }
 
         const resJson: unknown = await res.json();
+        const rawList = parseProductsResponse(resJson);
 
-        const rawList: BackendProduct[] = Array.isArray(resJson)
-          ? (resJson as BackendProduct[])
-          : Array.isArray((resJson as Record<string, unknown>)?.data)
-            ? ((resJson as Record<string, unknown>).data as BackendProduct[])
-            : [];
-
-        if (rawList.length === 0 && !Array.isArray(resJson) && !Array.isArray((resJson as Record<string, unknown>)?.data)) {
-          throw new Error('Dữ liệu phản hồi từ Backend không đúng cấu trúc sản phẩm');
-        }
-
-        // Map dữ liệu từ Backend sang model hiển thị Product của Frontend
         const mappedProducts: Product[] = rawList.map((item: BackendProduct, index: number) => {
           const { category, categoryName } = detectCategory(item.name);
           const hasValidImage =
@@ -181,13 +136,17 @@ export function useProducts() {
           setRawProducts(mappedProducts);
           setError(null);
         }
-      } catch {
+      } catch (cause) {
         if (!ignore) {
-          // Fallback an toàn sang dữ liệu MOCK_PRODUCTS chuẩn của hệ thống, không hiển thị hộp đỏ lỗi cho người dùng
-          setRawProducts(MOCK_PRODUCTS);
-          setError(null);
+          setRawProducts([]);
+          setError(controller.signal.aborted
+            ? 'Máy chủ phản hồi quá lâu. Vui lòng thử lại.'
+            : cause instanceof Error
+              ? cause.message
+              : 'Không thể tải thực đơn. Vui lòng kiểm tra kết nối và thử lại.');
         }
       } finally {
+        clearTimeout(timeout);
         if (!ignore) {
           setLoading(false);
         }
@@ -198,8 +157,10 @@ export function useProducts() {
 
     return () => {
       ignore = true;
+      clearTimeout(timeout);
+      controller.abort();
     };
-  }, [apiUrl, demoMode, refreshIndex]);
+  }, [activeDemoMode, refreshIndex]);
 
   // Bộ lọc searchQuery (theo tên & mô tả) và selectedCategory (theo category)
   const filteredProducts = useMemo(() => {
@@ -227,24 +188,19 @@ export function useProducts() {
   const refetch = useCallback(() => {
     setLoading(true);
     setError(null);
-    if (demoMode === 'error') {
-      setDemoMode('normal');
-    }
+    setDemoMode('normal');
     setRefreshIndex((prev) => prev + 1);
-  }, [demoMode]);
+  }, []);
 
   // Thao tác xóa bộ lọc (Reset filters)
   const resetFilters = useCallback(() => {
     setSelectedCategory('all');
     setSearchQuery('');
-    setDemoMode('normal');
-    setLoading(true);
-    setError(null);
-    setRefreshIndex((prev) => prev + 1);
   }, []);
 
   // Chuyển đổi trạng thái demo phục vụ kiểm thử UI trong môi trường Development
   const handleDemoModeChange = useCallback((mode: DemoMode) => {
+    if (process.env.NODE_ENV !== 'development') return;
     setDemoMode(mode);
     setLoading(true);
     setError(null);
@@ -252,9 +208,12 @@ export function useProducts() {
   }, []);
 
   return {
-    products: filteredProducts,
-    loading,
-    error,
+    products: activeDemoMode === 'normal' ? filteredProducts : [],
+    isCatalogEmpty: activeDemoMode === 'empty' || rawProducts.length === 0,
+    loading: activeDemoMode === 'loading' || (activeDemoMode === 'normal' && loading),
+    error: activeDemoMode === 'error'
+      ? 'Lỗi kết nối máy chủ mô phỏng (HTTP 500). Vui lòng thử lại.'
+      : activeDemoMode === 'normal' ? error : null,
     selectedCategory,
     setSelectedCategory,
     searchQuery,
