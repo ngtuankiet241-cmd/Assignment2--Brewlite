@@ -21,7 +21,7 @@ export class OrdersController {
   }
 
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body('status') status: any) {
+  updateStatus(@Param('id') id: string, @Body('status') status: unknown) {
     return this.ordersService.updateStatus(id, status);
   }
 }

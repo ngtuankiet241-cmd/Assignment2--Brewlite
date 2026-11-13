@@ -58,9 +58,9 @@ Tất cả các yêu cầu được phân loại mức độ ưu tiên theo phư
   - *Mức ưu tiên:* Must.
   - *Tiêu chí chấp nhận:* Hiển thị mã đơn, thời gian đặt và trạng thái hiện tại đồng bộ với backend.
 - **FR-12 – Cập nhật trạng thái đơn hàng**
-  - *Mô tả:* Nhân viên quầy cập nhật trạng thái đơn qua quy trình: `PENDING` -> `CONFIRMED` -> `PREPARING` -> `READY` -> `COMPLETED` (hoặc `CANCELLED`).
+  - *Mô tả:* Đơn đi theo quy trình `PENDING` -> `PAID` -> `PREPARING` -> `READY` -> `COMPLETED`. Thanh toán lỗi chuyển `PENDING` -> `PAYMENT_FAILED`; thử lại chuyển `PAYMENT_FAILED` -> `PENDING`. Cho phép hủy từ `PENDING`, `PAYMENT_FAILED`, `PAID` sang `CANCELLED`.
   - *Mức ưu tiên:* Must.
-  - *Tiêu chí chấp nhận:* Chỉ nhân viên có quyền mới được cập nhật; từ chối các bước nhảy trạng thái trái quy tắc State Machine.
+  - *Tiêu chí chấp nhận:* Chỉ nhân viên có quyền mới được cập nhật; từ chối các bước nhảy trạng thái trái quy tắc State Machine. `COMPLETED` và `CANCELLED` là trạng thái kết thúc. Chuyển sai trả 409 và giữ nguyên trạng thái trong DB. Xem [quy tắc và bằng chứng kiểm thử](../order-state-machine.md).
 - **FR-13 – Xem lịch sử đơn hàng**
   - *Mô tả:* Khách hàng xem lại danh sách các đơn hàng đã đặt trong quá khứ của tài khoản mình.
   - *Mức ưu tiên:* Must.
@@ -139,7 +139,7 @@ Tất cả các yêu cầu được phân loại mức độ ưu tiên theo phư
 | **Trigger** | Khách hàng nhấn nút "Thanh toán" hoặc "Xác nhận đặt hàng" từ màn hình giỏ hàng |
 | **Mã yêu cầu** | FR-04, FR-05, FR-07 (Giỏ hàng); FR-08, FR-09, FR-10 (Tạo đơn); FR-17 (JWT); FR-18..21 (Thanh toán) |
 | **Tiền điều kiện** | 1. Đã đăng nhập (có JWT hợp lệ).<br/>2. Giỏ hàng có ít nhất 01 sản phẩm.<br/>3. Dịch vụ thanh toán đang hoạt động. |
-| **Hậu điều kiện** | - Thành công: Đơn hàng ở trạng thái PAID, trừ tồn kho, giỏ hàng được làm sạch, chuyển sang màn hình theo dõi.<br/>- Thất bại: Đơn hàng CANCELLED, hoàn tồn kho, giỏ hàng giữ nguyên, báo lỗi. |
+| **Hậu điều kiện** | - Thành công: Đơn hàng ở trạng thái PAID, trừ tồn kho, giỏ hàng được làm sạch, chuyển sang màn hình theo dõi.<br/>- Thất bại: Đơn hàng PAYMENT_FAILED, giỏ hàng giữ nguyên, báo lỗi; có thể thử lại về PENDING hoặc hủy sang CANCELLED. |
 
 ### Luồng sự kiện chính (Main Flow):
 1. Khách hàng kiểm tra giỏ hàng trên Next.js UI (món, size, topping, tổng tiền).
@@ -158,7 +158,7 @@ Tất cả các yêu cầu được phân loại mức độ ưu tiên theo phư
 - **AF-01 (Mã giảm giá):** Tại bước 3, áp dụng voucher hợp lệ -> tính lại tổng tiền.
 - **EF-01 (Token hết hạn - 401):** Yêu cầu khách hàng đăng nhập lại.
 - **EF-02 (Hết hàng - 400):** Tồn kho không đủ tại bước 6 -> hủy tạo đơn, yêu cầu cập nhật giỏ.
-- **EF-03 (Thanh toán thất bại):** Cổng thanh toán trả về lỗi -> cập nhật đơn CANCELLED, giữ giỏ hàng, cho phép thử lại.
+- **EF-03 (Thanh toán thất bại):** Cổng thanh toán trả về lỗi -> cập nhật đơn PAYMENT_FAILED, giữ giỏ hàng; thử lại về PENDING hoặc hủy sang CANCELLED.
 - **EF-04 (Trùng Idempotency-Key):** Nhận lại key đã xử lý -> trả về kết quả cũ mà không trừ tồn kho lần 2.
 
 ---

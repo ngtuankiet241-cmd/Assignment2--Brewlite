@@ -1,12 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrdersService } from './orders.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { OrderStatus } from '@prisma/client';
 
 describe('OrdersService', () => {
   let service: OrdersService;
   let prisma: PrismaService;
 
   const mockPrisma = {
+    $queryRaw: jest.fn(),
+    $transaction: jest.fn(),
     order: {
       create: jest.fn(),
       findUnique: jest.fn(),
@@ -17,6 +21,9 @@ describe('OrdersService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockPrisma.$transaction.mockImplementation((work) => work(mockPrisma));
+    mockPrisma.$queryRaw.mockResolvedValue([{ id: 'ord-123', status: OrderStatus.PENDING }]);
+    mockPrisma.order.update.mockImplementation(({ where, data }) => Promise.resolve({ id: where.id, ...data }));
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrdersService,
@@ -88,6 +95,34 @@ describe('OrdersService', () => {
 
       const result = await service.getStatus('ord-123');
       expect(result.status).toEqual('PAID');
+    });
+  });
+
+  describe('updateStatus', () => {
+    it('UT-ORD-04: updates an allowed transition inside a transaction', async () => {
+      await expect(service.updateStatus('ord-123', 'PAID')).resolves.toMatchObject({ status: 'PAID' });
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.order.update).toHaveBeenCalledWith({ where: { id: 'ord-123' }, data: { status: 'PAID' } });
+    });
+
+    it.each([
+      ['PENDING', 'COMPLETED'], ['COMPLETED', 'PREPARING'], ['CANCELLED', 'PAID'],
+      ['PAID', 'PAYMENT_FAILED'], ['READY', 'READY'],
+    ])('UT-ORD-05: rejects %s -> %s before writing', async (from, to) => {
+      mockPrisma.$queryRaw.mockResolvedValue([{ id: 'ord-123', status: from }]);
+      await expect(service.updateStatus('ord-123', to)).rejects.toThrow(ConflictException);
+      expect(mockPrisma.order.update).not.toHaveBeenCalled();
+    });
+
+    it('UT-ORD-06: rejects unknown status before opening a transaction', async () => {
+      await expect(service.updateStatus('ord-123', 'SHIPPED')).rejects.toThrow(BadRequestException);
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('UT-ORD-07: returns 404 for a missing order without writing', async () => {
+      mockPrisma.$queryRaw.mockResolvedValue([]);
+      await expect(service.updateStatus('missing', 'PAID')).rejects.toThrow(NotFoundException);
+      expect(mockPrisma.order.update).not.toHaveBeenCalled();
     });
   });
 });

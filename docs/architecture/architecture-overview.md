@@ -95,11 +95,13 @@ prisma/           # PrismaService + schema.prisma
 
 **Sơ đồ trạng thái đơn hàng (State Machine):**
 ```
-PENDING ──► CONFIRMED ──► PREPARING ──► READY ──► COMPLETED
-   │             │              │          │
-   └─────────────┴──────────────┴──────────┴──► CANCELLED
+PENDING ──► PAID ──► PREPARING ──► READY ──► COMPLETED
+   │          │
+   ├──► PAYMENT_FAILED ──► PENDING (thử lại)
+   │          │
+   └──────────┴──► CANCELLED  (PAID cũng có thể hủy)
 ```
-Mỗi bước chuyển trạng thái được kiểm tra bởi `OrderStateMachine` service; chỉ nhân viên (`STAFF`) có quyền gọi `PATCH /orders/:id/status`.
+Mỗi bước chuyển được kiểm tra bởi `assertTransition` trong `orders/order-state-machine.ts`. API trạng thái và xử lý thanh toán khóa dòng đơn trong transaction trước khi ghi. `COMPLETED` và `CANCELLED` là trạng thái kết thúc. Phân quyền nhân viên cho API là yêu cầu triển khai riêng. Xem [đồ thị chính xác và bằng chứng unit/integration test](../order-state-machine.md).
 
 ### 2.3 Tầng Dữ liệu – PostgreSQL 16
 
