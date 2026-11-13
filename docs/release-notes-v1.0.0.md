@@ -48,9 +48,9 @@ Hệ thống đã sẵn sàng phục vụ khách hàng đặt thức uống tr�
 
 | Thành phần | Nền tảng | URL Hoạt động | Ghi chú |
 |---|---|---|---|
-| **Frontend PWA** | Vercel Edge CDN | [https://brewlite.vercel.app](https://brewlite.vercel.app) | Giao diện Next.js bảo mật HTTPS |
-| **Backend REST API** | Render PaaS | [https://brewlite-api.onrender.com/api](https://brewlite-api.onrender.com/api) | API dịch vụ cốt lõi |
-| **Health Check** | Render API | [https://brewlite-api.onrender.com/health](https://brewlite-api.onrender.com/health) | Giám sát trạng thái hệ thống |
+| **Frontend PWA** | Vercel Edge CDN | [https://assignment2-brewlite.vercel.app](https://assignment2-brewlite.vercel.app) | Giao diện Next.js bảo mật HTTPS |
+| **Backend REST API** | Render PaaS | [https://brewlite-assignment2-api.onrender.com](https://brewlite-assignment2-api.onrender.com) | API dịch vụ cốt lõi |
+| **Health Check** | Render API | [https://brewlite-assignment2-api.onrender.com/health](https://brewlite-assignment2-api.onrender.com/health) | Giám sát trạng thái hệ thống |
 | **Database** | Render Managed PostgreSQL | *Private Network Only* | Bảo mật nội bộ, không mở Internet |
 | **Kho mã nguồn** | GitHub | [https://github.com/ngtuankiet241-cmd/Assignment2--Brewlite](https://github.com/ngtuankiet241-cmd/Assignment2--Brewlite) | Mã nguồn mở và toàn bộ tài liệu |
 

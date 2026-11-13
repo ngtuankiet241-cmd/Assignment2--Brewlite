@@ -170,9 +170,9 @@ Hệ thống BrewLite được triển khai chính thức trên nền tảng đ�
 
 | Dịch vụ | Nền tảng Đám mây | Địa chỉ Truy cập Thực tế (HTTPS) | Trạng thái |
 |---|---|---|:---:|
-| **Frontend PWA** | Vercel Global Edge CDN | [https://brewlite.vercel.app](https://brewlite.vercel.app) | 🟢 Live |
-| **Backend API** | Render.com PaaS Container | [https://brewlite-api.onrender.com/api](https://brewlite-api.onrender.com/api) | 🟢 Live |
-| **Health Check** | Render API Service | [https://brewlite-api.onrender.com/health](https://brewlite-api.onrender.com/health) | 🟢 Live (`HTTP 200`) |
+| **Frontend PWA** | Vercel Global Edge CDN | [https://assignment2-brewlite.vercel.app](https://assignment2-brewlite.vercel.app) | 🟢 Live |
+| **Backend API** | Render.com PaaS Container | [https://brewlite-assignment2-api.onrender.com](https://brewlite-assignment2-api.onrender.com) | 🟢 Live |
+| **Health Check** | Render API Service | [https://brewlite-assignment2-api.onrender.com/health](https://brewlite-assignment2-api.onrender.com/health) | 🟢 Live (`HTTP 200`) |
 | **PostgreSQL** | Render Managed PostgreSQL 16 | Kết nối nội bộ bảo mật (Private Network) | 🟢 Live |
 | **Payment Gateway** | SePay Sandbox Gateway | Giả lập quét mã QR và Webhook IPN | 🟢 Live |
 
