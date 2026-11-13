@@ -10,6 +10,7 @@ import { useProducts } from '@/hooks/useProducts';
 export default function MenuPageClient() {
   const {
     products,
+    isCatalogEmpty,
     loading,
     error,
     selectedCategory,
@@ -34,6 +35,7 @@ export default function MenuPageClient() {
         {/* Core Product Menu with Loading, Error, Empty & Success States */}
         <ProductGrid
           products={products}
+          isCatalogEmpty={isCatalogEmpty}
           loading={loading}
           error={error}
           selectedCategory={selectedCategory}
