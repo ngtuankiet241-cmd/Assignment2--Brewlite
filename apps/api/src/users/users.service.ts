@@ -7,8 +7,9 @@ export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findByEmail(email: string) {
-    return this.prisma.user.findUnique({
-      where: { email },
+    // Also match accounts created before emails were normalized at registration.
+    return this.prisma.user.findFirst({
+      where: { email: { equals: email.trim().toLowerCase(), mode: 'insensitive' } },
     });
   }
 

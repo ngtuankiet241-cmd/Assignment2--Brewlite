@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { saveAuthSession } from '@/lib/auth';
 
 export default function RegisterPageClient() {
   const router = useRouter();
@@ -34,7 +35,7 @@ export default function RegisterPageClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fullName: fullName.trim(),
-          email: email.trim(),
+          email: email.trim().toLowerCase(),
           password,
         }),
       });
@@ -45,12 +46,9 @@ export default function RegisterPageClient() {
       }
 
       const data = await res.json();
-      localStorage.setItem('token', data.accessToken);
-      if (data.user) {
-        localStorage.setItem('user', JSON.stringify(data.user));
-      }
+      saveAuthSession(data);
 
-      router.push('/menu');
+      router.replace('/menu');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Đăng ký thất bại. Vui lòng thử lại.';
       setError(message);

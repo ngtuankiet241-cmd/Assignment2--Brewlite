@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { saveAuthSession } from '@/lib/auth';
 
 export default function LoginPageClient() {
   const router = useRouter();
@@ -27,7 +28,7 @@ export default function LoginPageClient() {
       const res = await fetch(`${apiUrl}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
 
       if (!res.ok) {
@@ -36,14 +37,13 @@ export default function LoginPageClient() {
       }
 
       const data = await res.json();
-      localStorage.setItem('token', data.accessToken);
-      if (data.user) {
-        localStorage.setItem('user', JSON.stringify(data.user));
-      }
+      saveAuthSession(data);
 
-      router.push('/menu');
+      router.replace('/menu');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Đăng nhập thất bại. Vui lòng thử lại.';
+      const message = err instanceof TypeError
+        ? 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối và thử lại.'
+        : err instanceof Error ? err.message : 'Đăng nhập thất bại. Vui lòng thử lại.';
       setError(message);
     } finally {
       setLoading(false);

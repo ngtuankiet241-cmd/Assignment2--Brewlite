@@ -41,7 +41,7 @@ describe('Products API (E2E)', () => {
     expect(response.body).toEqual({
       success: true,
       message: 'Lấy danh sách sản phẩm thành công',
-      data: [americano, latte],
+      data: JSON.parse(JSON.stringify([americano, latte])),
     });
   });
 
@@ -69,7 +69,7 @@ describe('Products API (E2E)', () => {
     expect(response.body).toEqual({
       success: true,
       message: 'Lấy chi tiết sản phẩm thành công',
-      data: product,
+      data: JSON.parse(JSON.stringify(product)),
     });
   });
 

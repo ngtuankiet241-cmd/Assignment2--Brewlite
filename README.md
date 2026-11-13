@@ -105,7 +105,7 @@ Một Task hoặc Pull Request chỉ được coi là hoàn thành (Done) khi th
 ## 💻 Hướng dẫn Cài đặt & Chạy Local
 
 ### 1. Yêu cầu Tiên quyết
-- Node.js LTS (v18+) và npm / pnpm.
+- Node.js v22+ và npm / pnpm.
 - Docker Desktop (để chạy PostgreSQL cục bộ).
 - Git.
 
@@ -132,6 +132,8 @@ npm run prisma:generate
 npm run prisma:seed
 npm run start:dev
 ```
+Backend tự đọc `.env` ở thư mục gốc khi khởi động, kể cả khi chạy từ `apps/api`. Biến môi trường đã đặt trong terminal hoặc Docker được ưu tiên.
+
 - **Backend NestJS API:** `http://localhost:3001`
 - **Health Check Endpoint:** `http://localhost:3001/health`
 - **Chạy Unit Tests:** `npm test`
