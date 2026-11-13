@@ -47,11 +47,13 @@ export const AVAILABLE_TOPPINGS: Omit<Topping, 'quantity'>[] = [
   { id: 'cheese-foam', name: 'Kem cheese', unitPrice: 10000 },
 ];
 
-export function getCartItemUnitPrice(item: CartItem): number {
-  const toppingTotal = item.toppings.reduce(
+export function getCartItemToppingPrice(item: Pick<CartItem, 'toppings'>): number {
+  return item.toppings.reduce(
     (total, topping) => total + topping.unitPrice * topping.quantity,
     0,
   );
+}
 
-  return Math.max(0, item.basePrice + item.sizePriceAdjustment + toppingTotal);
+export function getCartItemUnitPrice(item: CartItem): number {
+  return Math.max(0, item.basePrice + item.sizePriceAdjustment + getCartItemToppingPrice(item));
 }

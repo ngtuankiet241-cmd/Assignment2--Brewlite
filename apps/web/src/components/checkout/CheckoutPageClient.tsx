@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useCart } from '@/context/useCart';
-import { getCartItemUnitPrice } from '@/types/cart';
+import { getCartItemToppingPrice, getCartItemUnitPrice } from '@/types/cart';
 import { formatCurrencyVND } from '@/data/mockProducts';
 
 interface CreatedOrder {
@@ -442,7 +442,8 @@ export default function CheckoutPageClient() {
           <div className="max-h-64 divide-y divide-coffee-100 overflow-y-auto pr-1 text-sm">
             {items.map((item) => {
               const unitPrice = getCartItemUnitPrice(item);
-              const toppingDesc = item.toppings.map((t) => t.name).join(', ');
+              const selectedToppings = item.toppings.filter((topping) => topping.quantity > 0);
+              const toppingPrice = getCartItemToppingPrice(item);
 
               return (
                 <div className="flex justify-between py-2.5" key={item.id}>
@@ -450,8 +451,20 @@ export default function CheckoutPageClient() {
                     <p className="truncate font-semibold text-coffee-950">
                       {item.quantity}x {item.productName} (Size {item.size})
                     </p>
-                    {toppingDesc && (
-                      <p className="text-[11px] text-coffee-500 truncate">+ {toppingDesc}</p>
+                    {selectedToppings.length > 0 && (
+                      <div className="mt-1 text-[11px] text-coffee-600">
+                        <ul aria-label="Topping mỗi ly" className="space-y-0.5">
+                          {selectedToppings.map((topping) => (
+                            <li key={topping.id} className="break-words">
+                              + {topping.name} x{topping.quantity}: {formatCurrencyVND(topping.unitPrice * topping.quantity)} / ly
+                            </li>
+                          ))}
+                        </ul>
+                        <p className="mt-1 font-semibold">
+                          Phụ phí topping: {formatCurrencyVND(toppingPrice)} / ly
+                          {item.quantity > 1 && ` · ${formatCurrencyVND(toppingPrice * item.quantity)} cho ${item.quantity} ly`}
+                        </p>
+                      </div>
                     )}
                   </div>
                   <span className="font-bold text-coffee-900 shrink-0">

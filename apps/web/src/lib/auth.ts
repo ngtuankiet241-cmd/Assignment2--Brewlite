@@ -41,6 +41,16 @@ export function getAuthSnapshot(): string | null {
   }
 }
 
+// Observe token rotation as well as user changes, without exposing expired sessions.
+export function getAuthTokenSnapshot(): string | null {
+  if (!getAuthSnapshot()) return null;
+  try {
+    return window.localStorage.getItem('token');
+  } catch {
+    return null;
+  }
+}
+
 export function saveAuthSession(session: { accessToken: string; user: AuthUser }) {
   if (typeof session?.accessToken !== 'string' || tokenExpiresAt(session.accessToken) <= Date.now() ||
       !parseAuthUser(JSON.stringify(session.user))) {

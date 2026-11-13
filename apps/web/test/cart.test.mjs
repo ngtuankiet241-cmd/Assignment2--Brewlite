@@ -1,14 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-// Helper logic directly matching src/types/cart.ts
-export function getCartItemUnitPrice(item) {
-  const toppingTotal = (item.toppings || []).reduce(
-    (total, topping) => total + topping.unitPrice * topping.quantity,
-    0,
-  );
-  return Math.max(0, item.basePrice + (item.sizePriceAdjustment || 0) + toppingTotal);
-}
+import { loadFrontend } from './helpers/frontend-runtime.mjs';
+
+const { getCartItemUnitPrice } = loadFrontend()('src/types/cart.ts');
 
 export function calculateCartTotal(items) {
   return items.reduce((sum, item) => sum + getCartItemUnitPrice(item) * item.quantity, 0);
