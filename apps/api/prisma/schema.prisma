@@ -15,6 +15,7 @@ enum Role {
 
 enum OrderStatus {
   PENDING
+  PAYMENT_FAILED
   PAID
   PREPARING
   READY

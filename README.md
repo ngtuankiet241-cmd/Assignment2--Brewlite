@@ -104,6 +104,8 @@ Một Task hoặc Pull Request chỉ được coi là hoàn thành (Done) khi th
 
 ## 💻 Hướng dẫn Cài đặt & Chạy Local
 
+Nghiệp vụ Order State Machine và bằng chứng chặn chuyển trạng thái sai: [quy tắc, migration và unit/integration test](docs/order-state-machine.md).
+
 ### 1. Yêu cầu Tiên quyết
 - Node.js v22+ và npm / pnpm.
 - Docker Desktop (để chạy PostgreSQL cục bộ).

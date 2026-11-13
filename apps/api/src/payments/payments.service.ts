@@ -1,5 +1,7 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { changeOrderStatus, lockOrder } from '../orders/order-transition';
 
 export interface CreatePaymentCheckoutDto {
   orderId: string;
@@ -19,61 +21,74 @@ export class PaymentsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async createCheckout(dto: CreatePaymentCheckoutDto) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: dto.orderId },
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const order = await lockOrder(tx, dto.orderId);
 
-    if (!order) {
-      throw new NotFoundException(`Order with id ${dto.orderId} not found`);
-    }
-
-    // Idempotency check (FR-21 / ADR-004)
-    if (dto.idempotencyKey) {
-      const existing = await this.prisma.payment.findUnique({
-        where: { idempotencyKey: dto.idempotencyKey },
-      });
-      if (existing) {
-        return existing;
+      if (dto.idempotencyKey) {
+        const existing = await tx.payment.findUnique({
+          where: { idempotencyKey: dto.idempotencyKey },
+        });
+        if (existing) {
+          if (existing.orderId !== order.id) {
+            throw new ConflictException('Idempotency key đã được sử dụng cho đơn hàng khác.');
+          }
+          return existing;
+        }
       }
-    }
 
-    const transactionRef = `SEPAY_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    const qrUrl = `https://qr.sepay.vn/img?acc=BREWLITE&bank=MBBank&amount=${dto.amount}&des=${transactionRef}`;
+      if (order.status === OrderStatus.PAYMENT_FAILED) {
+        await changeOrderStatus(tx, order.id, OrderStatus.PENDING);
+      } else if (order.status !== OrderStatus.PENDING) {
+        throw new ConflictException(`Không thể tạo thanh toán cho đơn ở trạng thái ${order.status}.`);
+      }
 
-    return this.prisma.payment.upsert({
-      where: { orderId: dto.orderId },
-      update: {
-        amount: dto.amount,
-        transactionRef,
-        idempotencyKey: dto.idempotencyKey,
-        qrUrl,
-        status: 'PENDING',
-      },
-      create: {
-        orderId: dto.orderId,
-        amount: dto.amount,
-        transactionRef,
-        idempotencyKey: dto.idempotencyKey,
-        qrUrl,
-        status: 'PENDING',
-      },
+      const transactionRef = `SEPAY_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const qrUrl = `https://qr.sepay.vn/img?acc=BREWLITE&bank=MBBank&amount=${dto.amount}&des=${transactionRef}`;
+
+      return tx.payment.upsert({
+        where: { orderId: dto.orderId },
+        update: {
+          amount: dto.amount,
+          transactionRef,
+          idempotencyKey: dto.idempotencyKey,
+          qrUrl,
+          status: 'PENDING',
+          paidAt: null,
+        },
+        create: {
+          orderId: dto.orderId,
+          amount: dto.amount,
+          transactionRef,
+          idempotencyKey: dto.idempotencyKey,
+          qrUrl,
+          status: 'PENDING',
+        },
+      });
     });
   }
 
   async handleWebhookIpn(payload: SepayWebhookPayload) {
-    const payment = await this.prisma.payment.findUnique({
-      where: { orderId: payload.orderId },
-    });
-
-    if (!payment) {
-      throw new NotFoundException(`Payment for order ${payload.orderId} not found`);
+    if (payload?.status !== 'SUCCESS' && payload?.status !== 'FAILED') {
+      throw new BadRequestException('Trạng thái thanh toán không hợp lệ.');
     }
 
-    const isSuccess = payload.status === 'SUCCESS';
-
-    // Atomically update payment and order status
     return this.prisma.$transaction(async (tx) => {
-      const updatedPayment = await tx.payment.update({
+      const order = await lockOrder(tx, payload.orderId);
+      const payment = await tx.payment.findUnique({ where: { orderId: order.id } });
+      if (!payment) throw new NotFoundException(`Payment for order ${order.id} not found`);
+
+      // An exact replay is a no-op, even after preparation or completion.
+      if (payment.status === payload.status && payment.transactionRef === payload.transactionRef &&
+          payment.amount === payload.amount) {
+        return payment;
+      }
+      if (payment.status === 'SUCCESS') {
+        throw new ConflictException('Không thể thay đổi giao dịch đã thanh toán thành công.');
+      }
+
+      const isSuccess = payload.status === 'SUCCESS';
+      await changeOrderStatus(tx, order.id, isSuccess ? OrderStatus.PAID : OrderStatus.PAYMENT_FAILED);
+      return tx.payment.update({
         where: { orderId: payload.orderId },
         data: {
           status: isSuccess ? 'SUCCESS' : 'FAILED',
@@ -81,15 +96,11 @@ export class PaymentsService {
           paidAt: isSuccess ? new Date() : null,
         },
       });
-
-      if (isSuccess) {
-        await tx.order.update({
-          where: { id: payload.orderId },
-          data: { status: 'PAID' },
-        });
+    }).catch((error) => {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('Mã giao dịch thanh toán đã được sử dụng.');
       }
-
-      return updatedPayment;
+      throw error;
     });
   }
 }

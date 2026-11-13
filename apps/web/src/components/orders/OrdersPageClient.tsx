@@ -30,18 +30,22 @@ const STATUS_STEPS = ['PENDING', 'PAID', 'PREPARING', 'READY', 'COMPLETED'];
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'Chờ thanh toán',
+  PAYMENT_FAILED: 'Thanh toán thất bại',
   PAID: 'Đã thanh toán',
   PREPARING: 'Đang pha chế',
   READY: 'Sẵn sàng nhận',
   COMPLETED: 'Hoàn tất',
+  CANCELLED: 'Đã hủy',
 };
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: 'bg-gray-100 text-gray-700',
+  PAYMENT_FAILED: 'bg-red-100 text-red-700',
   PAID: 'bg-amber-100 text-amber-800',
   PREPARING: 'bg-orange-100 text-orange-800',
   READY: 'bg-blue-100 text-blue-800',
   COMPLETED: 'bg-emerald-100 text-emerald-800',
+  CANCELLED: 'bg-gray-100 text-gray-700',
 };
 
 function formatCurrency(amount: number) {
@@ -59,6 +63,11 @@ function formatDate(dateStr: string) {
 }
 
 function OrderStatusBar({ status }: { status: string }) {
+  if (status === 'PAYMENT_FAILED' || status === 'CANCELLED') {
+    return <p className="mt-3 text-sm text-coffee-600">{status === 'PAYMENT_FAILED'
+      ? 'Thanh toán chưa thành công. Bạn có thể thử lại hoặc hủy đơn.'
+      : 'Đơn hàng đã kết thúc và không thể tiếp tục xử lý.'}</p>;
+  }
   const currentIndex = STATUS_STEPS.indexOf(status);
   return (
     <div className="mt-3">
