@@ -36,8 +36,11 @@ Mọi cặp khác, bao gồm chuyển về chính trạng thái hiện tại qua
 
 `PATCH /orders/:id/status` nhận `{ "status": "READY" }`:
 
+Endpoint yêu cầu `Authorization: Bearer <accessToken>` của tài khoản `BARISTA` hoặc `ADMIN`. Endpoint `PATCH /staff/orders/:id/status` dùng cùng logic cập nhật; xem [API nhân viên](./staff-api.md).
+
 - **200:** chuyển tiếp hợp lệ, trả bản ghi đơn đã cập nhật.
 - **400:** thiếu trạng thái hoặc giá trị không thuộc enum.
+- **401/403:** thiếu/token không hợp lệ hoặc không có quyền nhân viên.
 - **404:** không tìm thấy đơn.
 - **409:** cặp chuyển tiếp không hợp lệ; bản ghi đơn, kể cả `updatedAt`, giữ nguyên.
 
@@ -52,7 +55,7 @@ Thanh toán dùng cùng hàm chuyển trạng thái:
 - IPN đến sau khi đơn đã hủy không mở lại đơn. IPN trùng sau khi pha chế/hoàn tất không kéo đơn về `PAID`. Callback thất bại không ghi đè giao dịch đã thành công.
 - Nếu ghi Payment thất bại, cập nhật Order được rollback. Mã giao dịch đã dùng cho payment khác trả **409**.
 
-Phạm vi thay đổi là quy tắc trạng thái và tính nguyên tử. Tích hợp SePay hiện vẫn mô phỏng; xác thực chữ ký webhook, đối soát số tiền và phân quyền nhân viên cần được triển khai riêng.
+Phân quyền nhân viên đã được áp dụng cho hai API cập nhật trạng thái bằng JWT và `RolesGuard` (`BARISTA`/`ADMIN`). Tích hợp SePay hiện vẫn mô phỏng; xác thực chữ ký webhook và đối soát số tiền cần được triển khai riêng.
 
 ## Bằng chứng unit/integration test
 

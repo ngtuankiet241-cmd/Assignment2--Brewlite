@@ -1,4 +1,6 @@
 import request = require('supertest');
+import { Role } from '@prisma/client';
+import { AuthService } from '../src/auth/auth.service';
 import { InventoryService } from '../src/inventory/inventory.service';
 import { OrdersService } from '../src/orders/orders.service';
 import { createTestApplication, TestApplication } from './helpers/test-app';
@@ -6,12 +8,16 @@ import { createTestApplication, TestApplication } from './helpers/test-app';
 describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
   let context: TestApplication;
   let inventory: InventoryService;
+  let staffToken: string;
 
   beforeAll(async () => {
     context = await createTestApplication();
     // Bind once so all concurrent Supertest requests share the listening server.
     await context.app.listen(0, '127.0.0.1');
     inventory = context.app.get(InventoryService);
+    staffToken = context.app.get(AuthService).generateToken({
+      userId: 'inventory-staff', email: 'staff@example.test', role: Role.BARISTA, fullName: 'Staff Test',
+    });
   });
   beforeEach(async () => {
     await context.prisma.order.deleteMany();
@@ -36,7 +42,7 @@ describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
     where: { id }, data: { reservationExpiresAt: new Date(Date.now() - 1000) },
   });
   const patch = (id: string, status: string) => request(context.app.getHttpServer())
-    .patch(`/orders/${id}/status`).send({ status });
+    .patch(`/orders/${id}/status`).auth(staffToken, { type: 'bearer' }).send({ status });
   const checkout = (orderId: string) => request(context.app.getHttpServer())
     .post('/payments/sepay/checkout').send({ orderId, amount: 10000, idempotencyKey: `key-${orderId}` });
   const ipn = (orderId: string, status = 'SUCCESS') => request(context.app.getHttpServer())

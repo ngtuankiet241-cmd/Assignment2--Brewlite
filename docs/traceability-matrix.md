@@ -51,12 +51,12 @@ Bảng ma trận truy vết tuân thủ định dạng chuẩn 5 cột theo quy 
 | **FR-09** Xem lại thông tin đơn | US-07, UC-01 | AD-01, SD-01, CD-01 (`Order`, `OrderItem`) | `apps/web/src/components/checkout/CheckoutPageClient.tsx` (Tóm tắt đơn hàng, size, topping) | `UT-CART-01` -> `04` |
 | **FR-10** Tạo đơn hàng | US-08, UC-01 | AD-01, SD-01, CD-01 (`Order`, `OrderItem`) | `POST /orders`<br>`apps/api/src/orders/orders.controller.ts`<br>`apps/web/src/components/checkout/CheckoutPageClient.tsx` | `INT-ORD-01`<br>`UT-ORD-01` |
 | **FR-11** Theo dõi trạng thái đơn | US-09 | AD-01, SD-01, SM-01, CD-01 (`Order`) | *Sprint 2:* `GET /orders/:id/status`, `OrderStatus.tsx` | *Sprint 2:* `E2E-ORD-02` |
-| **FR-12** Cập nhật trạng thái đơn | US-10 | AD-01, SM-01, CD-01 (`Order`, `User`) | `PATCH /orders/:id/status`<br>`orders/order-state-machine.ts` (`assertTransition`)<br>`orders/order-transition.ts` (khóa dòng, transaction) | `UT-SM-01..03`<br>`UT-ORD-04..07`<br>`INT-SM-01..12` |
+| **FR-12** Cập nhật trạng thái đơn | US-10 | AD-01, SM-01, CD-01 (`Order`, `User`) | `GET /staff/orders`, `GET /staff/orders/:id`<br>`PATCH /staff/orders/:id/status`, `PATCH /orders/:id/status`<br>`staff/staff.controller.ts`, `staff/staff.service.ts`<br>`JwtAuthGuard` + `RolesGuard` (`BARISTA`/`ADMIN`)<br>`orders/order-state-machine.ts` (`assertTransition`)<br>`orders/order-transition.ts` (khóa dòng, transaction) | `UT-SM-01..03`<br>`UT-ORD-04..07`<br>`INT-SM-01..12`<br>`INT-STAFF-01..15` |
 | **FR-13** Xem lịch sử đơn hàng | US-14 | CD-01 (`User`, `Order`) | *Sprint 2:* `GET /orders/history`, `OrderHistory.tsx` | *Sprint 2:* `INT-ORD-06` |
 | **FR-14** Đăng ký tài khoản | US-13 | CD-01 (`User`) | `POST /auth/register`<br>`apps/api/src/auth/auth.service.ts` | `UT-AUTH-01`<br>`UT-AUTH-04` |
 | **FR-15** Đăng nhập tài khoản | US-13 | SD-01, CD-01 (`User`) | `POST /auth/login`<br>`apps/api/src/auth/auth.service.ts` | `UT-AUTH-02`<br>`UT-AUTH-03` |
 | **FR-16** Đăng xuất tài khoản | US-13 | CD-01 (`User`) | Phía Client xóa token xác thực | `UT-AUTH-03` |
-| **FR-17** Xác thực truy cập bằng JWT | UC-01 (xác thực) | SD-01, CD-01 (`User`) | `JwtAuthGuard`, `AuthService.verifyToken`<br>`apps/api/src/common/guards/jwt-auth.guard.ts` | `UT-AUTH-02` |
+| **FR-17** Xác thực truy cập bằng JWT | UC-01 (xác thực), US-10 | SD-01, CD-01 (`User`) | `JwtAuthGuard`, `AuthService.verifyToken`, `RolesGuard`<br>`apps/api/src/common/guards/jwt-auth.guard.ts`<br>`apps/api/src/staff/staff.controller.ts` | `UT-AUTH-02`<br>`INT-STAFF-01..04`, `INT-STAFF-15` |
 | **FR-18** Chọn phương thức thanh toán | US-11, UC-01 | AD-01, SD-01, CD-01 (`Payment`) | `POST /payments/sepay/checkout`<br>`apps/web/src/components/checkout/CheckoutPageClient.tsx` (QR/Tiền mặt) | `UT-PAY-01` -> `03` |
 | **FR-19** Xử lý thanh toán mô phỏng | US-12, UC-01 | SD-01, CD-01 (`Payment`, `Order`) | *Sprint 2:* `POST /payments/sepay/checkout`, SePay Gateway | *Sprint 2:* `INT-PAY-01` |
 | **FR-20** Xác nhận kết quả thanh toán | US-12, UC-01 | SD-01, CD-01 (`Payment`, `Order`) | *Sprint 2:* `POST /payments/sepay/webhook-ipn` | *Sprint 2:* `INT-PAY-02` |
@@ -66,7 +66,7 @@ Bảng ma trận truy vết tuân thủ định dạng chuẩn 5 cột theo quy 
 
 ## Ghi chú truy vết
 
-- Phần FR-12 được triển khai và kiểm chứng tại [order-state-machine.md](./order-state-machine.md) là quy tắc chuyển trạng thái và tính nguyên tử; phân quyền Admin/Barista cho API vẫn cần triển khai riêng.
+- FR-12 gồm quy tắc chuyển trạng thái và tính nguyên tử tại [order-state-machine.md](./order-state-machine.md); API nhân viên và phân quyền `BARISTA`/`ADMIN` được mô tả và kiểm chứng tại [staff-api.md](./staff-api.md).
 
 - US-07 bao gồm cả nhập thông tin và xem lại đơn (FR-08, FR-09); FR-07 là điều kiện để bắt đầu UC-01, không có User Story riêng.
 - US-13 gộp đăng ký, đăng nhập và đăng xuất; US-14 ánh xạ tới FR-13. Không tạo mã User Story riêng cho từng FR trong các nhóm này.
