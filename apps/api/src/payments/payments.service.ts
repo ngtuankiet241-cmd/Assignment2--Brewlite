@@ -30,6 +30,9 @@ export class PaymentsService {
     return this.prisma.$transaction(async (tx) => {
       const order = await lockOrder(tx, dto.orderId);
       assertReservationActive(order);
+      if (!Number.isSafeInteger(dto.amount) || dto.amount !== order.totalAmount) {
+        throw new BadRequestException('Số tiền thanh toán phải khớp tổng tiền sau giảm giá của đơn hàng.');
+      }
 
       if (dto.idempotencyKey) {
         const existing = await tx.payment.findUnique({
@@ -50,12 +53,12 @@ export class PaymentsService {
       }
 
       const transactionRef = `SEPAY_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      const qrUrl = `https://qr.sepay.vn/img?acc=BREWLITE&bank=MBBank&amount=${dto.amount}&des=${transactionRef}`;
+      const qrUrl = `https://qr.sepay.vn/img?acc=BREWLITE&bank=MBBank&amount=${order.totalAmount}&des=${transactionRef}`;
 
       return tx.payment.upsert({
         where: { orderId: dto.orderId },
         update: {
-          amount: dto.amount,
+          amount: order.totalAmount,
           transactionRef,
           idempotencyKey: dto.idempotencyKey,
           qrUrl,
@@ -64,7 +67,7 @@ export class PaymentsService {
         },
         create: {
           orderId: dto.orderId,
-          amount: dto.amount,
+          amount: order.totalAmount,
           transactionRef,
           idempotencyKey: dto.idempotencyKey,
           qrUrl,
@@ -84,6 +87,9 @@ export class PaymentsService {
       const order = await lockOrder(tx, payload.orderId);
       const payment = await tx.payment.findUnique({ where: { orderId: order.id } });
       if (!payment) throw new NotFoundException(`Payment for order ${order.id} not found`);
+      if (!Number.isSafeInteger(payload.amount) || payload.amount !== order.totalAmount || payload.amount !== payment.amount) {
+        throw new BadRequestException('Số tiền giao dịch không khớp số tiền cần thanh toán.');
+      }
 
       // An exact replay is a no-op, even after preparation or completion.
       if (payment.status === payload.status && payment.transactionRef === payload.transactionRef &&

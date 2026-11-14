@@ -1,16 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useCart } from '@/context/useCart';
 import { getCartItemUnitPrice } from '@/types/cart';
 import { formatCurrencyVND } from '@/data/mockProducts';
+import type { CartItem } from '@/types/cart';
+import { requestPromotionQuote, type PromotionQuote } from '@/lib/promotions';
+import PromotionCodeField from './PromotionCodeField';
 
 interface CreatedOrder {
   id: string;
   customerName: string;
   customerPhone: string;
   tableNumber?: number;
+  subtotalAmount: number;
+  discountAmount: number;
+  promotionCode: string | null;
   totalAmount: number;
   status: string;
 }
@@ -21,6 +27,12 @@ interface PaymentQR {
   amount: number;
   status: string;
 }
+
+type PromotionFeedback = { items: CartItem[] } & (
+  | { status: 'applying' }
+  | { status: 'applied'; quote: PromotionQuote }
+  | { status: 'error'; message: string }
+);
 
 export default function CheckoutPageClient() {
   const { items, itemCount, subtotal, hydrated, clearCart } = useCart();
@@ -33,6 +45,22 @@ export default function CheckoutPageClient() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [promotionCode, setPromotionCode] = useState('');
+  const [promotionFeedback, setPromotionFeedback] = useState<PromotionFeedback | null>(null);
+  const promotionRequest = useRef<AbortController | null>(null);
+  const promotionRequestId = useRef(0);
+
+  // Immutable cart arrays bind each quote to exactly the cart that was checked.
+  const currentPromotion = promotionFeedback?.items === items ? promotionFeedback : null;
+  const appliedPromotion = currentPromotion?.status === 'applied' ? currentPromotion.quote : null;
+  const applyingPromotion = currentPromotion?.status === 'applying';
+  const promotionError = currentPromotion?.status === 'error' ? currentPromotion.message : undefined;
+  const totalAmount = appliedPromotion?.totalAmount ?? subtotal;
+
+  useEffect(() => () => {
+    promotionRequestId.current += 1;
+    promotionRequest.current?.abort();
+  }, [items]);
 
   const [createdOrder, setCreatedOrder] = useState<CreatedOrder | null>(null);
   const [paymentQR, setPaymentQR] = useState<PaymentQR | null>(null);
@@ -40,6 +68,41 @@ export default function CheckoutPageClient() {
   const [isPaid, setIsPaid] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+  function changePromotionCode(code: string) {
+    promotionRequestId.current += 1;
+    promotionRequest.current?.abort();
+    setPromotionCode(code);
+    setPromotionFeedback(null);
+  }
+
+  async function applyPromotion() {
+    if (submitting || applyingPromotion) return;
+    const code = promotionCode.trim();
+    if (!code) {
+      setPromotionFeedback({ items, status: 'error', message: 'Vui lòng nhập mã giảm giá.' });
+      return;
+    }
+    promotionRequest.current?.abort();
+    const controller = new AbortController();
+    promotionRequest.current = controller;
+    const requestId = ++promotionRequestId.current;
+    setPromotionFeedback({ items, status: 'applying' });
+    try {
+      const quote = await requestPromotionQuote(apiUrl, code, subtotal, controller.signal);
+      if (controller.signal.aborted || requestId !== promotionRequestId.current) return;
+      setPromotionCode(quote.code);
+      setPromotionFeedback({ items, status: 'applied', quote });
+    } catch (error: unknown) {
+      if (controller.signal.aborted || requestId !== promotionRequestId.current) return;
+      setPromotionFeedback({
+        items, status: 'error',
+        message: error instanceof TypeError
+          ? 'Không thể kết nối để kiểm tra mã. Vui lòng thử lại.'
+          : error instanceof Error ? error.message : 'Không thể áp dụng mã giảm giá. Vui lòng thử lại.',
+      });
+    }
+  }
 
   if (!hydrated) {
     return (
@@ -78,6 +141,18 @@ export default function CheckoutPageClient() {
                 <span className="text-coffee-600">Số bàn:</span>
                 <span className="font-semibold">Bàn #{createdOrder.tableNumber}</span>
               </div>
+            )}
+            {createdOrder.promotionCode && (
+              <>
+                <div className="mt-2 flex justify-between border-t border-coffee-200/60 pt-2">
+                  <span className="text-coffee-600">Tạm tính:</span>
+                  <span>{formatCurrencyVND(createdOrder.subtotalAmount)}</span>
+                </div>
+                <div className="flex justify-between gap-3 py-1 text-emerald-700">
+                  <span>Giảm giá ({createdOrder.promotionCode}):</span>
+                  <span className="shrink-0 font-semibold">−{formatCurrencyVND(createdOrder.discountAmount)}</span>
+                </div>
+              </>
             )}
             <div className="flex justify-between py-1 border-t border-coffee-200/60 mt-2 pt-2">
               <span className="text-coffee-600">Tổng thanh toán:</span>
@@ -140,6 +215,11 @@ export default function CheckoutPageClient() {
             <p className="mt-3 text-xs font-bold text-coffee-800">
               Số tiền: {formatCurrencyVND(createdOrder.totalAmount)}
             </p>
+            {createdOrder.promotionCode && (
+              <p className="mt-1 text-center text-xs font-semibold text-emerald-700">
+                Mã {createdOrder.promotionCode}: đã giảm {formatCurrencyVND(createdOrder.discountAmount)}
+              </p>
+            )}
             <p className="mt-1 font-mono text-[11px] text-coffee-500">
               Nội dung: {paymentQR.transactionRef}
             </p>
@@ -223,6 +303,13 @@ export default function CheckoutPageClient() {
   // 4. Form thông tin đặt hàng & xem lại đơn
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting || applyingPromotion) return;
+    if (promotionCode.trim() && !appliedPromotion) {
+      setPromotionFeedback({
+        items, status: 'error', message: 'Vui lòng áp dụng mã giảm giá hoặc xóa mã trước khi đặt hàng.',
+      });
+      return;
+    }
     if (!customerName.trim() || !customerPhone.trim()) {
       setError('Vui lòng nhập đầy đủ họ tên và số điện thoại nhận đơn.');
       return;
@@ -237,6 +324,7 @@ export default function CheckoutPageClient() {
         customerPhone: customerPhone.trim(),
         tableNumber: tableNumber ? parseInt(tableNumber, 10) : undefined,
         notes: notes.trim() || undefined,
+        promotionCode: appliedPromotion?.code,
         items: items.map((item) => {
           const unitPrice = getCartItemUnitPrice(item);
           const toppingString = item.toppings
@@ -269,6 +357,9 @@ export default function CheckoutPageClient() {
 
       if (!orderRes.ok) {
         const errorData = await orderRes.json().catch(() => null);
+        if (orderRes.status === 400 && appliedPromotion) {
+          setPromotionFeedback({ items, status: 'error', message: 'Mã cần được kiểm tra lại. Vui lòng áp dụng lại mã hoặc xóa mã để tiếp tục.' });
+        }
         throw new Error(errorData?.message || `Lỗi máy chủ (${orderRes.status})`);
       }
 
@@ -462,20 +553,38 @@ export default function CheckoutPageClient() {
             })}
           </div>
 
+          <PromotionCodeField
+            appliedCode={appliedPromotion?.code}
+            applying={applyingPromotion}
+            code={promotionCode}
+            disabled={submitting}
+            error={promotionError}
+            notice={promotionFeedback && !currentPromotion ? 'Giỏ hàng đã thay đổi. Vui lòng áp dụng lại mã.' : undefined}
+            onApply={applyPromotion}
+            onCodeChange={changePromotionCode}
+            onRemove={() => changePromotionCode('')}
+          />
+
           <div className="border-t border-coffee-200/70 pt-3">
             <div className="flex justify-between text-sm text-coffee-600">
               <span>Tạm tính</span>
               <span>{formatCurrencyVND(subtotal)}</span>
             </div>
+            {appliedPromotion && (
+              <div className="mt-2 flex justify-between gap-3 text-sm text-emerald-700">
+                <span className="min-w-0 break-words">Giảm giá ({appliedPromotion.code})</span>
+                <span className="shrink-0 font-semibold">−{formatCurrencyVND(appliedPromotion.discountAmount)}</span>
+              </div>
+            )}
             <div className="mt-2 flex items-center justify-between">
               <span className="text-sm font-bold text-coffee-950">Tổng thanh toán</span>
-              <span className="text-xl font-black text-coffee-900">{formatCurrencyVND(subtotal)}</span>
+              <span aria-live="polite" className="text-xl font-black text-coffee-900">{formatCurrencyVND(totalAmount)}</span>
             </div>
           </div>
 
           <button
             className="mt-4 flex min-h-12 w-full items-center justify-center rounded-full bg-coffee-800 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-coffee-700 active:scale-[0.98] disabled:opacity-50"
-            disabled={submitting}
+            disabled={submitting || applyingPromotion}
             type="submit"
           >
             {submitting ? 'Đang khởi tạo đơn hàng...' : 'Xác nhận đặt hàng →'}

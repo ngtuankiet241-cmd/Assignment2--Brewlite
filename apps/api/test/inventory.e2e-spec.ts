@@ -43,10 +43,10 @@ describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
   });
   const patch = (id: string, status: string) => request(context.app.getHttpServer())
     .patch(`/orders/${id}/status`).auth(staffToken, { type: 'bearer' }).send({ status });
-  const checkout = (orderId: string) => request(context.app.getHttpServer())
-    .post('/payments/sepay/checkout').send({ orderId, amount: 10000, idempotencyKey: `key-${orderId}` });
-  const ipn = (orderId: string, status = 'SUCCESS') => request(context.app.getHttpServer())
-    .post('/payments/sepay/webhook-ipn').send({ orderId, amount: 10000, status, transactionRef: `ref-${orderId}` });
+  const checkout = (orderId: string, amount = 10000) => request(context.app.getHttpServer())
+    .post('/payments/sepay/checkout').send({ orderId, amount, idempotencyKey: `key-${orderId}` });
+  const ipn = (orderId: string, status = 'SUCCESS', amount = 10000) => request(context.app.getHttpServer())
+    .post('/payments/sepay/webhook-ipn').send({ orderId, amount, status, transactionRef: `ref-${orderId}` });
 
   it.each([1, 2, 3])('INT-INV-01: 30 simultaneous orders cannot exceed 7 units (round %s)', async () => {
     const p = await product(7);
@@ -142,11 +142,11 @@ describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
   it('INT-INV-09: concurrent sweepers, cancellation and late IPN cannot restore stock twice', async () => {
     const p = await product(3);
     const placed = await place([item(p.id, 3)]).expect(201);
-    await checkout(placed.body.id).expect(201);
+    await checkout(placed.body.id, 30000).expect(201);
     await expire(placed.body.id);
     const responses = await Promise.all([
       ...Array.from({ length: 6 }, () => inventory.expireReservations()),
-      patch(placed.body.id, 'CANCELLED'), ipn(placed.body.id),
+      patch(placed.body.id, 'CANCELLED'), ipn(placed.body.id, 'SUCCESS', 30000),
     ]);
     expect((responses[7] as request.Response).status).toBe(409);
     expect(await order(placed.body.id)).toMatchObject({ status: 'CANCELLED', reservationStatus: 'RELEASED' });

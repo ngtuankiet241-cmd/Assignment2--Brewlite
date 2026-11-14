@@ -41,6 +41,7 @@ export async function reserveStock(tx: Prisma.TransactionClient, quantities: Map
     });
     if (result.count !== 1) throw new OptimisticStockConflict();
   }
+  return products;
 }
 
 export function reservationExpired(order: Order, now = new Date()) {

@@ -92,7 +92,7 @@ Content-Type: application/json
 { "status": "PREPARING" }
 ```
 
-Luồng pha chế: `PAID -> PREPARING -> READY -> COMPLETED`. Hủy đơn bằng `CANCELLED` khi đơn còn `PENDING`, `PAYMENT_FAILED` hoặc `PAID`. API dùng toàn bộ [state machine hiện có](./order-state-machine.md), bao gồm các nhánh thanh toán/thử lại.
+Luồng pha chế: `PAID -> PREPARING -> READY -> COMPLETED`. Hủy đơn bằng `CANCELLED` khi đơn còn `PENDING`, `PAYMENT_FAILED` hoặc `PAID`. API dùng toàn bộ [state machine hiện có](../apps/api/src/orders/order-state-machine.ts), bao gồm các nhánh thanh toán/thử lại.
 
 ```powershell
 Invoke-RestMethod -Method Patch -Uri 'http://localhost:3001/staff/orders/order-id/status' `

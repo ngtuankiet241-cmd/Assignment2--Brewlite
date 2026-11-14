@@ -106,14 +106,14 @@ describe('PaymentsService', () => {
     });
 
     it.each(['CANCELLED', 'COMPLETED', 'PREPARING'])('UT-PAY-05: IPN cannot change an order in %s', async (status) => {
-      mockPrisma.$queryRaw.mockResolvedValue([{ id: 'ord-123', status }]);
+      mockPrisma.$queryRaw.mockResolvedValue([{ id: 'ord-123', status, totalAmount: 70000 }]);
       await expect(service.handleWebhookIpn({ orderId: 'ord-123', transactionRef: 'new-ref', amount: 70000, status: 'SUCCESS' })).rejects.toThrow(ConflictException);
       expect(mockPrisma.order.update).not.toHaveBeenCalled();
       expect(mockPrisma.payment.update).not.toHaveBeenCalled();
     });
 
     it('UT-PAY-06: an exact success replay does not rewind a completed order', async () => {
-      mockPrisma.$queryRaw.mockResolvedValue([{ id: 'ord-123', status: 'COMPLETED' }]);
+      mockPrisma.$queryRaw.mockResolvedValue([{ id: 'ord-123', status: 'COMPLETED', totalAmount: 70000 }]);
       mockPrisma.payment.findUnique.mockResolvedValue({ id: 'pay-1', orderId: 'ord-123', amount: 70000, transactionRef: 'paid-ref', status: 'SUCCESS' });
       await service.handleWebhookIpn({ orderId: 'ord-123', transactionRef: 'paid-ref', amount: 70000, status: 'SUCCESS' });
       expect(mockPrisma.order.update).not.toHaveBeenCalled();
@@ -121,7 +121,7 @@ describe('PaymentsService', () => {
     });
 
     it('UT-PAY-07: a failed callback cannot downgrade a successful payment', async () => {
-      mockPrisma.payment.findUnique.mockResolvedValue({ id: 'pay-1', orderId: 'ord-123', status: 'SUCCESS' });
+      mockPrisma.payment.findUnique.mockResolvedValue({ id: 'pay-1', orderId: 'ord-123', status: 'SUCCESS', amount: 70000 });
       await expect(service.handleWebhookIpn({ orderId: 'ord-123', transactionRef: 'failed-ref', amount: 70000, status: 'FAILED' })).rejects.toThrow(ConflictException);
       expect(mockPrisma.order.update).not.toHaveBeenCalled();
       expect(mockPrisma.payment.update).not.toHaveBeenCalled();
@@ -135,13 +135,13 @@ describe('PaymentsService', () => {
 
   describe('checkout state restrictions', () => {
     it.each(['PAID', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED'])('UT-PAY-09: cannot start a new payment for %s', async (status) => {
-      mockPrisma.$queryRaw.mockResolvedValue([{ id: 'ord-123', status }]);
+      mockPrisma.$queryRaw.mockResolvedValue([{ id: 'ord-123', status, totalAmount: 70000 }]);
       await expect(service.createCheckout({ orderId: 'ord-123', amount: 70000 })).rejects.toThrow(ConflictException);
       expect(mockPrisma.payment.upsert).not.toHaveBeenCalled();
     });
 
     it('UT-PAY-10: retrying a failed payment resets the order to PENDING in the same transaction', async () => {
-      mockPrisma.$queryRaw.mockResolvedValue([{ id: 'ord-123', status: 'PAYMENT_FAILED' }]);
+      mockPrisma.$queryRaw.mockResolvedValue([{ id: 'ord-123', status: 'PAYMENT_FAILED', totalAmount: 70000 }]);
       await service.createCheckout({ orderId: 'ord-123', amount: 70000 });
       expect(mockPrisma.order.update).toHaveBeenCalledWith({ where: { id: 'ord-123' }, data: { status: 'PENDING' } });
       expect(mockPrisma.payment.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: expect.objectContaining({ status: 'PENDING', paidAt: null }) }));

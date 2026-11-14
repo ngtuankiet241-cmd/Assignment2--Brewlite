@@ -101,7 +101,7 @@ PENDING ──► PAID ──► PREPARING ──► READY ──► COMPLETED
    │          │
    └──────────┴──► CANCELLED  (PAID cũng có thể hủy)
 ```
-Mỗi bước chuyển được kiểm tra bởi `assertTransition` trong `orders/order-state-machine.ts`. API trạng thái và xử lý thanh toán khóa dòng đơn trong transaction trước khi ghi. `COMPLETED` và `CANCELLED` là trạng thái kết thúc. API `/staff` và cập nhật trạng thái được bảo vệ bằng `JwtAuthGuard` + `RolesGuard` cho `BARISTA`/`ADMIN`. Xem [đồ thị chính xác và bằng chứng unit/integration test](../order-state-machine.md) và [API nhân viên](../staff-api.md).
+Mỗi bước chuyển được kiểm tra bởi `assertTransition` trong `orders/order-state-machine.ts`. API trạng thái và xử lý thanh toán khóa dòng đơn trong transaction trước khi ghi. `COMPLETED` và `CANCELLED` là trạng thái kết thúc. API `/staff` và cập nhật trạng thái được bảo vệ bằng `JwtAuthGuard` + `RolesGuard` cho `BARISTA`/`ADMIN`. Xem [quy tắc chuyển trạng thái](../../apps/api/src/orders/order-state-machine.ts), [kiểm thử tích hợp](../../apps/api/test/order-state-machine.e2e-spec.ts) và [API nhân viên](../staff-api.md).
 
 ### 2.3 Tầng Dữ liệu – PostgreSQL 16
 

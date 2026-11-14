@@ -104,9 +104,11 @@ Một Task hoặc Pull Request chỉ được coi là hoàn thành (Done) khi th
 
 ## 💻 Hướng dẫn Cài đặt & Chạy Local
 
-Nghiệp vụ Order State Machine và bằng chứng chặn chuyển trạng thái sai: [quy tắc, migration và unit/integration test](docs/order-state-machine.md).
+Nghiệp vụ Order State Machine: [quy tắc chuyển trạng thái](apps/api/src/orders/order-state-machine.ts) và [kiểm thử tích hợp](apps/api/test/order-state-machine.e2e-spec.ts).
 
 API nhân viên `/staff` (JWT `BARISTA`/`ADMIN`): [endpoint, cách đăng nhập và ví dụ gọi API](docs/staff-api.md).
+
+Áp mã giảm giá (UC-01 / AF-01): nhập và áp dụng mã tại `/checkout`; `POST /promotions/validate` kiểm tra mã, sau đó gửi `promotionCode` khi tạo đơn qua `POST /orders` để áp dụng.
 
 ### 1. Yêu cầu Tiên quyết
 - Node.js v22+ và npm / pnpm.
