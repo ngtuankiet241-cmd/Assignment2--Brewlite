@@ -4,6 +4,8 @@ Thư mục `tests/` ở thư mục gốc chứa các bộ kiểm thử tích h�
 
 Kiểm thử tồn kho đồng thời qua **HTTP + PostgreSQL thật** nằm tại `apps/api/test/inventory.e2e-spec.ts`. Chạy `npm.cmd --prefix apps/api run test:e2e -- inventory`. Bộ test này tự tạo và xóa schema riêng, không xóa bảng dữ liệu ứng dụng.
 
+Kiểm thử API nhân viên, JWT/RBAC, lọc/phân trang và cập nhật trạng thái nằm tại `apps/api/test/staff.e2e-spec.ts`. Chạy `npm.cmd --prefix apps/api run test:e2e -- staff`. Xem [hướng dẫn API `/staff`](../docs/staff-api.md).
+
 ---
 
 ## 📁 Cấu trúc Thư mục

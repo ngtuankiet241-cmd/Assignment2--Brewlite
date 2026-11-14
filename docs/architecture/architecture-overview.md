@@ -73,7 +73,7 @@ lib/
 | **Ngôn ngữ** | TypeScript |
 | **ORM** | Prisma 5 (type-safe, migration-first) |
 | **Xác thực** | JWT (passport-jwt), bcrypt hash mật khẩu |
-| **RBAC** | `@Roles()` decorator + `RolesGuard` – phân biệt `CUSTOMER` / `STAFF` |
+| **RBAC** | `@Roles()` decorator + `RolesGuard` – phân biệt `CUSTOMER` / `BARISTA` / `ADMIN`; API `/staff` và cập nhật trạng thái dành cho `BARISTA`/`ADMIN` |
 | **Validation** | `class-validator` + `class-transformer` (DTO tự động validate) |
 | **Anti-patterns** | Idempotency Middleware (ngăn double-submit) |
 
@@ -101,7 +101,7 @@ PENDING ──► PAID ──► PREPARING ──► READY ──► COMPLETED
    │          │
    └──────────┴──► CANCELLED  (PAID cũng có thể hủy)
 ```
-Mỗi bước chuyển được kiểm tra bởi `assertTransition` trong `orders/order-state-machine.ts`. API trạng thái và xử lý thanh toán khóa dòng đơn trong transaction trước khi ghi. `COMPLETED` và `CANCELLED` là trạng thái kết thúc. Phân quyền nhân viên cho API là yêu cầu triển khai riêng. Xem [đồ thị chính xác và bằng chứng unit/integration test](../order-state-machine.md).
+Mỗi bước chuyển được kiểm tra bởi `assertTransition` trong `orders/order-state-machine.ts`. API trạng thái và xử lý thanh toán khóa dòng đơn trong transaction trước khi ghi. `COMPLETED` và `CANCELLED` là trạng thái kết thúc. API `/staff` và cập nhật trạng thái được bảo vệ bằng `JwtAuthGuard` + `RolesGuard` cho `BARISTA`/`ADMIN`. Xem [đồ thị chính xác và bằng chứng unit/integration test](../order-state-machine.md) và [API nhân viên](../staff-api.md).
 
 ### 2.3 Tầng Dữ liệu – PostgreSQL 16
 
