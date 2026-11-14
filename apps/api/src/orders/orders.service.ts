@@ -46,7 +46,11 @@ export class OrdersService {
     // Retrying reruns the entire transaction, including all product reads.
     return this.inventory.withStockRetry(async (tx) => {
       const products = await reserveStock(tx, quantities);
-      const { items, subtotalAmount } = priceOrderItems(dto.items, products);
+      const [sizes, toppings] = await Promise.all([
+        tx.drinkSizeOption.findMany({ where: { isActive: true } }),
+        tx.toppingOption.findMany({ where: { isActive: true } }),
+      ]);
+      const { items, subtotalAmount } = priceOrderItems(dto.items, products, sizes, toppings);
       // Recheck against authoritative prices within the order/stock transaction.
       const promotion = dto.promotionCode === undefined ? undefined : await this.promotions.validate({
         code: dto.promotionCode, subtotalAmount,

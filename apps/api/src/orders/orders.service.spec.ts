@@ -20,6 +20,20 @@ describe('OrdersService', () => {
       update: jest.fn(),
     },
     product: { findMany: jest.fn(), updateMany: jest.fn() },
+    drinkSizeOption: {
+      findMany: jest.fn().mockResolvedValue([
+        { id: 'S', label: 'Nhỏ', priceAdjustment: -5000 },
+        { id: 'M', label: 'Vừa', priceAdjustment: 0 },
+        { id: 'L', label: 'Lớn', priceAdjustment: 5000 },
+      ]),
+    },
+    toppingOption: {
+      findMany: jest.fn().mockResolvedValue([
+        { id: 'pearls', name: 'Trân châu đen', unitPrice: 7000 },
+        { id: 'peach-jelly', name: 'Thạch đào', unitPrice: 8000 },
+        { id: 'cheese-foam', name: 'Kem cheese', unitPrice: 10000 },
+      ]),
+    },
   };
 
   beforeEach(async () => {

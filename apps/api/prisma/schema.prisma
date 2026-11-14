@@ -50,6 +50,26 @@ enum DiscountType {
   FIXED_AMOUNT
 }
 
+model DrinkSizeOption {
+  id              String   @id
+  label           String
+  priceAdjustment Int
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ToppingOption {
+  id        String   @id
+  name      String   @unique
+  unitPrice Int
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model User {
   id                  String               @id @default(cuid())
   email               String               @unique

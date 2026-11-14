@@ -147,7 +147,9 @@ for (const [label, fetcher] of [
   ['invalid JSON', async () => new Response('<html>error</html>')],
   ['invalid envelope', async () => json({ products: [] })],
   ['invalid product', async () => json([{ ...product, price: 'free' }])],
-  ['legacy HTTP 200 mock fallback', async () => json(loader()('src/data/mockProducts.ts').MOCK_PRODUCTS)],
+  ['legacy HTTP 200 mock data', async () => json([{
+    id: 'legacy', name: 'Coffee', description: 'Coffee', price: 25000, imageUrl: '/coffee.svg',
+  }])],
   ['network failure', async () => { throw new TypeError('Failed to fetch'); }],
 ]) {
   test(`${label} ends loading with Error and no mock products`, async () => {
@@ -159,7 +161,41 @@ for (const [label, fetcher] of [
     assert.deepEqual(view.products, []);
     host.dispose();
   });
+
 }
+
+test('configuration parser accepts database-backed options and rejects malformed prices', () => {
+  const { parseProductConfiguration } = loader()('src/lib/productConfiguration.ts');
+  const configuration = {
+    success: true,
+    data: {
+      sizes: [{ id: 'L', label: 'Lớn', priceAdjustment: 6500 }],
+      toppings: [{ id: 'pearls', name: 'Trân châu đen', unitPrice: 7500 }],
+    },
+  };
+  assert.deepEqual(parseProductConfiguration(configuration), configuration.data);
+  assert.throws(() => parseProductConfiguration({
+    success: true,
+    data: { sizes: [{ id: 'L', label: 'Lớn', priceAdjustment: '6500' }], toppings: [] },
+  }), /kích cỡ/);
+});
+
+test('configuration proxy validates and forwards database options without caching', async () => {
+  const clock = timers();
+  const configuration = {
+    success: true,
+    data: { sizes: [{ id: 'M', label: 'Vừa', priceAdjustment: 0 }], toppings: [] },
+  };
+  const { GET } = loader({ ...clock, fetch: async (url) => {
+    assert.equal(url, 'https://configured.example/products/configuration');
+    return json(configuration);
+  } })('src/app/api/products/configuration/route.ts');
+  const response = await GET();
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(await response.json(), configuration);
+  assert.equal(clock.pending.size, 0);
+});
 
 test('client timeout ends loading and retry after recovery succeeds', async () => {
   let recovered = false;

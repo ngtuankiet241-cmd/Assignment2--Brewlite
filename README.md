@@ -134,11 +134,13 @@ Cơ sở dữ liệu PostgreSQL 16 sẽ sẵn sàng tại cổng `5432`.
 ```bash
 cd apps/api
 npm install
+npx prisma migrate deploy
 npm run prisma:generate
 npm run prisma:seed
 npm run start:dev
 ```
 Backend tự đọc `.env` ở thư mục gốc khi khởi động, kể cả khi chạy từ `apps/api`. Biến môi trường đã đặt trong terminal hoặc Docker được ưu tiên.
+Kích cỡ và topping (bao gồm phần chênh lệch/đơn giá) được lưu trong PostgreSQL; `prisma:seed` chỉ thêm cấu hình mặc định khi chưa có. Không chạy seed trên production vì seed cũng cập nhật giá và tồn kho sản phẩm.
 
 - **Backend NestJS API:** `http://localhost:3001`
 - **Health Check Endpoint:** `http://localhost:3001/health`

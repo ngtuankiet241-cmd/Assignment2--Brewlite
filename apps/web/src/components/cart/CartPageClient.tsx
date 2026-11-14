@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useCart } from '@/context/useCart';
 import { getCartItemUnitPrice } from '@/types/cart';
-import { formatCurrencyVND } from '@/data/mockProducts';
+import { formatCurrencyVND } from '@/lib/formatCurrency';
 
 export default function CartPageClient() {
   const {

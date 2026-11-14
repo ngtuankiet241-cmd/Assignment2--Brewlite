@@ -1,12 +1,23 @@
 import type { Product } from '@/types/product';
 
-export type DrinkSize = 'S' | 'M' | 'L';
+export type DrinkSize = string;
+
+export interface DrinkSizeOption {
+  id: DrinkSize;
+  label: string;
+  priceAdjustment: number;
+}
 
 export interface Topping {
   id: string;
   name: string;
   unitPrice: number;
   quantity: number;
+}
+
+export interface ProductConfiguration {
+  sizes: DrinkSizeOption[];
+  toppings: Omit<Topping, 'quantity'>[];
 }
 
 export interface CartItem {
@@ -27,25 +38,10 @@ export interface CartItem {
 export interface AddCartItemInput {
   product: Product;
   size: DrinkSize;
+  sizePriceAdjustment: number;
   toppings: Topping[];
   quantity: number;
 }
-
-export const DRINK_SIZES: {
-  id: DrinkSize;
-  label: string;
-  priceAdjustment: number;
-}[] = [
-  { id: 'S', label: 'Nhỏ', priceAdjustment: -5000 },
-  { id: 'M', label: 'Vừa', priceAdjustment: 0 },
-  { id: 'L', label: 'Lớn', priceAdjustment: 5000 },
-];
-
-export const AVAILABLE_TOPPINGS: Omit<Topping, 'quantity'>[] = [
-  { id: 'pearls', name: 'Trân châu đen', unitPrice: 7000 },
-  { id: 'peach-jelly', name: 'Thạch đào', unitPrice: 8000 },
-  { id: 'cheese-foam', name: 'Kem cheese', unitPrice: 10000 },
-];
 
 export function getCartItemUnitPrice(item: CartItem): number {
   const toppingTotal = item.toppings.reduce(

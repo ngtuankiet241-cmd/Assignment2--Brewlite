@@ -22,7 +22,6 @@ function isBackendProduct(value: unknown): value is BackendProduct {
 }
 
 // Accept both the NestJS envelope and the deployed API's array response.
-// The legacy MOCK_PRODUCTS fallback has no stock and fails this contract.
 export function parseProductsResponse(value: unknown): BackendProduct[] {
   const envelope = value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>

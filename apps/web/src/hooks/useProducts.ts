@@ -100,7 +100,7 @@ export function useProducts() {
         const resJson: unknown = await res.json();
         const rawList = parseProductsResponse(resJson);
 
-        const mappedProducts: Product[] = rawList.map((item: BackendProduct, index: number) => {
+        const mappedProducts: Product[] = rawList.map((item: BackendProduct) => {
           const { category, categoryName } = detectCategory(item.name);
           const hasValidImage =
             typeof item.imageUrl === 'string' &&
@@ -126,9 +126,6 @@ export function useProducts() {
             categoryName,
             isAvailable: typeof item.stock === 'number' ? item.stock > 0 : true,
             stock: item.stock,
-            rating: 4.8,
-            prepTimeMinutes: 3,
-            badge: index === 0 ? 'Bán chạy nhất' : undefined,
           };
         });
 

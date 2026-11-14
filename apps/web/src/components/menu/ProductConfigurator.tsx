@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { AVAILABLE_TOPPINGS, DRINK_SIZES } from '@/types/cart';
-import type { DrinkSize, Topping } from '@/types/cart';
+import type { DrinkSize, ProductConfiguration, Topping } from '@/types/cart';
 import type { Product } from '@/types/product';
 import { useCart } from '@/context/useCart';
-import { formatCurrencyVND } from '@/data/mockProducts';
+import { formatCurrencyVND } from '@/lib/formatCurrency';
+import { parseProductConfiguration } from '@/lib/productConfiguration';
 
 interface ProductConfiguratorProps {
   product: Product;
@@ -20,23 +20,70 @@ export default function ProductConfigurator({
   const { addItem, hydrated } = useCart();
   const [size, setSize] = useState<DrinkSize>('M');
   const [quantity, setQuantity] = useState(1);
-  const [toppings, setToppings] = useState<Topping[]>(
-    AVAILABLE_TOPPINGS.map((topping) => ({ ...topping, quantity: 0 })),
-  );
-  const selectedSize = DRINK_SIZES.find((option) => option.id === size)!;
+  const [configuration, setConfiguration] = useState<ProductConfiguration | null>(null);
+  const [configurationError, setConfigurationError] = useState<string | null>(null);
+  const [retryIndex, setRetryIndex] = useState(0);
+  const [toppings, setToppings] = useState<Topping[]>([]);
+  const selectedSize = configuration?.sizes.find((option) => option.id === size)
+    ?? configuration?.sizes[0];
   const toppingPrice = toppings.reduce(
     (total, topping) => total + topping.unitPrice * topping.quantity,
     0,
   );
   const unitPrice = Math.max(
     0,
-    product.price + selectedSize.priceAdjustment + toppingPrice,
+    product.price + (selectedSize?.priceAdjustment ?? 0) + toppingPrice,
   );
   const totalPrice = unitPrice * quantity;
   const maximumQuantity =
     typeof product.stock === 'number' && product.stock > 0
       ? product.stock
       : Number.MAX_SAFE_INTEGER;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+
+    async function loadConfiguration() {
+      setConfiguration(null);
+      setConfigurationError(null);
+      try {
+        const response = await fetch('/api/products/configuration', {
+          cache: 'no-store',
+          signal: controller.signal,
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) {
+          throw new Error(`Không thể tải tùy chọn sản phẩm (HTTP ${response.status}).`);
+        }
+
+        const nextConfiguration = parseProductConfiguration(await response.json());
+        if (!nextConfiguration.sizes.length) {
+          throw new Error('Chưa có kích cỡ nào được cấu hình. Vui lòng thử lại sau.');
+        }
+
+        if (active) {
+          setConfiguration(nextConfiguration);
+          setSize((current) => nextConfiguration.sizes.some((option) => option.id === current)
+            ? current
+            : nextConfiguration.sizes[0].id);
+          setToppings(nextConfiguration.toppings.map((topping) => ({ ...topping, quantity: 0 })));
+        }
+      } catch (cause) {
+        if (active && !controller.signal.aborted) {
+          setConfigurationError(cause instanceof Error
+            ? cause.message
+            : 'Không thể tải tùy chọn sản phẩm. Vui lòng thử lại.');
+        }
+      }
+    }
+
+    loadConfiguration();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [retryIndex]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -68,7 +115,14 @@ export default function ProductConfigurator({
   }
 
   function handleAddToCart() {
-    addItem({ product, size, toppings: selectedToppings, quantity });
+    if (!selectedSize) return;
+    addItem({
+      product,
+      size: selectedSize.id,
+      sizePriceAdjustment: selectedSize.priceAdjustment,
+      toppings: selectedToppings,
+      quantity,
+    });
     onClose();
   }
 
@@ -124,30 +178,45 @@ export default function ProductConfigurator({
           <legend className="mb-2 text-sm font-bold text-coffee-950">
             Chọn kích cỡ
           </legend>
-          <div className="grid grid-cols-3 gap-2">
-            {DRINK_SIZES.map((option) => (
+          {configurationError ? (
+            <div className="rounded-xl bg-red-50 p-3 text-sm text-red-800" role="alert">
+              <p>{configurationError}</p>
               <button
-                aria-pressed={size === option.id}
-                className={`min-h-12 rounded-xl border px-2 py-2 text-left transition ${
-                  size === option.id
-                    ? 'border-coffee-800 bg-coffee-50 text-coffee-950 ring-1 ring-coffee-800'
-                    : 'border-coffee-200 bg-white text-coffee-800'
-                }`}
-                key={option.id}
-                onClick={() => setSize(option.id)}
+                className="mt-2 font-semibold underline"
+                onClick={() => setRetryIndex((current) => current + 1)}
                 type="button"
               >
-                <span className="block text-xs font-bold">
-                  Size {option.id} · {option.label}
-                </span>
-                <span className="mt-0.5 block text-[10px] text-coffee-600">
-                  {option.priceAdjustment === 0
-                    ? 'Giá gốc'
-                    : `${option.priceAdjustment > 0 ? '+' : ''}${formatCurrencyVND(option.priceAdjustment)}`}
-                </span>
+                Thử tải lại
               </button>
-            ))}
-          </div>
+            </div>
+          ) : !configuration ? (
+            <p aria-live="polite" className="text-sm text-coffee-600">
+              Đang tải tùy chọn...
+            </p>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {configuration.sizes.map((option) => (
+                <button
+                  aria-pressed={size === option.id}
+                  className={`min-h-12 rounded-xl border px-2 py-2 text-left transition ${
+                    size === option.id
+                      ? 'border-coffee-800 bg-coffee-50 text-coffee-950 ring-1 ring-coffee-800'
+                      : 'border-coffee-200 bg-white text-coffee-800'
+                  }`}
+                  key={option.id}
+                  onClick={() => setSize(option.id)}
+                  type="button"
+                >
+                  <span className="block text-xs font-bold">{option.label}</span>
+                  <span className="mt-0.5 block text-[10px] text-coffee-600">
+                    {option.priceAdjustment === 0
+                      ? 'Giá gốc'
+                      : `${option.priceAdjustment > 0 ? '+' : ''}${formatCurrencyVND(option.priceAdjustment)}`}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </fieldset>
 
         <fieldset className="mt-5">
@@ -239,7 +308,7 @@ export default function ProductConfigurator({
         <button
           className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-coffee-800 px-5 text-sm font-bold text-cream-50 shadow-sm transition hover:bg-coffee-700 active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
           onClick={handleAddToCart}
-          disabled={!hydrated}
+          disabled={!hydrated || !configuration || !selectedSize || Boolean(configurationError)}
           type="button"
         >
           {hydrated ? (

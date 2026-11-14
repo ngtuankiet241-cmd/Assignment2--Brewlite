@@ -11,6 +11,8 @@ describe('ProductsService', () => {
       findMany: jest.fn(),
       findUnique: jest.fn(),
     },
+    drinkSizeOption: { findMany: jest.fn() },
+    toppingOption: { findMany: jest.fn() },
   };
 
   beforeEach(() => {
@@ -61,6 +63,25 @@ describe('ProductsService', () => {
     expect(result).toEqual(product);
     expect(mockPrismaService.product.findUnique).toHaveBeenCalledWith({
       where: { id: 'p1' },
+    });
+  });
+
+  it('should return active size and topping options in configured order', async () => {
+    const sizes = [{ id: 'M', label: 'Vừa', priceAdjustment: 0 }];
+    const toppings = [{ id: 'pearls', name: 'Trân châu đen', unitPrice: 7000 }];
+    mockPrismaService.drinkSizeOption.findMany.mockResolvedValue(sizes);
+    mockPrismaService.toppingOption.findMany.mockResolvedValue(toppings);
+
+    await expect(service.findConfiguration()).resolves.toEqual({ sizes, toppings });
+    expect(mockPrismaService.drinkSizeOption.findMany).toHaveBeenCalledWith({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+      select: { id: true, label: true, priceAdjustment: true },
+    });
+    expect(mockPrismaService.toppingOption.findMany).toHaveBeenCalledWith({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+      select: { id: true, name: true, unitPrice: true },
     });
   });
 

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useCart } from '@/context/useCart';
 import { getCartItemUnitPrice } from '@/types/cart';
-import { formatCurrencyVND } from '@/data/mockProducts';
+import { formatCurrencyVND } from '@/lib/formatCurrency';
 import type { CartItem } from '@/types/cart';
 import { requestPromotionQuote, type PromotionQuote } from '@/lib/promotions';
 import PromotionCodeField from './PromotionCodeField';
