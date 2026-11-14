@@ -3,18 +3,14 @@ name: Continuous Delivery & Deployment (CD)
 on:
   push:
     branches: [main]
-    tags:
-      - 'v*.*.*'
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Target Environment'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-          - production
-          - staging
+
+concurrency:
+  group: production-cd
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
   # -------------------------------------------------------------
@@ -79,6 +75,10 @@ jobs:
 
       - name: Run Unit & Component Tests
         run: npm test
+
+      - name: Test deployment API handling
+        working-directory: .
+        run: node --test tests/cd-deploy.test.mjs
 
       - name: Build Next.js Application
         run: npm run build
@@ -147,10 +147,10 @@ jobs:
           labels: ${{ steps.meta-web.outputs.labels }}
 
   # -------------------------------------------------------------
-  # STAGE 4: SAFE DATABASE MIGRATION
+  # STAGE 4: PRODUCTION CONFIGURATION AND DATABASE MIGRATION
   # -------------------------------------------------------------
   safe-database-migration:
-    name: 4. Safe Database Migration (Zero-Downtime)
+    name: 4. Validate configuration and migrate production database
     needs: [docker-packaging]
     runs-on: ubuntu-latest
     defaults:
@@ -166,46 +166,64 @@ jobs:
         with:
           node-version: 20
 
+      - name: Validate production configuration
+        working-directory: .
+        env:
+          PRODUCTION_DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          RENDER_API_TOKEN: ${{ secrets.RENDER_API_TOKEN }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_PROJECT_NAME: ${{ vars.VERCEL_PROJECT_NAME }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          PRODUCTION_WEB_URL: https://assignment2-brewlite.vercel.app
+          PRODUCTION_API_URL: https://brewlite-assignment2-api.onrender.com
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Production deployments must run from main."
+            exit 1
+          fi
+          node .github/scripts/deploy.mjs --check
+          LATEST_SHA=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$LATEST_SHA" != "$GITHUB_SHA" ]; then
+            echo "::error::This run is not the latest main commit; run CD for the latest commit."
+            exit 1
+          fi
+
       - name: Install Prisma CLI
         run: npm ci
 
-      - name: Apply Database Migrations Safely
+      - name: Apply database migrations
         env:
-          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL || secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
         run: |
-          echo "Executing safe database migration against production database..."
-          if [ -n "$DATABASE_URL" ]; then
-            npx prisma migrate deploy
-          else
-            echo "DATABASE_URL secret not present in CI environment; skipping remote migration step."
-          fi
+          npx prisma migrate deploy
 
   # -------------------------------------------------------------
-  # STAGE 5: DEPLOY TO PRODUCTION CLOUD
+  # STAGE 5: DEPLOY AND VERIFY THE REQUESTED COMMIT
   # -------------------------------------------------------------
   deploy-to-production:
-    name: 5. Deploy to Production Cloud (Render & Vercel)
+    name: 5. Deploy and verify Render and Vercel
     needs: [safe-database-migration]
     runs-on: ubuntu-latest
+    timeout-minutes: 65
 
     steps:
-      - name: Trigger Render Backend Deployment via Deploy Hook
-        run: |
-          if [ -n "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
-            echo "Triggering Render API deploy hook..."
-            curl -X POST -f "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
-          else
-            echo "RENDER_DEPLOY_HOOK_URL secret not configured; simulated automated hook success."
-          fi
-
-      - name: Trigger Vercel Frontend Deployment via Deploy Hook
-        run: |
-          if [ -n "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}" ]; then
-            echo "Triggering Vercel Web deploy hook..."
-            curl -X POST -f "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}"
-          else
-            echo "VERCEL_DEPLOY_HOOK_URL secret not configured; simulated automated hook success."
-          fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Deploy exact commit and wait for both providers
+        env:
+          RENDER_API_TOKEN: ${{ secrets.RENDER_API_TOKEN }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_PROJECT_NAME: ${{ vars.VERCEL_PROJECT_NAME }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          PRODUCTION_WEB_URL: https://assignment2-brewlite.vercel.app
+          PRODUCTION_API_URL: https://brewlite-assignment2-api.onrender.com
+        run: node .github/scripts/deploy.mjs
 
   # -------------------------------------------------------------
   # STAGE 6: SMOKE TEST & HEALTH CHECK AFTER DEPLOYMENT
@@ -216,83 +234,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Verify Backend Health Endpoint (GET /health)
+      - name: Verify backend, frontend and product endpoints
         run: |
-          API_URL="${{ secrets.PRODUCTION_API_URL }}"
-          if [ -z "$API_URL" ]; then
-            API_URL="https://brewlite-assignment2-api.onrender.com"
-          fi
-          echo "Probing Health Check endpoint at: $API_URL/health"
-          
-          # Retry loop up to 6 times (60s total) for cloud services cold start
-          MAX_ATTEMPTS=6
-          ATTEMPT=1
-          SUCCESS=0
-          
-          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
-            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/health" || echo "000")
-            if [ "$HTTP_STATUS" -eq 200 ]; then
-              echo "✅ Health check PASSED with HTTP $HTTP_STATUS"
-              SUCCESS=1
-              break
-            else
-              echo "⚠️ Health check returned HTTP $HTTP_STATUS. Waiting 10s before retry..."
-              sleep 10
-              ATTEMPT=$((ATTEMPT + 1))
-            fi
-          done
-          
-          if [ $SUCCESS -ne 1 ]; then
-            echo "❌ Health check failed or timed out after $MAX_ATTEMPTS attempts."
-            # In CI without live cloud credentials, do not hard-fail if using simulated endpoint
-            if [ -n "${{ secrets.PRODUCTION_API_URL }}" ]; then
+          for url in \
+            https://brewlite-assignment2-api.onrender.com/health \
+            https://brewlite-assignment2-api.onrender.com/products \
+            https://assignment2-brewlite.vercel.app/ \
+            https://assignment2-brewlite.vercel.app/api/products; do
+            status=$(curl --fail --silent --show-error --retry 5 --retry-delay 10 --retry-all-errors --max-time 30 --output /dev/null --write-out '%{http_code}' "$url")
+            if [ "$status" != "200" ]; then
+              echo "::error::$url returned HTTP $status, expected 200."
               exit 1
             fi
-          fi
-
-      - name: Verify Frontend Web Availability (HTTPS)
-        run: |
-          WEB_URL="${{ secrets.PRODUCTION_WEB_URL }}"
-          if [ -z "$WEB_URL" ]; then
-            WEB_URL="https://assignment2-brewlite.vercel.app"
-          fi
-          echo "Probing Frontend Web Application at: $WEB_URL"
-          
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$WEB_URL" || echo "000")
-          echo "Frontend response status: $HTTP_STATUS"
-
-  # -------------------------------------------------------------
-  # STAGE 7: ROLLBACK ON FAILURE
-  # -------------------------------------------------------------
-  rollback-on-failure:
-    name: 7. Rollback Mechanism (Triggered on Failure)
-    needs: [deploy-to-production, smoke-test]
-    if: failure()
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Execute Automated Rollback Alert & Protocol
-        run: |
-          echo "=========================================================="
-          echo "🚨 CRITICAL: CD PIPELINE FAILURE DETECTED!"
-          echo "Executing Rollback Protocol for Commit: ${{ github.sha }}"
-          echo "Target Environment: production"
-          echo "=========================================================="
-          
-          if [ -n "${{ secrets.RENDER_ROLLBACK_HOOK_URL }}" ]; then
-            echo "Invoking Render automated rollback hook..."
-            curl -X POST -f "${{ secrets.RENDER_ROLLBACK_HOOK_URL }}"
-          else
-            echo "Render manual rollback required via Dashboard: Deploy Previous Commit"
-          fi
-          
-          if [ -n "${{ secrets.VERCEL_ROLLBACK_HOOK_URL }}" ]; then
-            echo "Invoking Vercel automated rollback hook..."
-            curl -X POST -f "${{ secrets.VERCEL_ROLLBACK_HOOK_URL }}"
-          else
-            echo "Vercel instant rollback available: Instant Rollback to previous deployment in Dashboard"
-          fi
-          
-          echo "Rollback procedures dispatched. Please inspect the logs and consult docs/deployment.md."
+            echo "$url returned HTTP 200."
+          done
 
