@@ -1640,9 +1640,9 @@ Hệ thống thiết lập bộ kiểm thử toàn diện trên cả Backend và
 
 Hệ thống CI tự động được thiết lập thông qua \textbf{GitHub Actions} (file cấu hình \texttt{.github/workflows/ci.yml}), kích hoạt khi có commit push vào \texttt{main}/\texttt{develop} hoặc Pull Request nhắm vào một trong hai nhánh này.
 
-Pipeline tuân thủ nghiêm ngặt quy trình Quality Gate 4 bước bắt buộc theo yêu cầu đề bài:
+Pipeline tuân thủ quy trình Quality Gate 4 bước bắt buộc theo yêu cầu đề bài:
 \begin{center}
-\textbf{Install} $\longrightarrow$ \textbf{Lint / Type-check} $\longrightarrow$ \textbf{Unit Test} $\longrightarrow$ \textbf{Build}
+\textbf{Install} $\longrightarrow$ \textbf{Lint / Type-check} $\longrightarrow$ \textbf{Unit + E2E Test} $\longrightarrow$ \textbf{Build}
 \end{center}
 
 \subsubsection{Chi tiết các Jobs trong Pipeline}
@@ -1653,6 +1653,7 @@ Pipeline tuân thủ nghiêm ngặt quy trình Quality Gate 4 bước bắt bu�
         \item \textit{Generate Prisma:} Sinh Prisma Client từ \texttt{schema.prisma}.
         \item \textit{Type-check:} Kiểm tra kiểu dữ liệu tĩnh với TypeScript compiler (\texttt{npm run typecheck} $\rightarrow$ \texttt{tsc --noEmit}); Backend hiện chưa cấu hình linter riêng.
         \item \textit{Unit Test:} Thực thi toàn bộ Unit Tests với Jest (\texttt{npm test -- --runInBand}).
+        \item \textit{E2E Test:} Chạy kiểm thử HTTP và PostgreSQL với \texttt{npm run test:e2e}.
         \item \textit{Build:} Biên dịch mã nguồn Backend NestJS (\texttt{npm run build}).
     \end{enumerate}
     \item \textbf{Frontend CI Job (\texttt{frontend-ci}):}
@@ -1802,7 +1803,7 @@ Pipeline gồm trigger và các bước triển khai sau:
         arrow/.style={->, >=stealth, thick, color=blue!80!black}
     ]
         \node (tag) [box, fill=gray!20] {1. Push \texttt{main} /\\Manual dispatch};
-        \node (qg) [box, right=of tag] {2. Quality Gate\\(Lint, Test, Build)};
+        \node (qg) [box, right=of tag] {2. Quality Gate\\(Type-check, Lint,\\Unit + E2E, Build)};
         \node (docker) [box, right=of qg] {3. Build\\Docker Images};
         \node (push) [box, right=of docker] {4. Push to Registry\\(GitHub GHCR)};
         
@@ -1827,7 +1828,7 @@ Pipeline gồm trigger và các bước triển khai sau:
 
 \begin{enumerate}
     \item \textbf{Cổng kiểm soát chất lượng (Quality Gate):}
-    Trước khi đóng gói, CD chạy type-check và unit test cho Backend; linter, unit/component test và kiểm thử script triển khai cho Frontend; sau đó build cả hai ứng dụng. E2E Backend với PostgreSQL chạy trong CI của Pull Request, nhưng hiện không được lặp lại trong quality gate của CD. Backend chưa cấu hình linter riêng. Nếu một bước trong quality gate thất bại, các job phụ thuộc sẽ không chạy.
+    Trước khi đóng gói, CD chạy type-check, unit test và E2E Backend với PostgreSQL 16 cho Backend; linter, unit/component test và kiểm thử script triển khai cho Frontend; sau đó build cả hai ứng dụng. E2E Backend cũng chạy trong CI của Pull Request. Backend chưa cấu hình linter riêng. Nếu một bước trong quality gate thất bại, các job phụ thuộc sẽ không chạy.
 
     \item \textbf{Gắn nhãn định danh Container Image:}
     Mỗi container image được build độc lập từ \texttt{apps/api/Dockerfile} và \texttt{apps/web/Dockerfile}. Workflow tạo tag theo commit SHA rút gọn (\texttt{sha-<hash>}) và tag \texttt{latest} trên nhánh mặc định. Dù metadata có khai báo mẫu tag Semantic Versioning, workflow không có trigger Git Tag nên không tự phát hành theo tag phiên bản.
