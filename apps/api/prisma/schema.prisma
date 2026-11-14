@@ -85,6 +85,8 @@ model Order {
   customerPhone        String
   tableNumber          Int?
   notes                String?
+  subtotalAmount       Int                     @default(0)
+  discountAmount       Int                     @default(0)
   totalAmount          Int
   status               OrderStatus             @default(PENDING)
   reservationStatus    StockReservationStatus?
@@ -92,6 +94,7 @@ model Order {
   items                OrderItem[]
   payment              Payment?
   promotionId          String?
+  promotionCode        String?
   promotion            Promotion?              @relation(fields: [promotionId], references: [id])
   loyaltyTransactions  LoyaltyTransaction[]
   createdAt            DateTime                @default(now())

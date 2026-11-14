@@ -24,11 +24,20 @@ Incorrect credentials stay on `/login` and display the API error. Email matching
 - Sizes S, M, and L apply -5,000 VND, 0 VND, and +5,000 VND to the base price.
 - Toppings are priced per portion, and their quantities are calculated per drink.
 - Cart contents and selected options persist in the browser's local storage.
-- Checkout and payment are not part of this cart UI yet.
+- Continue to `/checkout` to enter pickup details, apply a promotion, and place the order.
+
+## Checkout promotions
+
+The order summary on `/checkout` includes a promotion code input and an Apply button. Validation calls `POST /promotions/validate` with the current cart subtotal. A valid code displays the discount and updated payable total; invalid, expired, or ineligible codes display the backend reason. Customers can remove a code or edit it to apply another.
+
+Editing the code or changing the cart invalidates the previous quote and cancels pending validation. An entered code must be applied or cleared before placing the order. The order request includes the validated `promotionCode`, and the QR and confirmation screens display the amounts saved by the API.
+
+Run the backend migrations before using promotions. The API seed includes `BREW10` (10% off orders from 50,000 VND, capped at 20,000 VND) and `BREW20K` (20,000 VND off orders from 100,000 VND).
 
 ## Validate
 
 ```bash
+npm test
 npm run lint
 npm run build
 ```

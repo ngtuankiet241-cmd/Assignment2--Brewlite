@@ -6,6 +6,10 @@ Kiểm thử tồn kho đồng thời qua **HTTP + PostgreSQL thật** nằm t�
 
 Kiểm thử API nhân viên, JWT/RBAC, lọc/phân trang và cập nhật trạng thái nằm tại `apps/api/test/staff.e2e-spec.ts`. Chạy `npm.cmd --prefix apps/api run test:e2e -- staff`. Xem [hướng dẫn API `/staff`](../docs/staff-api.md).
 
+Kiểm thử áp mã giảm giá, tính giá từ backend, rollback và thanh toán đúng số tiền sau giảm nằm tại [apps/api/test/promotions.e2e-spec.ts](../apps/api/test/promotions.e2e-spec.ts). Chạy `npm.cmd --prefix apps/api run test:e2e -- promotions`.
+
+Kiểm thử client API khuyến mãi và các trạng thái giao diện nhập mã nằm tại [apps/web/test/promotions.test.mjs](../apps/web/test/promotions.test.mjs). Chạy `npm.cmd --prefix apps/web test`.
+
 ---
 
 ## 📁 Cấu trúc Thư mục
