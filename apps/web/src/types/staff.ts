@@ -1,19 +1,17 @@
-// Proposed Staff contract based on AS2 Order / OrderItem / Payment.
-// Confirm response envelopes and pagination with Backend before integration.
+// Staff API contract verified against the controller, service and Prisma schema.
 export type StaffOrderStatus = 'PENDING' | 'PAYMENT_FAILED' | 'PAID' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
 export type StaffOrderFilter = 'ALL' | StaffOrderStatus;
 export type StaffDemoMode = 'normal' | 'loading' | 'empty' | 'error';
 
 export interface StaffOrdersQuery {
   status?: StaffOrderStatus;
-  search?: string;
   page?: number;
   limit?: number;
 }
 
 export interface StaffOrdersPage {
-  data: StaffOrder[];
-  meta?: { page: number; limit: number; total: number };
+  data: StaffOrderDetails[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
 export interface StaffUpdateStatusInput {
@@ -31,6 +29,7 @@ export interface StaffOrderItem {
   itemTotal: number;
 }
 
+// UI projection shared with the existing demo; API responses use the stricter types below.
 export interface StaffOrder {
   id: string;
   customerName: string;
@@ -44,7 +43,6 @@ export interface StaffOrder {
   items: StaffOrderItem[];
   payment: {
     id: string;
-    orderId: string;
     amount: number;
     method: 'SEPAY_QR' | 'CASH';
     status: 'PENDING' | 'SUCCESS' | 'FAILED';
@@ -52,14 +50,32 @@ export interface StaffOrder {
   } | null;
 }
 
+/** Scalar Order returned by PATCH; relations must be fetched separately. */
+export interface StaffOrderScalar extends Omit<StaffOrder, 'items' | 'payment' | 'customerPhone'> {
+  userId: string | null;
+  customerPhone: string;
+  subtotalAmount: number;
+  discountAmount: number;
+  reservationStatus: 'HELD' | 'CONSUMED' | 'RELEASED' | null;
+  reservationExpiresAt: string | null;
+  promotionId: string | null;
+  promotionCode: string | null;
+}
+
+/** GET list/detail includes item snapshots and the selected payment fields. */
+export interface StaffOrderDetails extends StaffOrderScalar {
+  items: (StaffOrderItem & { orderId: string })[];
+  payment: StaffOrder['payment'];
+}
+
 export const STAFF_STATUSES: Record<StaffOrderStatus, { label: string; color: string }> = {
-  PENDING: { label: 'Chờ thanh toán', color: 'border-stone-200 bg-stone-100 text-stone-700' },
-  PAYMENT_FAILED: { label: 'Thanh toán lỗi', color: 'border-red-200 bg-red-50 text-red-800' },
-  PAID: { label: 'Đã thanh toán', color: 'border-amber-200 bg-amber-50 text-amber-900' },
-  PREPARING: { label: 'Đang chuẩn bị', color: 'border-orange-200 bg-orange-50 text-orange-900' },
-  READY: { label: 'Sẵn sàng nhận', color: 'border-sky-200 bg-sky-50 text-sky-900' },
-  COMPLETED: { label: 'Hoàn thành', color: 'border-emerald-200 bg-emerald-50 text-emerald-800' },
-  CANCELLED: { label: 'Đã hủy', color: 'border-stone-200 bg-stone-100 text-stone-600' },
+  PENDING: { label: 'PENDING', color: 'border-stone-200 bg-stone-100 text-stone-700' },
+  PAYMENT_FAILED: { label: 'PAYMENT_FAILED', color: 'border-red-200 bg-red-50 text-red-800' },
+  PAID: { label: 'PAID', color: 'border-amber-200 bg-amber-50 text-amber-900' },
+  PREPARING: { label: 'PREPARING', color: 'border-orange-200 bg-orange-50 text-orange-900' },
+  READY: { label: 'READY', color: 'border-sky-200 bg-sky-50 text-sky-900' },
+  COMPLETED: { label: 'COMPLETED', color: 'border-emerald-200 bg-emerald-50 text-emerald-800' },
+  CANCELLED: { label: 'CANCELLED', color: 'border-stone-200 bg-stone-100 text-stone-600' },
 };
 
 // UI affordances only; the backend must enforce transitions and authorization.

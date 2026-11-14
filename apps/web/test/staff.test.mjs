@@ -31,7 +31,9 @@ function loader(mocks = {}, fetcher = () => { throw new Error('Staff demo must n
       }
       return require(name);
     }
-    new Function('require', 'module', 'exports', 'fetch', code)(localRequire, loaded, loaded.exports, fetcher);
+    new Function('require', 'module', 'exports', 'fetch', 'process', 'window', code)(
+      localRequire, loaded, loaded.exports, fetcher, mocks.process ?? process, mocks.window ?? globalThis.window,
+    );
     return loaded.exports;
   }
   return load;
@@ -82,8 +84,8 @@ test('each permitted UI transition is disabled and no cancel/payment retry actio
   const Detail = load('src/components/staff/StaffOrderDetail.tsx').default;
   for (const order of STAFF_DEMO_ORDERS) {
     const html = render(Detail, { order });
-    assert.match(html, /chờ API Staff an toàn/);
-    assert.match(html, /Demo/);
+    assert.match(html, /chờ xác minh quy tắc thanh toán/);
+    assert.doesNotMatch(html, /Chi tiết đơn · Demo/);
     if (STAFF_NEXT_ACTION[order.status]) {
       assert.match(html, /<button[^>]*disabled=""/);
       assert.ok(html.includes(STAFF_NEXT_ACTION[order.status].label.replaceAll('&', '&amp;')));
@@ -101,9 +103,16 @@ test('staff states provide loading announcement, distinct empty messages, error 
   const { StaffLoadingState, StaffEmptyState, StaffErrorState } = load('src/components/staff/StaffStates.tsx');
   assert.match(render(StaffLoadingState, {}), /aria-busy="true"/);
   assert.match(render(StaffEmptyState, { filtered: true, onReset() {} }), /Xem tất cả/);
-  assert.match(render(StaffEmptyState, { filtered: false, onReset() {} }), /Tải lại demo/);
+  assert.match(render(StaffEmptyState, { filtered: false, onReset() {} }), /Tải lại danh sách/);
   assert.match(render(StaffErrorState, { message: 'Demo error', onRetry() {} }), /role="alert"/);
 });
+
+function staffView(overrides = {}) {
+  return { orders: STAFF_DEMO_ORDERS, visibleOrders: STAFF_DEMO_ORDERS, selectedId: 'DEMO-001',
+    detail: { status: 'ready', data: STAFF_DEMO_ORDERS[0] }, status: 'ready', error: '',
+    pagination: { page: 1, limit: 10, total: 17, totalPages: 2 }, page: 1, filter: 'ALL', search: '',
+    changeFilter() {}, changePage() {}, changeSearch() {}, selectOrder() {}, resetFilters() {}, refresh() {}, retryDetail() {}, ...overrides };
+}
 
 for (const [role, allowed] of [['BARISTA', true], ['ADMIN', true], ['CUSTOMER', false], [undefined, false]]) {
   test(`staff page role ${role}: gate is applied before demo orders can render`, () => {
@@ -112,16 +121,21 @@ for (const [role, allowed] of [['BARISTA', true], ['ADMIN', true], ['CUSTOMER', 
       react: { ...React, useSyncExternalStore: (_subscribe, snapshot) => snapshot(), useEffect: () => {} },
       '@/hooks/useAuth': { useAuth: () => ({ user, logout() {} }) },
       'next/navigation': { useRouter: () => ({ replace() {} }) },
-      '@/hooks/useStaffDemoOrders': { useStaffDemoOrders: () => ({ orders: STAFF_DEMO_ORDERS, status: 'ready', error: '', refreshedAt: null, mode: 'normal', changeMode() {}, refresh() {} }) },
+      '@/hooks/useStaffOrders': { useStaffOrders: () => staffView() },
     });
     const Page = read('src/components/staff/StaffPageClient.tsx').default;
     const html = render(Page, {});
     assert.equal(html.includes('DEMO-001'), allowed);
     assert.equal(html.includes('Bạn không có quyền truy cập'), !allowed);
     if (allowed) {
-      assert.match(html, /Không tải đơn thật/);
-      assert.match(html, /Kiểm tra giao diện demo/);
-      assert.match(html, /Làm mới demo/);
+      assert.doesNotMatch(html, /Thông tin quầy nhân viên|Chỉ xem đơn hàng|Thống kê đơn trong trang hiện tại/);
+      assert.doesNotMatch(html, /Đơn trong trang|Chờ pha chế|Đang thực hiện/);
+      for (const status of Object.keys(STAFF_STATUSES)) {
+        assert.ok(html.includes(`<option value="${status}">${status}</option>`));
+      }
+      assert.match(html, /trong trang hiện tại/);
+      assert.match(html, /Làm mới/);
+      assert.doesNotMatch(html, /Kiểm tra giao diện demo/);
     }
   });
 }
@@ -186,81 +200,118 @@ test('selection can only resolve an order in the visible result, including empty
   assert.equal(selectStaffOrder([], 'DEMO-002'), undefined);
 });
 
-test('dashboard handlers select, search, filter, reset and refresh without leaking hidden details', () => {
-  const slots = []; let cursor = 0; let refreshes = 0;
-  const react = { ...React,
-    useState(initial) {
-      const slot = slots[cursor++] ??= { value: initial };
-      return [slot.value, (value) => { slot.value = value; }];
-    },
-    useEffect() {}, useSyncExternalStore: (_sub, snapshot) => snapshot(),
-  };
-  const Page = loader({ react,
+test('dashboard renders API loading, empty, errors, pagination and detail independently', () => {
+  let state = staffView(); const calls = [];
+  const Page = loader({
+    react: { ...React, useEffect() {}, useSyncExternalStore: (_sub, snapshot) => snapshot() },
     '@/hooks/useAuth': { useAuth: () => ({ user: { id: 'staff', role: 'BARISTA' }, logout() {} }) },
     'next/navigation': { useRouter: () => ({ replace() {} }) },
-    '@/hooks/useStaffDemoOrders': { useStaffDemoOrders: () => ({ orders: STAFF_DEMO_ORDERS, status: 'ready', mode: 'normal', refresh() { refreshes++; }, changeMode() {} }) },
+    '@/hooks/useStaffOrders': { useStaffOrders: () => state },
   })('src/components/staff/StaffPageClient.tsx').default;
-  const dashboard = Page();
-  function nodes() {
-    cursor = 0;
-    const output = [];
-    function visit(value) {
-      React.Children.forEach(value, (node) => {
-        if (!React.isValidElement(node)) return;
-        output.push(node); visit(node.props.children);
-      });
+  let html = render(Page, {});
+  assert.match(html, /Phân trang đơn hàng/); assert.match(html, /17 đơn theo bộ lọc/);
+  assert.equal((html.match(/id="staff-order-detail"/g) ?? []).length, 1);
+  state = staffView({ detail: { status: 'loading' } });
+  html = render(Page, {}); assert.match(html, /aria-busy="true"/); assert.doesNotMatch(html, /Chi tiết đơn hàng<\/p>/);
+  state = staffView({ detail: { status: 'error', error: { code: 'NOT_FOUND', message: 'Missing order' } } });
+  assert.match(render(Page, {}), /Đơn hàng không còn tồn tại/);
+  state = staffView({ status: 'error', error: 'Forbidden', orders: [], visibleOrders: [], detail: { status: 'idle' } });
+  html = render(Page, {}); assert.match(html, /Forbidden/); assert.doesNotMatch(html, /DEMO-001/);
+  state = staffView({ orders: [], visibleOrders: [], selectedId: undefined, detail: { status: 'idle' },
+    pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } });
+  html = render(Page, {}); assert.match(html, /Chưa có đơn hàng/); assert.doesNotMatch(html, /DEMO-001/);
+  state = staffView({ changePage: (value) => calls.push(['page', value]), changeFilter: (value) => calls.push(['filter', value]),
+    changeSearch: (value) => calls.push(['search', value]), selectOrder: (value) => calls.push(['select', value]), refresh: () => calls.push(['refresh']) });
+  const dashboard = Page(); const output = [];
+  function visit(value) { React.Children.forEach(value, (node) => { if (React.isValidElement(node)) { output.push(node); visit(node.props.children); } }); }
+  visit(dashboard.type(dashboard.props));
+  output.find((node) => node.type === 'button' && node.props.children === 'Trang sau').props.onClick();
+  output.find((node) => node.type === 'button' && node.props.children === 'READY').props.onClick();
+  output.find((node) => node.type === 'input').props.onChange({ target: { value: 'ban 2' } });
+  output.find((node) => node.type.name === 'StaffOrderList').props.onSelect('DEMO-002');
+  output.find((node) => node.type === 'select').props.onChange({ target: { value: 'PAID' } });
+  assert.deepEqual(calls, [['page', 2], ['filter', 'READY'], ['search', 'ban 2'], ['select', 'DEMO-002'], ['filter', 'PAID']]);
+});
+
+test('floating cart and its spacer/notification are hidden only on Staff and existing cart exclusions', () => {
+  let pathname = '/staff'; let cart = { itemCount: 2, hydrated: true };
+  const Button = loader({
+    'next/navigation': { usePathname: () => pathname },
+    '@/context/useCart': { useCart: () => cart },
+  })('src/components/cart/FloatingCartButton.tsx').default;
+  for (pathname of ['/staff', '/staff/', '/staff/orders/123', '/cart']) {
+    assert.equal(render(Button, { showAddedNotification: true }), '');
+  }
+  for (pathname of ['/menu', '/checkout', '/orders', '/', '/staffing']) {
+    const html = render(Button, { showAddedNotification: true });
+    assert.match(html, /Xem giỏ hàng, 2 sản phẩm/); assert.match(html, /Đã thêm vào giỏ hàng/);
+  }
+  pathname = '/menu'; cart = { itemCount: 0, hydrated: true };
+  assert.equal(render(Button, { showAddedNotification: false }), '');
+  cart = { itemCount: 2, hydrated: false };
+  assert.equal(render(Button, { showAddedNotification: false }), '');
+});
+
+test('Staff placeholders distinguish loading, an empty database and an empty page', () => {
+  const { StaffLoadingState, StaffEmptyState } = load('src/components/staff/StaffStates.tsx');
+  assert.match(render(StaffLoadingState, { variant: 'detail' }), /Đang tải chi tiết đơn hàng/);
+  const noOrders = render(StaffEmptyState, { filtered: false, onReset() {} });
+  assert.match(noOrders, /Quầy đã sẵn sàng/); assert.doesNotMatch(noOrders, /database|mock|demo/i);
+  assert.match(render(StaffEmptyState, { filtered: false, hasOrders: true, onReset() {} }), /Trang này chưa có đơn/);
+});
+
+test('Staff order status labels use enum names in badges/list/detail without translating payment or customer data', () => {
+  const Badge = load('src/components/staff/StaffOrderStatus.tsx').default;
+  const List = load('src/components/staff/StaffOrderList.tsx').default;
+  const Detail = load('src/components/staff/StaffOrderDetail.tsx').default;
+  for (const order of STAFF_DEMO_ORDERS) {
+    assert.equal(STAFF_STATUSES[order.status].label, order.status);
+    for (const html of [render(Badge, { status: order.status }),
+      render(List, { orders: [order], onSelect() {} }), render(Detail, { order })]) {
+      assert.ok(html.includes(`>${order.status}</span>`));
     }
-    visit(dashboard.type(dashboard.props)); return output;
+    const html = render(Detail, { order });
+    assert.ok(html.includes(order.customerName)); assert.ok(html.includes(order.items[0].productName));
+    if (order.payment?.status === 'SUCCESS') assert.match(html, /Đã thanh toán<\/dd>/);
   }
-  const component = (name) => nodes().find((node) => node.type.name === name);
-  const button = (label) => nodes().find((node) => node.type === 'button' && React.Children.toArray(node.props.children).includes(label));
-  assert.equal(component('StaffOrderDetail').props.order.id, 'DEMO-001');
-  const originalWindow = globalThis.window; const originalDocument = globalThis.document;
-  let pendingFrame; let focused = false;
-  try {
-    globalThis.window = { matchMedia: () => ({ matches: true }), requestAnimationFrame: (callback) => { pendingFrame = callback; } };
-    globalThis.document = { getElementById: (id) => {
-      assert.equal(id, 'staff-order-detail'); return { focus() { focused = true; } };
-    } };
-    component('StaffOrderList').props.onSelect('DEMO-002');
-    assert.equal(component('StaffOrderDetail').props.order.id, 'DEMO-002');
-    pendingFrame(); assert.equal(focused, true);
-  } finally {
-    if (originalWindow === undefined) delete globalThis.window; else globalThis.window = originalWindow;
-    if (originalDocument === undefined) delete globalThis.document; else globalThis.document = originalDocument;
-  }
-  assert.equal(component('StaffOrderDetail').props.order.id, 'DEMO-002');
-  button('Sẵn sàng nhận').props.onClick();
-  assert.equal(component('StaffOrderDetail').props.order.id, 'DEMO-003');
-  nodes().find((node) => node.type === 'input').props.onChange({ target: { value: 'bàn 2' } });
-  assert.equal(component('StaffOrderDetail'), undefined);
-  assert.equal(component('StaffEmptyState').props.filtered, true);
-  component('StaffEmptyState').props.onReset();
-  assert.equal(component('StaffOrderList').props.orders.length, 7);
-  component('StaffOrderList').props.onSelect('DEMO-005');
-  button(' Làm mới demo').props.onClick();
-  assert.equal(refreshes, 1);
-  assert.equal(component('StaffOrderDetail').props.order.id, 'DEMO-001');
-  nodes().find((node) => node.type === 'input').props.onChange({ target: { value: '#demo-002' } });
-  assert.equal(component('StaffOrderDetail').props.order.id, 'DEMO-002');
+  assert.doesNotMatch(readFileSync(resolve(root, 'src/components/staff/StaffPageClient.tsx'), 'utf8'), /StaffSummary/);
 });
 
 const { createStaffApiClient, StaffApiError } = load('src/services/staffApiClient.ts');
-const apiOptions = { baseUrl: 'https://staff.example.test/api/', getAccessToken: () => 'test-token' };
+const apiOptions = { baseUrl: 'https://staff.example.test/', getAccessToken: () => 'test-token' };
 const jsonResponse = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 const errorCode = (code) => (error) => error instanceof StaffApiError && error.code === code;
+
+// Synthetic JSON matching Prisma Order + StaffService's explicit payment selection.
+// Independent of the dashboard demo; no real backend or database is accessed.
+const backendScalar = {
+  id: 'order-contract-1', userId: null, customerName: 'Khách kiểm thử', customerPhone: '0900000000',
+  tableNumber: 2, notes: null, subtotalAmount: 60000, discountAmount: 5000, totalAmount: 55000,
+  status: 'PAID', reservationStatus: 'CONSUMED', reservationExpiresAt: null,
+  promotionId: 'promotion-contract-1', promotionCode: 'TEST5K',
+  createdAt: '2026-11-14T03:00:00.000Z', updatedAt: '2026-11-14T03:01:00.000Z',
+};
+const backendOrder = {
+  ...backendScalar,
+  items: [{ id: 'item-contract-1', orderId: backendScalar.id, productId: 'product-contract-1',
+    productName: 'Cà phê sữa', unitPrice: 30000, quantity: 2, size: 'M', toppings: null, itemTotal: 60000 }],
+  payment: { id: 'payment-contract-1', amount: 55000, method: 'SEPAY_QR', status: 'SUCCESS', paidAt: '2026-11-14T03:01:00.000Z' },
+};
+const backendPage = (data = [backendOrder], pagination = { page: 1, limit: 20, total: data.length, totalPages: data.length ? 1 : 0 }) => ({ data, pagination });
 
 test('staff client is inert until called, uses fresh JWT, GET query encoding and no-store', async () => {
   const calls = []; let token = 'account-a';
   const client = createStaffApiClient({ ...apiOptions, getAccessToken: () => token, fetcher: async (...args) => {
-    calls.push(args); return jsonResponse({ success: true, data: STAFF_DEMO_ORDERS, meta: { page: 1, limit: 10, total: 7 } });
+    calls.push(args); return jsonResponse(backendPage());
   } });
   assert.equal(calls.length, 0);
-  const page = await client.listOrders({ status: 'PAID', search: ' bàn 2 ', page: 1, limit: 10 });
-  assert.equal(page.data.length, 7); assert.equal(page.meta.total, 7);
+  const page = await client.listOrders({ status: 'PAID', page: 1, limit: 20 });
+  assert.deepEqual(page, backendPage());
   const [url, init] = calls[0];
-  assert.equal(new URL(url).pathname, '/api/staff/orders');
-  assert.equal(new URL(url).searchParams.get('search'), 'bàn 2');
+  assert.equal(new URL(url).pathname, '/staff/orders');
+  assert.equal(new URL(url).searchParams.has('search'), false);
+  assert.equal(new URL(url).searchParams.get('page'), '1');
+  assert.equal(new URL(url).searchParams.get('limit'), '20');
   assert.equal(new URL(url).searchParams.get('status'), 'PAID');
   assert.equal(init.method, 'GET'); assert.equal(init.cache, 'no-store');
   assert.equal(init.headers.Authorization, 'Bearer account-a'); assert.equal(init.body, undefined);
@@ -268,34 +319,39 @@ test('staff client is inert until called, uses fresh JWT, GET query encoding and
   assert.equal(calls[1][1].headers.Authorization, 'Bearer account-b');
 });
 
-test('staff detail encodes ID and parses wrapped or direct orders; empty list is valid', async () => {
+test('staff detail accepts backend payment without orderId, encodes IDs and accepts null payment', async () => {
   const calls = [];
   const client = createStaffApiClient({ ...apiOptions, fetcher: async (url) => {
-    calls.push(url); return jsonResponse({ data: STAFF_DEMO_ORDERS[0] });
+    calls.push(url); return jsonResponse(backendOrder);
   } });
-  assert.equal((await client.getOrder('order/a ?')).id, 'DEMO-001');
+  assert.deepEqual(await client.getOrder('order/a ?'), backendOrder);
   assert.ok(calls[0].endsWith('/staff/orders/order%2Fa%20%3F'));
-  const direct = createStaffApiClient({ ...apiOptions, fetcher: async () => jsonResponse(STAFF_DEMO_ORDERS[1]) });
-  assert.equal((await direct.getOrder('DEMO-002')).id, 'DEMO-002');
-  const empty = createStaffApiClient({ ...apiOptions, fetcher: async () => jsonResponse([]) });
-  assert.deepEqual(await empty.listOrders(), { data: [] });
+  const direct = createStaffApiClient({ ...apiOptions, fetcher: async () => jsonResponse({ ...backendOrder, payment: null }) });
+  assert.equal((await direct.getOrder(backendScalar.id)).payment, null);
+  const empty = createStaffApiClient({ ...apiOptions, fetcher: async () => jsonResponse(backendPage([])) });
+  assert.deepEqual(await empty.listOrders(), backendPage([]));
+  const beyond = backendPage([], { page: 3, limit: 20, total: 1, totalPages: 1 });
+  const outOfRange = createStaffApiClient({ ...apiOptions, fetcher: async () => jsonResponse(beyond) });
+  assert.deepEqual(await outOfRange.listOrders({ page: 3 }), beyond);
 });
 
 test('staff PATCH stays disabled by default; explicit opt-in only sends requested status once to fake fetch', async () => {
   const calls = [];
-  const fetcher = async (...args) => { calls.push(args); return jsonResponse({ data: { ...STAFF_DEMO_ORDERS[0], status: 'PREPARING' } }); };
+  const fetcher = async (...args) => { calls.push(args); return jsonResponse({ ...backendScalar, status: 'PREPARING' }); };
   const client = createStaffApiClient({ ...apiOptions, fetcher });
   await assert.rejects(client.updateOrderStatus('DEMO-001', { status: 'PREPARING' }), errorCode('WRITES_DISABLED'));
   assert.equal(calls.length, 0);
   const enabled = createStaffApiClient({ ...apiOptions, fetcher, allowStatusUpdates: true });
-  assert.equal((await enabled.updateOrderStatus('DEMO-001', { status: 'PREPARING' })).status, 'PREPARING');
+  const result = await enabled.updateOrderStatus('DEMO-001', { status: 'PREPARING' });
+  assert.deepEqual(result, { ...backendScalar, status: 'PREPARING' });
+  assert.equal('items' in result, false); assert.equal('payment' in result, false);
   assert.equal(calls.length, 1); assert.ok(calls[0][0].endsWith('/staff/orders/DEMO-001/status'));
   assert.equal(calls[0][1].method, 'PATCH'); assert.deepEqual(JSON.parse(calls[0][1].body), { status: 'PREPARING' });
   await assert.rejects(enabled.updateOrderStatus('DEMO-001', { status: 'CANCELLED' }), errorCode('CONFIGURATION'));
   assert.equal(calls.length, 1);
 });
 
-for (const [status, code] of [[401, 'UNAUTHENTICATED'], [403, 'FORBIDDEN'], [404, 'NOT_FOUND'], [409, 'CONFLICT'], [500, 'HTTP']]) {
+for (const [status, code] of [[400, 'BAD_REQUEST'], [401, 'UNAUTHENTICATED'], [403, 'FORBIDDEN'], [404, 'NOT_FOUND'], [409, 'CONFLICT'], [500, 'HTTP']]) {
   test(`staff client handles HTTP ${status} without exposing server text or retrying`, async () => {
     let requests = 0;
     const client = createStaffApiClient({ ...apiOptions, fetcher: async () => { requests++; return new Response('private server text', { status }); } });
@@ -308,18 +364,28 @@ for (const [status, code] of [[401, 'UNAUTHENTICATED'], [403, 'FORBIDDEN'], [404
 }
 
 test('staff client rejects invalid JSON, invalid fields, duplicate IDs and false success without mock fallback', async () => {
-  const cases = [null, { success: false, data: STAFF_DEMO_ORDERS }, { data: {} },
-    [{ ...STAFF_DEMO_ORDERS[0], totalAmount: '45000' }],
-    [{ ...STAFF_DEMO_ORDERS[0], items: [{ ...STAFF_DEMO_ORDERS[0].items[0], quantity: 0 }] }],
-    [{ ...STAFF_DEMO_ORDERS[0], status: 'UNKNOWN' }],
-    [STAFF_DEMO_ORDERS[0], STAFF_DEMO_ORDERS[0]],
-    { data: [], meta: { page: 0, limit: 10, total: 0 } }];
+  const cases = [null, { success: false, ...backendPage() }, { data: {} },
+    backendPage([{ ...backendOrder, totalAmount: '55000' }]),
+    backendPage([{ ...backendOrder, items: [{ ...backendOrder.items[0], quantity: 0 }] }]),
+    backendPage([{ ...backendOrder, status: 'UNKNOWN' }]),
+    backendPage([{ ...backendOrder, payment: { ...backendOrder.payment, status: 'PAID' } }]),
+    backendPage([backendOrder, backendOrder]),
+    [backendOrder], { data: [], meta: { page: 1, limit: 20, total: 0 } },
+    ...[{ page: 0 }, { limit: 101 }, { total: -1 }, { totalPages: undefined }, { totalPages: 2 }]
+      .map((change) => backendPage([], { page: 1, limit: 20, total: 0, totalPages: 0, ...change }))];
   for (const data of cases) {
     const client = createStaffApiClient({ ...apiOptions, fetcher: async () => jsonResponse(data) });
     await assert.rejects(client.listOrders(), errorCode('INVALID_RESPONSE'));
   }
   const malformed = createStaffApiClient({ ...apiOptions, fetcher: async () => new Response('<html>wrong response</html>') });
   await assert.rejects(malformed.getOrder('a'), errorCode('INVALID_RESPONSE'));
+  for (const payload of [backendScalar, { data: backendOrder }]) {
+    const detail = createStaffApiClient({ ...apiOptions, fetcher: async () => jsonResponse(payload) });
+    await assert.rejects(detail.getOrder('a'), errorCode('INVALID_RESPONSE'));
+  }
+  const badPatch = createStaffApiClient({ ...apiOptions, allowStatusUpdates: true,
+    fetcher: async () => jsonResponse({ ...backendScalar, status: 'UNKNOWN' }) });
+  await assert.rejects(badPatch.updateOrderStatus('a', { status: 'READY' }), errorCode('INVALID_RESPONSE'));
 });
 
 test('staff client validates configuration/query/token before any network access', async () => {
@@ -329,9 +395,23 @@ test('staff client validates configuration/query/token before any network access
   assert.throws(() => createStaffApiClient({ ...apiOptions, timeoutMs: 0 }), errorCode('CONFIGURATION'));
   const noToken = createStaffApiClient({ ...apiOptions, getAccessToken: () => null });
   await assert.rejects(noToken.listOrders(), errorCode('UNAUTHENTICATED'));
-  const client = createStaffApiClient(apiOptions);
-  for (const query of [{ page: 0 }, { limit: 1.5 }, { status: 'ALL' }]) await assert.rejects(client.listOrders(query), errorCode('CONFIGURATION'));
+  let calls = 0;
+  const urls = [];
+  const client = createStaffApiClient({ ...apiOptions, fetcher: async (url) => { calls++; urls.push(url); return jsonResponse(backendPage([])); } });
+  for (const query of [{ page: 0 }, { page: -1 }, { page: 1.5 }, { page: '1' }, { page: NaN },
+    { page: 2147483648 }, { page: 2147483647 }, { page: 2147483647, limit: 100 },
+    { page: 107374184 },
+    { limit: 0 }, { limit: 1.5 }, { limit: 101 }, { limit: Infinity }, { status: 'ALL' }]) {
+    await assert.rejects(client.listOrders(query), errorCode('CONFIGURATION'));
+  }
   for (const id of ['', '..', '.']) await assert.rejects(client.getOrder(id), errorCode('CONFIGURATION'));
+  assert.equal(calls, 0);
+  for (const query of [{ page: 2147483647, limit: 1 }, { page: 21474837, limit: 100 }, { limit: 100 }, { page: 107374183 }]) {
+    await client.listOrders(query);
+  }
+  assert.equal(calls, 4);
+  await client.listOrders({ search: 'unsupported' });
+  assert.equal(new URL(urls.at(-1)).searchParams.has('search'), false);
 });
 
 test('staff client distinguishes network, timeout, caller abort and abort during response body', async () => {
@@ -349,4 +429,154 @@ test('staff client distinguishes network, timeout, caller abort and abort during
     ok: true, json: () => pendingFetch('', { signal }),
   }) });
   await assert.rejects(bodyTimeout.getOrder('a'), errorCode('TIMEOUT'));
+});
+
+// Exercise the actual hook + API client + parsers. Only HTTP and the existing session are simulated.
+function apiHook(fetcher, { baseUrl = 'https://staff.example.test', token = 'session-token' } = {}) {
+  const slots = []; let cursor = 0; let pending = []; let cleared = 0;
+  const changed = (previous, next) => !previous || next.some((value, index) => !Object.is(value, previous[index]));
+  const react = {
+    useState(initial) {
+      const index = cursor++; const slot = slots[index] ??= { value: initial };
+      return [slot.value, (next) => { slot.value = typeof next === 'function' ? next(slot.value) : next; }];
+    },
+    useCallback(callback, deps) {
+      const index = cursor++; const slot = slots[index] ??= {};
+      if (changed(slot.deps, deps)) { slot.deps = deps; slot.callback = callback; }
+      return slot.callback;
+    },
+    useEffect(effect, deps) {
+      const index = cursor++; const slot = slots[index] ??= {};
+      if (changed(slot.deps, deps)) {
+        slot.deps = deps;
+        pending.push(() => { slot.cleanup?.(); slot.cleanup = effect(); });
+      }
+    },
+  };
+  const hook = loader({ react, process: { env: { NEXT_PUBLIC_API_URL: baseUrl } },
+    window: { localStorage: { getItem: (key) => { assert.equal(key, 'token'); return token; } } },
+    '@/lib/auth': { clearAuthSession: () => { cleared++; } },
+  }, fetcher)('src/hooks/useStaffOrders.ts').useStaffOrders;
+  const render = () => { cursor = 0; const view = hook(); const effects = pending; pending = []; effects.forEach((run) => run()); return view; };
+  return { render, async settle() { await tick(); return render(); },
+    unmount() { slots.forEach((slot) => slot.cleanup?.()); }, get cleared() { return cleared; } };
+}
+
+test('API hook shows loading, genuine empty, errors and refresh without demo fallback', async () => {
+  const calls = []; let respond;
+  const host = apiHook((url, init) => { calls.push({ url, init }); return new Promise((resolve) => { respond = resolve; }); });
+  try {
+    assert.equal(host.render().status, 'loading');
+    assert.equal(new URL(calls[0].url).pathname, '/staff/orders');
+    assert.equal(calls[0].init.headers.Authorization, 'Bearer session-token');
+    assert.equal(calls[0].init.method, 'GET');
+    respond(jsonResponse(backendPage([])));
+    let view = await host.settle(); assert.equal(view.status, 'ready'); assert.deepEqual(view.orders, []);
+    assert.equal(view.detail.status, 'idle'); assert.equal(calls.length, 1);
+    view.refresh(); view = host.render(); assert.equal(view.status, 'loading'); assert.deepEqual(view.orders, []);
+    respond(new Response('server error', { status: 500 }));
+    view = await host.settle(); assert.equal(view.status, 'error'); assert.deepEqual(view.orders, []);
+    view.refresh(); host.render(); respond(jsonResponse(backendPage([])));
+    assert.equal((await host.settle()).status, 'ready');
+  } finally { host.unmount(); }
+});
+
+test('API hook sends server filters/pages, searches Vietnamese locally and fetches detail separately', async () => {
+  const calls = [];
+  const host = apiHook(async (url, init) => {
+    calls.push({ url: new URL(url), init });
+    return jsonResponse(new URL(url).pathname === '/staff/orders'
+      ? backendPage([backendOrder], { page: Number(new URL(url).searchParams.get('page')), limit: 10, total: 12, totalPages: 2 })
+      : { ...backendOrder, notes: 'Authoritative detail' });
+  });
+  try {
+    host.render(); let view = await host.settle();
+    assert.equal(view.detail.status, 'loading'); assert.equal(view.detail.data, undefined);
+    view = await host.settle(); assert.equal(view.detail.data.notes, 'Authoritative detail');
+    assert.equal(calls.filter((call) => call.url.pathname === '/staff/orders').length, 1);
+    view.changeSearch('khach kiem thu'); view = host.render(); assert.equal(view.visibleOrders.length, 1);
+    view.changeSearch('missing'); view = host.render(); assert.deepEqual(view.visibleOrders, []); assert.equal(view.detail.status, 'idle');
+    assert.equal(calls.filter((call) => call.url.pathname === '/staff/orders').length, 1);
+    view.changePage(2); view = host.render(); assert.equal(view.status, 'loading'); assert.deepEqual(view.orders, []);
+    view = await host.settle(); assert.equal(view.pagination.page, 2);
+    view.changeFilter('READY'); host.render(); view = await host.settle();
+    assert.equal(view.page, 1); assert.equal(view.filter, 'READY');
+    const request = calls.filter((call) => call.url.pathname === '/staff/orders').at(-1);
+    assert.equal(request.url.searchParams.get('status'), 'READY'); assert.equal(request.url.searchParams.get('limit'), '10');
+    for (const call of calls) { assert.equal(call.init.method, 'GET'); assert.equal(call.url.searchParams.has('search'), false); }
+  } finally { host.unmount(); }
+});
+
+test('API hook aborts obsolete detail, ignores late replies and handles detail 404/retry', async () => {
+  const other = { ...backendOrder, id: 'order-contract-2', items: backendOrder.items.map((item) => ({ ...item, orderId: 'order-contract-2' })) };
+  const details = [];
+  const host = apiHook((url, init) => new URL(url).pathname === '/staff/orders'
+    ? Promise.resolve(jsonResponse(backendPage([backendOrder, other])))
+    : new Promise((resolve) => details.push({ url, init, resolve })));
+  try {
+    host.render(); let view = await host.settle(); assert.equal(details.length, 1);
+    view.selectOrder(other.id); view = host.render(); assert.equal(view.detail.status, 'loading');
+    assert.equal(details[0].init.signal.aborted, true);
+    details[1].resolve(jsonResponse(other)); view = await host.settle(); assert.equal(view.detail.data.id, other.id);
+    details[0].resolve(jsonResponse(backendOrder)); view = await host.settle(); assert.equal(view.detail.data.id, other.id);
+    view.selectOrder(backendOrder.id); host.render(); details[2].resolve(new Response('missing', { status: 404 }));
+    view = await host.settle(); assert.equal(view.detail.error.code, 'NOT_FOUND'); assert.equal(view.detail.data, undefined);
+    view.retryDetail(); host.render(); details[3].resolve(jsonResponse(backendOrder));
+    view = await host.settle(); assert.equal(view.detail.data.id, backendOrder.id);
+  } finally { host.unmount(); }
+});
+
+for (const status of [401, 403]) {
+  for (const endpoint of ['list', 'detail']) {
+    test(`API hook clears visible private data on ${endpoint} ${status}`, async () => {
+      const host = apiHook(async (url) => endpoint === 'detail' && new URL(url).pathname === '/staff/orders'
+        ? jsonResponse(backendPage()) : new Response('denied', { status }));
+      try {
+        host.render(); await host.settle(); const view = await host.settle();
+        assert.equal(view.errorCode, status === 401 ? 'UNAUTHENTICATED' : 'FORBIDDEN');
+        assert.equal(view.status, 'error'); assert.deepEqual(view.orders, []); assert.equal(view.detail.data, undefined);
+        assert.equal(host.cleared, status === 401 ? 1 : 0);
+      } finally { host.unmount(); }
+    });
+  }
+}
+
+test('API hook aborts list on refresh/unmount and ignores stale responses', async () => {
+  const requests = [];
+  const host = apiHook((_url, init) => new Promise((resolve) => requests.push({ init, resolve })));
+  let view = host.render(); view.refresh(); host.render(); assert.equal(requests[0].init.signal.aborted, true);
+  requests[1].resolve(jsonResponse(backendPage([]))); view = await host.settle(); assert.deepEqual(view.orders, []);
+  requests[0].resolve(jsonResponse(backendPage())); view = await host.settle(); assert.deepEqual(view.orders, []);
+  view.refresh(); host.render(); host.unmount(); assert.equal(requests[2].init.signal.aborted, true);
+  requests[2].resolve(jsonResponse(backendPage())); await tick();
+});
+
+test('API hook reports missing API configuration/token and never falls back to mock', async () => {
+  for (const [options, code] of [[{ baseUrl: '' }, 'CONFIGURATION'], [{ token: null }, 'UNAUTHENTICATED']]) {
+    let calls = 0; const host = apiHook(async () => { calls++; throw new Error('Must not fetch'); }, options);
+    try { host.render(); const view = await host.settle(); assert.equal(view.errorCode, code); assert.deepEqual(view.orders, []); assert.equal(calls, 0); }
+    finally { host.unmount(); }
+  }
+  for (const file of ['src/components/staff/StaffPageClient.tsx', 'src/hooks/useStaffOrders.ts']) {
+    assert.doesNotMatch(readFileSync(resolve(root, file), 'utf8'), /useStaffDemoOrders|staffDemoOrders|allowStatusUpdates:\s*true/);
+  }
+});
+
+test('reselecting the active order or filter does not refetch; explicit refresh still does', async () => {
+  const requests = [];
+  const host = apiHook(async (url) => {
+    requests.push(url);
+    return jsonResponse(new URL(url).pathname === '/staff/orders' ? backendPage() : backendOrder);
+  });
+  try {
+    host.render(); await host.settle(); let view = await host.settle();
+    assert.equal(requests.length, 2);
+    host.render(); host.render(); assert.equal(requests.length, 2);
+    view.selectOrder(view.selectedId); view = host.render(); await host.settle();
+    assert.equal(requests.length, 2, 'clicking the selected order must not repeat its detail GET');
+    view.changeFilter(view.filter); view = host.render(); await host.settle();
+    assert.equal(requests.length, 2, 'clicking the active filter must not reload the page');
+    view.refresh(); host.render(); await host.settle(); await host.settle();
+    assert.equal(requests.length, 4, 'explicit refresh reloads the list and selected detail');
+  } finally { host.unmount(); }
 });

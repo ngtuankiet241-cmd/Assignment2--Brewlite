@@ -3,7 +3,7 @@ import StaffOrderStatus from './StaffOrderStatus';
 
 export default function StaffOrderList({ orders, selectedId, onSelect }: { orders: StaffOrder[]; selectedId?: string; onSelect: (id: string) => void }) {
   return (
-    <ul aria-label="Danh sách đơn demo" className="space-y-3">
+    <ul aria-label="Danh sách đơn hàng" className="space-y-3">
       {orders.map((order) => <li key={order.id}>
         <button type="button" aria-pressed={selectedId === order.id} aria-controls="staff-order-detail" onClick={() => onSelect(order.id)}
           className={`w-full min-w-0 rounded-2xl border p-4 text-left transition focus-visible:outline-2 focus-visible:outline-coffee-600 ${selectedId === order.id ? 'border-coffee-600 bg-coffee-50 ring-1 ring-coffee-600' : 'border-coffee-200 bg-white hover:border-coffee-400'}`}>

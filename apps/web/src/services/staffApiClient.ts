@@ -1,6 +1,6 @@
-import { STAFF_STATUSES, type StaffOrder, type StaffOrdersPage, type StaffOrdersQuery, type StaffUpdateStatusInput } from '@/types/staff';
+import { STAFF_STATUSES, type StaffOrderDetails, type StaffOrderScalar, type StaffOrdersPage, type StaffOrdersQuery, type StaffUpdateStatusInput } from '@/types/staff';
 
-export type StaffApiErrorCode = 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'HTTP'
+export type StaffApiErrorCode = 'BAD_REQUEST' | 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'HTTP'
   | 'NETWORK' | 'TIMEOUT' | 'ABORTED' | 'INVALID_RESPONSE' | 'CONFIGURATION' | 'WRITES_DISABLED';
 
 export class StaffApiError extends Error {
@@ -31,17 +31,34 @@ const nullableText = (value: unknown) => value === null || typeof value === 'str
 const date = (value: unknown) => typeof value === 'string' && Number.isFinite(Date.parse(value));
 const status = (value: unknown) => typeof value === 'string' && Object.hasOwn(STAFF_STATUSES, value);
 
-function isOrder(value: unknown): value is StaffOrder {
+const MAX_PAGE = 2147483647;
+const MAX_LIMIT = 100;
+
+function validPagination(page: unknown, limit: unknown): page is number {
+  return integer(page, 1) && page <= MAX_PAGE && integer(limit, 1) && limit <= MAX_LIMIT
+    && (page - 1) * limit <= MAX_PAGE;
+}
+
+function isOrderScalar(value: unknown): value is StaffOrderScalar {
+  if (!record(value)) return false;
+  return text(value.id) && typeof value.customerName === 'string' && typeof value.customerPhone === 'string'
+    && nullableText(value.userId) && (value.tableNumber === null || integer(value.tableNumber, -2147483648))
+    && nullableText(value.notes) && status(value.status) && amount(value.totalAmount)
+    && amount(value.subtotalAmount) && amount(value.discountAmount)
+    && (value.reservationStatus === null || ['HELD', 'CONSUMED', 'RELEASED'].includes(String(value.reservationStatus)))
+    && (value.reservationExpiresAt === null || date(value.reservationExpiresAt))
+    && nullableText(value.promotionId) && nullableText(value.promotionCode)
+    && date(value.createdAt) && date(value.updatedAt);
+}
+
+function isOrder(value: unknown): value is StaffOrderDetails {
   if (!record(value)) return false;
   const payment = value.payment;
-  return text(value.id) && text(value.customerName)
-    && (value.customerPhone === undefined || typeof value.customerPhone === 'string')
-    && (value.tableNumber === null || integer(value.tableNumber, 1)) && nullableText(value.notes)
-    && status(value.status) && amount(value.totalAmount) && date(value.createdAt) && date(value.updatedAt)
+  return isOrderScalar(value)
     && Array.isArray(value.items) && value.items.every((item: unknown) => record(item)
-      && text(item.id) && text(item.productId) && text(item.productName) && amount(item.unitPrice)
+      && text(item.id) && item.orderId === value.id && text(item.productId) && text(item.productName) && amount(item.unitPrice)
       && integer(item.quantity, 1) && text(item.size) && nullableText(item.toppings) && amount(item.itemTotal))
-    && (payment === null || (record(payment) && text(payment.id) && payment.orderId === value.id
+    && (payment === null || (record(payment) && text(payment.id)
       && amount(payment.amount) && ['SEPAY_QR', 'CASH'].includes(String(payment.method))
       && ['PENDING', 'SUCCESS', 'FAILED'].includes(String(payment.status))
       && (payment.paidAt === null || date(payment.paidAt))));
@@ -51,29 +68,30 @@ function invalidResponse(): never {
   throw new StaffApiError('INVALID_RESPONSE', 'Dữ liệu đơn hàng không đúng hợp đồng Staff.');
 }
 
-function unwrap(value: unknown): unknown {
-  if (record(value) && value.success === false) return invalidResponse();
-  return record(value) && Object.hasOwn(value, 'data') ? value.data : value;
+function parseOrder(value: unknown): StaffOrderDetails {
+  if (!isOrder(value)) return invalidResponse();
+  return value;
 }
 
-function parseOrder(value: unknown): StaffOrder {
-  const order = unwrap(value);
-  if (!isOrder(order)) return invalidResponse();
-  return order;
+function parseStatusResult(value: unknown): StaffOrderScalar {
+  if (!isOrderScalar(value)) return invalidResponse();
+  return value;
 }
 
 function parsePage(value: unknown): StaffOrdersPage {
-  const data = unwrap(value);
+  if (!record(value) || value.success === false) return invalidResponse();
+  const { data, pagination } = value;
   if (!Array.isArray(data) || !data.every(isOrder)) return invalidResponse();
   if (new Set(data.map((order) => order.id)).size !== data.length) return invalidResponse();
-  const meta = record(value) ? value.meta : undefined;
-  if (meta === undefined) return { data };
-  if (!record(meta) || !integer(meta.page, 1) || !integer(meta.limit, 1) || !integer(meta.total, 0)) return invalidResponse();
-  return { data, meta: { page: meta.page, limit: meta.limit, total: meta.total } };
+  if (!record(pagination) || !validPagination(pagination.page, pagination.limit)
+    || !integer(pagination.limit, 1) || !integer(pagination.total, 0) || !integer(pagination.totalPages, 0)
+    || pagination.totalPages !== Math.ceil(pagination.total / pagination.limit)) return invalidResponse();
+  return { data, pagination: { page: pagination.page, limit: pagination.limit, total: pagination.total, totalPages: pagination.totalPages } };
 }
 
 function httpError(status: number) {
   const errors: Partial<Record<number, [StaffApiErrorCode, string]>> = {
+    400: ['BAD_REQUEST', 'Yêu cầu đơn hàng không hợp lệ. Kiểm tra bộ lọc, phân trang hoặc trạng thái.'],
     401: ['UNAUTHENTICATED', 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'],
     403: ['FORBIDDEN', 'Bạn không có quyền thao tác với đơn hàng nhân viên.'],
     404: ['NOT_FOUND', 'Không tìm thấy đơn hàng hoặc API Staff.'],
@@ -141,7 +159,9 @@ export function createStaffApiClient(options: StaffApiOptions) {
         if (!status(query.status)) throw new StaffApiError('CONFIGURATION', 'Bộ lọc trạng thái không hợp lệ.');
         params.set('status', query.status);
       }
-      if (query.search?.trim()) params.set('search', query.search.trim());
+      if (!validPagination(query.page ?? 1, query.limit ?? 20)) {
+        throw new StaffApiError('CONFIGURATION', 'Phân trang vượt giới hạn Backend Staff.');
+      }
       for (const key of ['page', 'limit'] as const) {
         if (query[key] !== undefined) {
           if (!integer(query[key], 1)) throw new StaffApiError('CONFIGURATION', 'Phân trang không hợp lệ.');
@@ -150,13 +170,13 @@ export function createStaffApiClient(options: StaffApiOptions) {
       }
       return parsePage(await request(`/staff/orders${params.size ? `?${params}` : ''}`, requestOptions));
     },
-    async getOrder(id: string, requestOptions: RequestOptions = {}): Promise<StaffOrder> {
+    async getOrder(id: string, requestOptions: RequestOptions = {}): Promise<StaffOrderDetails> {
       return parseOrder(await request(orderPath(id), requestOptions));
     },
-    async updateOrderStatus(id: string, input: StaffUpdateStatusInput, requestOptions: RequestOptions = {}): Promise<StaffOrder> {
+    async updateOrderStatus(id: string, input: StaffUpdateStatusInput, requestOptions: RequestOptions = {}): Promise<StaffOrderScalar> {
       if (!options.allowStatusUpdates) throw new StaffApiError('WRITES_DISABLED', 'Cập nhật đơn đang khóa cho đến khi có API Staff an toàn.');
       if (!['PREPARING', 'READY', 'COMPLETED'].includes(input.status)) throw new StaffApiError('CONFIGURATION', 'Trạng thái đích không hợp lệ.');
-      return parseOrder(await request(`${orderPath(id)}/status`, requestOptions, { status: input.status }));
+      return parseStatusResult(await request(`${orderPath(id)}/status`, requestOptions, { status: input.status }));
     },
   };
 }

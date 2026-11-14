@@ -3,7 +3,7 @@ import StaffPageClient from '@/components/staff/StaffPageClient';
 
 export const metadata: Metadata = {
   title: 'Quầy nhân viên – BrewLite',
-  description: 'Giao diện nhân viên BrewLite — bản demo chưa kết nối API.',
+  description: 'Xem hàng đợi và chi tiết đơn hàng BrewLite dành cho nhân viên.',
   robots: { index: false, follow: false },
 };
 

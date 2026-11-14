@@ -4,7 +4,7 @@ import type { AuthUser } from '@/lib/auth';
 export default function StaffHeader({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   return (
     <header className="border-b border-coffee-700 bg-coffee-950 text-cream-50">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
           <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cream-100 text-xl text-coffee-900">☕</span>
           <div><p className="text-xl font-black tracking-tight">BrewLite<span className="text-coffee-300"> / Staff</span></p><p className="text-xs text-coffee-300">Gọn từng đơn. Trọn từng ly.</p></div>
