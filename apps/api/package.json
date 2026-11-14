@@ -8,7 +8,7 @@
     "start:dev": "nest start --watch",
     "prisma:generate": "prisma generate",
     "prisma:seed": "ts-node prisma/seed.ts",
-    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
     "test:watch": "jest --watch",

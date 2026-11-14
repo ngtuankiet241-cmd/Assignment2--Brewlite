@@ -40,8 +40,8 @@ jobs:
       - name: Generate Prisma Client
         run: npm run prisma:generate
 
-      - name: Run Linter & Type-check
-        run: npm run lint
+      - name: Type-check Backend
+        run: npm run typecheck
 
       - name: Run Unit Tests
         run: npm test -- --runInBand
