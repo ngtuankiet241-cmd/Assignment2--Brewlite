@@ -78,7 +78,7 @@ test('demo source supports empty/error and returns isolated copies without calli
   assert.notEqual(STAFF_DEMO_ORDERS[0].items[0].quantity, 99);
 });
 
-test('each permitted UI transition is disabled and no cancel/payment retry actions are created', () => {
+test('each permitted UI transition is disabled by default; cancellation is a disabled placeholder', () => {
   assert.deepEqual(Object.keys(STAFF_NEXT_ACTION), ['PAID', 'PREPARING', 'READY']);
   assert.deepEqual(Object.values(STAFF_NEXT_ACTION).map((action) => action.status), ['PREPARING', 'READY', 'COMPLETED']);
   const Detail = load('src/components/staff/StaffOrderDetail.tsx').default;
@@ -97,6 +97,29 @@ test('each permitted UI transition is disabled and no cancel/payment retry actio
   assert.match(detailed, /Size L/);
   assert.match(detailed, /96\.000/);
   assert.match(detailed, /SePay QR/);
+});
+
+test('Staff action labels, loading and permanently disabled cancellation follow each status', () => {
+  const Detail = load('src/components/staff/StaffOrderDetail.tsx').default;
+  const expected = { PAID: 'Bắt đầu pha chế', PREPARING: 'Sẵn sàng nhận', READY: 'Hoàn thành' };
+  for (const order of STAFF_DEMO_ORDERS) {
+    for (const updatesEnabled of [false, true]) {
+      const html = render(Detail, { order, updatesEnabled, onUpdate() {} });
+      const buttons = [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map((match) => match[0]);
+      assert.equal(buttons.length, expected[order.status] ? (order.status === 'PAID' ? 2 : 1) : 0);
+      if (expected[order.status]) {
+        assert.ok(buttons[0].includes(expected[order.status]));
+        assert.equal(buttons[0].includes('disabled=""'), !updatesEnabled);
+        const busy = render(Detail, { order, updatesEnabled, updating: true, onUpdate() {} });
+        assert.match(busy, /<button[^>]*disabled=""[^>]*aria-busy="true"[^>]*>Đang cập nhật…/);
+      }
+      if (order.status === 'PAID') {
+        assert.match(buttons[1], /disabled=""/);
+        assert.match(buttons[1], /title="Chức năng đang phát triển"/);
+        assert.match(buttons[1], />Hủy đơn</);
+      }
+    }
+  }
 });
 
 test('staff states provide loading announcement, distinct empty messages, error and retry', () => {
@@ -432,10 +455,13 @@ test('staff client distinguishes network, timeout, caller abort and abort during
 });
 
 // Exercise the actual hook + API client + parsers. Only HTTP and the existing session are simulated.
-function apiHook(fetcher, { baseUrl = 'https://staff.example.test', token = 'session-token' } = {}) {
+function apiHook(fetcher, { baseUrl = 'https://staff.example.test', token = 'session-token', updatesFlag } = {}) {
   const slots = []; let cursor = 0; let pending = []; let cleared = 0;
   const changed = (previous, next) => !previous || next.some((value, index) => !Object.is(value, previous[index]));
   const react = {
+    useRef(initial) {
+      const index = cursor++; return slots[index] ??= { current: initial };
+    },
     useState(initial) {
       const index = cursor++; const slot = slots[index] ??= { value: initial };
       return [slot.value, (next) => { slot.value = typeof next === 'function' ? next(slot.value) : next; }];
@@ -453,7 +479,7 @@ function apiHook(fetcher, { baseUrl = 'https://staff.example.test', token = 'ses
       }
     },
   };
-  const hook = loader({ react, process: { env: { NEXT_PUBLIC_API_URL: baseUrl } },
+  const hook = loader({ react, process: { env: { NEXT_PUBLIC_API_URL: baseUrl, NEXT_PUBLIC_STAFF_STATUS_UPDATES_ENABLED: updatesFlag } },
     window: { localStorage: { getItem: (key) => { assert.equal(key, 'token'); return token; } } },
     '@/lib/auth': { clearAuthSession: () => { cleared++; } },
   }, fetcher)('src/hooks/useStaffOrders.ts').useStaffOrders;
@@ -579,4 +605,136 @@ test('reselecting the active order or filter does not refetch; explicit refresh 
     view.refresh(); host.render(); await host.settle(); await host.settle();
     assert.equal(requests.length, 4, 'explicit refresh reloads the list and selected detail');
   } finally { host.unmount(); }
+});
+
+for (const updatesFlag of [undefined, 'false', '', '1', 'TRUE']) {
+  test(`status feature flag ${JSON.stringify(updatesFlag)} blocks PATCH even when handler is called directly`, async () => {
+    const calls = [];
+    const host = apiHook(async (url, init) => {
+      calls.push(init.method);
+      return jsonResponse(new URL(url).pathname === '/staff/orders' ? backendPage() : backendOrder);
+    }, { updatesFlag });
+    try {
+      host.render(); await host.settle(); let view = await host.settle();
+      assert.equal(view.statusUpdatesEnabled, false);
+      await view.updateSelectedOrder(); view = host.render();
+      assert.deepEqual(calls, ['GET', 'GET']);
+      assert.equal(view.notice.kind, 'error');
+      assert.match(view.notice.message, /đang khóa/);
+    } finally { host.unmount(); }
+  });
+}
+
+for (const [from, to] of [['PAID', 'PREPARING'], ['PREPARING', 'READY'], ['READY', 'COMPLETED']]) {
+  test(`Staff mutation ${from} -> ${to} sends JWT, prevents double click and refreshes list/detail`, async () => {
+    const calls = []; let stored = { ...backendOrder, status: from }; let complete;
+    const host = apiHook(async (url, init) => {
+      calls.push({ url: new URL(url), init });
+      if (init.method === 'PATCH') return new Promise((resolve) => { complete = () => {
+        stored = { ...stored, status: to };
+        resolve(jsonResponse({ ...backendScalar, status: to }));
+      }; });
+      return jsonResponse(new URL(url).pathname === '/staff/orders' ? backendPage([stored]) : stored);
+    }, { updatesFlag: 'true' });
+    try {
+      host.render(); await host.settle(); let view = await host.settle();
+      const first = view.updateSelectedOrder();
+      await view.updateSelectedOrder(); // Same render, before the loading UI appears.
+      view = host.render(); assert.equal(view.updatingId, backendOrder.id);
+      await view.updateSelectedOrder(); // Loading render must also remain locked.
+      const writes = calls.filter((call) => call.init.method === 'PATCH');
+      assert.equal(writes.length, 1);
+      assert.equal(writes[0].url.pathname, `/staff/orders/${backendOrder.id}/status`);
+      assert.equal(writes[0].init.headers.Authorization, 'Bearer session-token');
+      assert.equal(writes[0].init.headers['Content-Type'], 'application/json');
+      assert.deepEqual(JSON.parse(writes[0].init.body), { status: to });
+      complete(); await first;
+      view = host.render(); assert.equal(view.status, 'loading'); assert.equal(view.updatingId, null);
+      assert.equal(view.notice.kind, 'success');
+      await host.settle(); view = await host.settle();
+      assert.equal(view.orders[0].status, to); assert.equal(view.detail.data.status, to);
+      assert.deepEqual(calls.map((call) => call.init.method), ['GET', 'GET', 'PATCH', 'GET', 'GET']);
+    } finally { host.unmount(); }
+  });
+}
+
+for (const status of ['PENDING', 'PAYMENT_FAILED', 'COMPLETED', 'CANCELLED']) {
+  test(`view-only status ${status} never sends PATCH even with feature enabled`, async () => {
+    const calls = []; const order = { ...backendOrder, status };
+    const host = apiHook(async (url, init) => {
+      calls.push(init.method);
+      return jsonResponse(new URL(url).pathname === '/staff/orders' ? backendPage([order]) : order);
+    }, { updatesFlag: 'true' });
+    try {
+      host.render(); await host.settle(); const view = await host.settle();
+      await view.updateSelectedOrder(); assert.deepEqual(calls, ['GET', 'GET']);
+    } finally { host.unmount(); }
+  });
+}
+
+for (const [status, code] of [[401, 'UNAUTHENTICATED'], [403, 'FORBIDDEN'], [404, 'NOT_FOUND'], [409, 'CONFLICT'], [500, 'HTTP']]) {
+  test(`Staff PATCH ${status} reports error, releases loading and reconciles without retrying PATCH`, async () => {
+    const calls = []; let stored = backendOrder;
+    const host = apiHook(async (url, init) => {
+      calls.push(init.method);
+      if (init.method === 'PATCH') {
+        if (status === 409) stored = { ...stored, status: 'READY' };
+        return new Response('private backend message', { status });
+      }
+      return jsonResponse(new URL(url).pathname === '/staff/orders' ? backendPage([stored]) : stored);
+    }, { updatesFlag: 'true' });
+    try {
+      host.render(); await host.settle(); let view = await host.settle();
+      await view.updateSelectedOrder(); view = host.render();
+      assert.equal(view.updatingId, null); assert.equal(view.notice.kind, 'error');
+      assert.doesNotMatch(view.notice.message, /private backend/);
+      await host.settle(); view = await host.settle();
+      if (status === 401 || status === 403) {
+        assert.equal(view.errorCode, code); assert.equal(view.status, 'error');
+        assert.deepEqual(view.orders, []); assert.equal(view.detail.data, undefined);
+        assert.equal(host.cleared, status === 401 ? 1 : 0);
+        assert.deepEqual(calls, ['GET', 'GET', 'PATCH']);
+      } else {
+        assert.equal(view.detail.data.status, stored.status);
+        assert.deepEqual(calls, ['GET', 'GET', 'PATCH', 'GET', 'GET']);
+      }
+      assert.equal(calls.filter((method) => method === 'PATCH').length, 1);
+    } finally { host.unmount(); }
+  });
+}
+
+test('ambiguous PATCH network failure refreshes actual state and never retries the write', async () => {
+  let stored = backendOrder; const calls = [];
+  const host = apiHook(async (url, init) => {
+    calls.push(init.method);
+    if (init.method === 'PATCH') {
+      stored = { ...stored, status: 'PREPARING' };
+      throw new TypeError('connection lost after server commit');
+    }
+    return jsonResponse(new URL(url).pathname === '/staff/orders' ? backendPage([stored]) : stored);
+  }, { updatesFlag: 'true' });
+  try {
+    host.render(); await host.settle(); let view = await host.settle();
+    await view.updateSelectedOrder(); host.render(); await host.settle(); view = await host.settle();
+    assert.equal(view.notice.kind, 'error'); assert.equal(view.detail.data.status, 'PREPARING');
+    assert.deepEqual(calls, ['GET', 'GET', 'PATCH', 'GET', 'GET']);
+  } finally { host.unmount(); }
+});
+
+test('unmount aborts in-flight PATCH and prevents stale session refreshes or messages', async () => {
+  const calls = []; let writeSignal; let respond;
+  const host = apiHook(async (url, init) => {
+    calls.push(init.method);
+    if (init.method === 'PATCH') {
+      writeSignal = init.signal; return new Promise((resolve) => { respond = resolve; });
+    }
+    return jsonResponse(new URL(url).pathname === '/staff/orders' ? backendPage() : backendOrder);
+  }, { updatesFlag: 'true' });
+  host.render(); await host.settle(); const view = await host.settle();
+  const pending = view.updateSelectedOrder(); host.unmount();
+  assert.equal(writeSignal.aborted, true);
+  respond(jsonResponse({ ...backendScalar, status: 'PREPARING' })); await pending;
+  await view.updateSelectedOrder();
+  assert.deepEqual(calls, ['GET', 'GET', 'PATCH']);
+  assert.equal(host.cleared, 0);
 });

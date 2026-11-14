@@ -79,10 +79,10 @@ export const STAFF_STATUSES: Record<StaffOrderStatus, { label: string; color: st
 };
 
 // UI affordances only; the backend must enforce transitions and authorization.
-export const STAFF_NEXT_ACTION: Partial<Record<StaffOrderStatus, { status: StaffOrderStatus; label: string }>> = {
-  PAID: { status: 'PREPARING', label: 'Nhận đơn & chuẩn bị' },
-  PREPARING: { status: 'READY', label: 'Đánh dấu sẵn sàng' },
-  READY: { status: 'COMPLETED', label: 'Hoàn thành đơn' },
+export const STAFF_NEXT_ACTION: Partial<Record<StaffOrderStatus, StaffUpdateStatusInput & { label: string }>> = {
+  PAID: { status: 'PREPARING', label: 'Bắt đầu pha chế' },
+  PREPARING: { status: 'READY', label: 'Sẵn sàng nhận' },
+  READY: { status: 'COMPLETED', label: 'Hoàn thành' },
 };
 
 export function canAccessStaff(role?: string): boolean {

@@ -9,7 +9,8 @@
 Dashboard `/staff` dùng `useStaffOrders` để gọi API thật qua `staffApiClient`.
 Luồng mặc định không import `useStaffDemoOrders` hoặc `staffDemoOrders.ts`.
 Hai file demo được giữ riêng cho kiểm thử, không làm fallback khi API rỗng/lỗi.
-Nút cập nhật tiếp tục disabled; hook chỉ gọi hai phương thức GET.
+Nút cập nhật được nối với PATCH thật nhưng mặc định disabled bằng feature flag OFF.
+Nút Hủy chỉ xuất hiện ở PAID, luôn disabled với tooltip "Chức năng đang phát triển".
 
 - Danh sách gọi GET `/staff/orders` với `page`, `limit: 10` và status khi chọn bộ lọc.
   Đổi bộ lọc trở về trang 1. Nút trước/sau dùng pagination Backend trả về.
@@ -38,7 +39,25 @@ Có AbortSignal và timeout mặc định 10 giây, bao gồm đọc JSON; khôn
 Client không log token hoặc nội dung lỗi Backend.
 
 `allowStatusUpdates` vẫn mặc định `false`: cập nhật trả `WRITES_DISABLED` trước khi gửi request.
-Dashboard/hook không bật tùy chọn này. Unit test chỉ opt-in với fake fetch để kiểm tra parser PATCH.
+Hook truyền `STAFF_STATUS_UPDATES_ENABLED` từ `src/lib/staffFeatures.ts` vào tùy chọn này.
+Chỉ giá trị chính xác `NEXT_PUBLIC_STAFF_STATUS_UPDATES_ENABLED=true` cho phép cập nhật;
+thiếu biến hoặc giá trị khác đều OFF. Không đổi `.env` trong triển khai Frontend này.
+Biến NEXT_PUBLIC được nhúng lúc build: cần build/deploy lại khi đổi flag.
+
+Không bật flag trên Backend hiện tại. Thành viên Backend cần hoàn tất:
+
+1. Policy thủ công chỉ cho PAID → PREPARING, PREPARING → READY, READY → COMPLETED.
+   Áp dụng đồng nhất PATCH `/staff/orders/:id/status` và `/orders/:id/status`;
+   không cho thủ công đánh dấu PAID hoặc dùng nhánh thanh toán/thử lại/hủy.
+2. PAID → PREPARING kiểm tra Payment SUCCESS, số tiền khớp tổng Order và reservation
+   hợp lệ trong transaction đang giữ khóa Order. Xác định rõ xử lý đơn cũ reservation NULL.
+3. Giữ transaction/SELECT FOR UPDATE hiện có và bổ sung test cho hai endpoint,
+   Payment thiếu/PENDING/FAILED/sai tiền, reservation không hợp lệ và cập nhật đồng thời.
+
+Đối chiếu source: `StaffService.updateOrderStatus` chuyển thẳng sang
+`OrdersService.updateStatus`; `OrdersController.updateStatus` cũng gọi service này.
+`changeOrderStatus` chưa đọc Payment và `assertTransition` vẫn cho PENDING → PAID.
+Không sửa Backend, kho, schema, migrations hoặc SePay trong thay đổi Frontend này.
 
 ## Endpoint và query
 
@@ -127,7 +146,13 @@ kể cả fake fetch không tuân theo AbortSignal. Dữ liệu được gắn v
 ngay trong render khi đổi trang/bộ lọc, trước khi effect cleanup chạy.
 Dashboard remount theo user ID và role; đăng xuất hoặc mất quyền sẽ unmount và hủy request.
 Lỗi 401/403 từ bất kỳ request nào cũng chặn hiển thị dữ liệu cả hai phần.
-Khi cho phép PATCH ở giai đoạn sau cần tải lại chi tiết/danh sách sau thành công hoặc 409.
+PATCH có khóa đồng bộ chống double click, loading và thông báo thành công/lỗi.
+Sau thành công hoặc lỗi không phải 401/403, hook tải lại danh sách và chi tiết đang chọn
+nếu đơn còn trong kết quả; bộ lọc/trang/tìm kiếm được giữ nguyên. Nếu đơn rời bộ lọc,
+chọn đơn còn lại theo cơ chế sẵn có. Không ghép scalar PATCH thành chi tiết giả.
+401 xóa session; 403 chặn dữ liệu; 404/409 thông báo và đồng bộ lại từ Backend.
+Không tự retry PATCH, kể cả khi lỗi mạng/timeout có thể đã ghi thành công ở server.
+Unmount/đổi tài khoản hủy request và bỏ kết quả cũ; abort không bảo đảm server rollback.
 Tìm kiếm toàn bộ dữ liệu và thống kê theo ca/toàn hệ thống chưa có API Staff tương ứng;
 lọc hoặc đếm trên một trang không đại diện toàn bộ đơn.
 
