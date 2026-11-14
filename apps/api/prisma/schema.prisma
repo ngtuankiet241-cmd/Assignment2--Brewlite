@@ -34,6 +34,12 @@ enum PaymentMethod {
   CASH
 }
 
+enum StockReservationStatus {
+  HELD
+  CONSUMED
+  RELEASED
+}
+
 enum LoyaltyType {
   EARN
   REDEEM
@@ -65,42 +71,47 @@ model Product {
   price       Int
   imageUrl    String
   stock       Int
+  version     Int         @default(0)
   orderItems  OrderItem[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @default(now()) @updatedAt
 }
 
 model Order {
-  id                  String               @id @default(cuid())
-  userId              String?
-  user                User?                @relation(fields: [userId], references: [id])
-  customerName        String
-  customerPhone       String
-  tableNumber         Int?
-  notes               String?
-  totalAmount         Int
-  status              OrderStatus          @default(PENDING)
-  items               OrderItem[]
-  payment             Payment?
-  promotionId         String?
-  promotion           Promotion?           @relation(fields: [promotionId], references: [id])
-  loyaltyTransactions LoyaltyTransaction[]
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  id                   String                  @id @default(cuid())
+  userId               String?
+  user                 User?                   @relation(fields: [userId], references: [id])
+  customerName         String
+  customerPhone        String
+  tableNumber          Int?
+  notes                String?
+  totalAmount          Int
+  status               OrderStatus             @default(PENDING)
+  reservationStatus    StockReservationStatus?
+  reservationExpiresAt DateTime?
+  items                OrderItem[]
+  payment              Payment?
+  promotionId          String?
+  promotion            Promotion?              @relation(fields: [promotionId], references: [id])
+  loyaltyTransactions  LoyaltyTransaction[]
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  @@index([reservationStatus, reservationExpiresAt])
 }
 
 model OrderItem {
-  id                  String   @id @default(cuid())
-  orderId             String
-  order               Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId           String
-  product             Product  @relation(fields: [productId], references: [id])
-  productName         String
-  unitPrice           Int
-  quantity            Int
-  size                String   @default("M")
-  toppings            String?
-  itemTotal           Int
+  id          String  @id @default(cuid())
+  orderId     String
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+  productName String
+  unitPrice   Int
+  quantity    Int
+  size        String  @default("M")
+  toppings    String?
+  itemTotal   Int
 }
 
 model Payment {
@@ -145,4 +156,3 @@ model LoyaltyTransaction {
   description String?
   createdAt   DateTime    @default(now())
 }
-

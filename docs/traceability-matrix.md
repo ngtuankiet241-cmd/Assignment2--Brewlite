@@ -62,6 +62,7 @@ Bảng ma trận truy vết tuân thủ định dạng chuẩn 5 cột theo quy 
 | **FR-20** Xác nhận kết quả thanh toán | US-12, UC-01 | SD-01, CD-01 (`Payment`, `Order`) | *Sprint 2:* `POST /payments/sepay/webhook-ipn` | *Sprint 2:* `INT-PAY-02` |
 | **FR-21** Ngăn chặn thanh toán trùng lặp | US-12, UC-01 | SD-01, CD-01 (`Payment`) | *Sprint 2:* Idempotency Key Guard, `PaymentsService` | *Sprint 2:* `INT-PAY-03` |
 | **NFR-HEALTH** Giám sát trạng thái hệ thống | Tiêu chí Sprint 1 | CD-01, Deployment Diagram | `GET /health`<br>`apps/api/src/health/health.controller.ts` | `E2E-HEALTH-01`<br>`E2E-HEALTH-02`<br>`UT-HEALTH-01` |
+| **NFR-INVENTORY** Không bán vượt tồn kho khi đặt đồng thời; TTL giữ hàng (hỗ trợ FR-07, FR-10, FR-20) | US-07, US-08, US-12, UC-01 | Transaction, optimistic locking và TTL, SM-01 | `orders/orders.service.ts`<br>`inventory/stock-reservation.ts`<br>`inventory/inventory.service.ts`<br>`orders/order-transition.ts` | `UT-INV-01..16`<br>`INT-INV-01..16` |
 
 ## Ghi chú truy vết
 

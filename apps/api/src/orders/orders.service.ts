@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { assertOrderStatus } from './order-state-machine';
 import { changeOrderStatus } from './order-transition';
+import { InventoryService } from '../inventory/inventory.service';
+import { aggregateQuantities, reserveStock } from '../inventory/stock-reservation';
 
 export interface CreateOrderItemDto {
   productId: string;
@@ -24,44 +26,55 @@ export interface CreateOrderDto {
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly inventory: InventoryService,
+  ) {}
 
   async create(dto: CreateOrderDto) {
-    if (!dto.items || dto.items.length === 0) {
+    if (!dto || !Array.isArray(dto.items) || dto.items.length === 0) {
       throw new BadRequestException('Order must contain at least one item');
     }
 
+    const quantities = aggregateQuantities(dto.items);
     const totalAmount = dto.items.reduce((sum, item) => sum + item.itemTotal, 0);
+    await this.inventory.expireReservations();
 
-    // Transaction to create order and items atomically
-    return this.prisma.order.create({
-      data: {
-        userId: dto.userId,
-        customerName: dto.customerName,
-        customerPhone: dto.customerPhone,
-        tableNumber: dto.tableNumber,
-        notes: dto.notes,
-        totalAmount,
-        status: 'PENDING',
-        items: {
-          create: dto.items.map((item) => ({
-            productId: item.productId,
-            productName: item.productName,
-            unitPrice: item.unitPrice,
-            quantity: item.quantity,
-            size: item.size || 'M',
-            toppings: item.toppings,
-            itemTotal: item.itemTotal,
-          })),
+    // Retrying reruns the entire transaction, including all product reads.
+    return this.inventory.withStockRetry(async (tx) => {
+      await reserveStock(tx, quantities);
+      return tx.order.create({
+        data: {
+          userId: dto.userId,
+          customerName: dto.customerName,
+          customerPhone: dto.customerPhone,
+          tableNumber: dto.tableNumber,
+          notes: dto.notes,
+          totalAmount,
+          status: 'PENDING',
+          reservationStatus: 'HELD',
+          reservationExpiresAt: new Date(Date.now() + this.inventory.reservationTtlMs),
+          items: {
+            create: dto.items.map((item) => ({
+              productId: item.productId,
+              productName: item.productName,
+              unitPrice: item.unitPrice,
+              quantity: item.quantity,
+              size: item.size || 'M',
+              toppings: item.toppings,
+              itemTotal: item.itemTotal,
+            })),
+          },
         },
-      },
-      include: {
-        items: true,
-      },
+        include: {
+          items: true,
+        },
+      });
     });
   }
 
   async getStatus(id: string) {
+    await this.inventory.expireReservations(id);
     const order = await this.prisma.order.findUnique({
       where: { id },
       select: {
@@ -70,6 +83,7 @@ export class OrdersService {
         totalAmount: true,
         customerName: true,
         updatedAt: true,
+        reservationExpiresAt: true,
       },
     });
 
@@ -81,6 +95,7 @@ export class OrdersService {
   }
 
   async getHistory(userId?: string) {
+    await this.inventory.expireReservations();
     return this.prisma.order.findMany({
       where: userId ? { userId } : {},
       orderBy: { createdAt: 'desc' },
@@ -94,6 +109,7 @@ export class OrdersService {
 
   async updateStatus(id: string, status: unknown) {
     assertOrderStatus(status);
+    await this.inventory.expireReservations(id);
     return this.prisma.$transaction((tx) => changeOrderStatus(tx, id, status));
   }
 }

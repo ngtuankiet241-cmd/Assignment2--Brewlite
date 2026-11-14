@@ -56,7 +56,7 @@ async function main() {
     if (existingProduct) {
       await prisma.product.update({
         where: { id: existingProduct.id },
-        data: product,
+        data: { ...product, version: { increment: 1 } },
       });
     } else {
       await prisma.product.create({
