@@ -56,7 +56,8 @@ describe('Orders & Checkout Flow (E2E)', () => {
 
     expect(orderRes.body.id).toBeDefined();
     expect(orderRes.body.status).toEqual('PENDING');
-    expect(orderRes.body.totalAmount).toEqual(78000);
+    // L adds 5,000 VND per drink; the server ignores the stale client price.
+    expect(orderRes.body.totalAmount).toEqual(88000);
     const orderId = orderRes.body.id;
 
     // 3. Initiate Checkout QR (POST /payments/sepay/checkout)
@@ -64,7 +65,7 @@ describe('Orders & Checkout Flow (E2E)', () => {
       .post('/payments/sepay/checkout')
       .send({
         orderId,
-        amount: 78000,
+        amount: 88000,
         idempotencyKey: `idem-${orderId}`,
       })
       .expect(201);
@@ -78,7 +79,7 @@ describe('Orders & Checkout Flow (E2E)', () => {
       .send({
         orderId,
         transactionRef: 'SEPAY_TEST_TXN_999',
-        amount: 78000,
+        amount: 88000,
         status: 'SUCCESS',
       })
       .expect(201);

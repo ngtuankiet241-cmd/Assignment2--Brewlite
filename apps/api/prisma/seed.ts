@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { DiscountType, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -47,6 +47,13 @@ const products = [
   },
 ];
 
+const promotions = [
+  { code: 'BREW10', description: 'Giảm 10%, tối đa 20.000đ, cho đơn từ 50.000đ',
+    discountType: DiscountType.PERCENTAGE, discountValue: 10, minOrderValue: 50000, maxDiscount: 20000 },
+  { code: 'BREW20K', description: 'Giảm 20.000đ cho đơn từ 100.000đ',
+    discountType: DiscountType.FIXED_AMOUNT, discountValue: 20000, minOrderValue: 100000 },
+];
+
 async function main() {
   for (const product of products) {
     const existingProduct = await prisma.product.findFirst({
@@ -56,7 +63,7 @@ async function main() {
     if (existingProduct) {
       await prisma.product.update({
         where: { id: existingProduct.id },
-        data: product,
+        data: { ...product, version: { increment: 1 } },
       });
     } else {
       await prisma.product.create({
@@ -65,12 +72,21 @@ async function main() {
     }
   }
 
-  console.log(`Seeded ${products.length} products successfully.`);
+  for (const promotion of promotions) {
+    await prisma.promotion.upsert({
+      where: { code: promotion.code },
+      // Preserve any operator changes to validity, caps or activation on reruns.
+      update: {},
+      create: promotion,
+    });
+  }
+
+  console.log(`Seeded ${products.length} products and ${promotions.length} promotions successfully.`);
 }
 
 main()
   .catch((error) => {
-    console.error('Failed to seed products:', error);
+    console.error('Failed to seed data:', error);
     process.exit(1);
   })
   .finally(async () => {

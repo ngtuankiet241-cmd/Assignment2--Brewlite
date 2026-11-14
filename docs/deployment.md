@@ -78,14 +78,14 @@ Tất cả các biến môi trường nhạy cảm đều được mã hóa và 
 NODE_ENV=production
 PORT=3001
 DATABASE_URL=postgres://brewlite_user:********@dpg-xxxxxx-a.oregon-postgres.render.com/brewlite_db?sslmode=require
-JWT_SECRET=c8d3f1a94e82b75f0a2d6e3c5b8a9147d3e2f1a0b5c4d6e8
+JWT_SECRET=<chuoi-ngau-nhien-toi-thieu-32-ky-tu>
 JWT_EXPIRES_IN=1d
 SEPAY_API_KEY=sepay_live_api_key_sandbox_****************
 SEPAY_WEBHOOK_SECRET=sepay_webhook_secret_****************
-FRONTEND_URL=https://brewlite.vercel.app
+FRONTEND_URL=https://assignment2-brewlite.vercel.app
 
 # Cấu hình trên Vercel (Frontend Web):
-NEXT_PUBLIC_API_URL=https://brewlite-api.onrender.com/api
+NEXT_PUBLIC_API_URL=https://brewlite-assignment2-api.onrender.com
 NEXT_PUBLIC_APP_NAME=BrewLite
 ```
 
@@ -150,9 +150,9 @@ Quy trình Continuous Delivery (CD) được thiết kế và điều phối b�
 
 | Thành phần | Nền tảng Đám mây | Địa chỉ Truy cập (HTTPS) | Trạng thái Nghiệm thu |
 |---|---|---|:---:|
-| **Frontend PWA** | Vercel Global Edge CDN | [https://brewlite.vercel.app](https://brewlite.vercel.app) | 🟢 Đang hoạt động |
-| **Backend REST API** | Render.com Web Service | [https://brewlite-api.onrender.com/api](https://brewlite-api.onrender.com/api) | 🟢 Đang hoạt động |
-| **Giám sát Sức khỏe** | Render API Health Check | [https://brewlite-api.onrender.com/health](https://brewlite-api.onrender.com/health) | 🟢 Đang hoạt động (`status: ok`) |
+| **Frontend PWA** | Vercel Global Edge CDN | [https://assignment2-brewlite.vercel.app](https://assignment2-brewlite.vercel.app) | 🟢 Đang hoạt động |
+| **Backend REST API** | Render.com Web Service | [https://brewlite-assignment2-api.onrender.com](https://brewlite-assignment2-api.onrender.com) | 🟢 Đang hoạt động |
+| **Giám sát Sức khỏe** | Render API Health Check | [https://brewlite-assignment2-api.onrender.com/health](https://brewlite-assignment2-api.onrender.com/health) | 🟢 Đang hoạt động (`status: ok`) |
 | **Cơ sở Dữ liệu** | Render Managed PostgreSQL 16 | Kết nối mạng nội bộ riêng (Private Service Network) | 🟢 Đang hoạt động (ACID) |
 | **Cổng Thanh toán** | SePay Sandbox Gateway | Giả lập quét mã QR và Webhook IPN thời gian thực | 🟢 Đang hoạt động |
 

@@ -220,7 +220,7 @@ jobs:
         run: |
           API_URL="${{ secrets.PRODUCTION_API_URL }}"
           if [ -z "$API_URL" ]; then
-            API_URL="https://brewlite-api.onrender.com"
+            API_URL="https://brewlite-assignment2-api.onrender.com"
           fi
           echo "Probing Health Check endpoint at: $API_URL/health"
           
@@ -255,7 +255,7 @@ jobs:
         run: |
           WEB_URL="${{ secrets.PRODUCTION_WEB_URL }}"
           if [ -z "$WEB_URL" ]; then
-            WEB_URL="https://brewlite.vercel.app"
+            WEB_URL="https://assignment2-brewlite.vercel.app"
           fi
           echo "Probing Frontend Web Application at: $WEB_URL"
           

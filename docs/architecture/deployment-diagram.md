@@ -82,10 +82,10 @@ JWT_SECRET=c8d3f1a94e82b75f0a2d6e3c5b8a9147d3e2f1a0b5c4d6e8
 JWT_EXPIRES_IN=1d
 SEPAY_API_KEY=sepay_live_api_key_sandbox_****************
 SEPAY_WEBHOOK_SECRET=sepay_webhook_secret_****************
-FRONTEND_URL=https://brewlite.vercel.app
+FRONTEND_URL=https://assignment2-brewlite.vercel.app
 
 # Cấu hình trên Vercel (Frontend Web):
-NEXT_PUBLIC_API_URL=https://brewlite-api.onrender.com/api
+NEXT_PUBLIC_API_URL=https://brewlite-assignment2-api.onrender.com
 NEXT_PUBLIC_APP_NAME=BrewLite
 ```
 

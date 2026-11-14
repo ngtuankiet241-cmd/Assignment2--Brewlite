@@ -4,7 +4,13 @@ import { parseProductsResponse } from '@/lib/productResponse';
 const responseHeaders = { 'Cache-Control': 'no-store' };
 
 export async function GET() {
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://brewlite-api.onrender.com';
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (!backendUrl) {
+    return NextResponse.json(
+      { success: false, message: 'Chưa cấu hình địa chỉ máy chủ API.' },
+      { status: 500, headers: responseHeaders },
+    );
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 6000);
 

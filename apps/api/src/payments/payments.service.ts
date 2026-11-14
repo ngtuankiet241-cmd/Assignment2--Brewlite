@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException }
 import { OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { changeOrderStatus, lockOrder } from '../orders/order-transition';
+import { InventoryService } from '../inventory/inventory.service';
+import { assertReservationActive } from '../inventory/stock-reservation';
 
 export interface CreatePaymentCheckoutDto {
   orderId: string;
@@ -18,11 +20,19 @@ export interface SepayWebhookPayload {
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly inventory: InventoryService,
+  ) {}
 
   async createCheckout(dto: CreatePaymentCheckoutDto) {
+    await this.inventory.expireReservations(dto.orderId);
     return this.prisma.$transaction(async (tx) => {
       const order = await lockOrder(tx, dto.orderId);
+      assertReservationActive(order);
+      if (!Number.isSafeInteger(dto.amount) || dto.amount !== order.totalAmount) {
+        throw new BadRequestException('Số tiền thanh toán phải khớp tổng tiền sau giảm giá của đơn hàng.');
+      }
 
       if (dto.idempotencyKey) {
         const existing = await tx.payment.findUnique({
@@ -43,12 +53,12 @@ export class PaymentsService {
       }
 
       const transactionRef = `SEPAY_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      const qrUrl = `https://qr.sepay.vn/img?acc=BREWLITE&bank=MBBank&amount=${dto.amount}&des=${transactionRef}`;
+      const qrUrl = `https://qr.sepay.vn/img?acc=BREWLITE&bank=MBBank&amount=${order.totalAmount}&des=${transactionRef}`;
 
       return tx.payment.upsert({
         where: { orderId: dto.orderId },
         update: {
-          amount: dto.amount,
+          amount: order.totalAmount,
           transactionRef,
           idempotencyKey: dto.idempotencyKey,
           qrUrl,
@@ -57,7 +67,7 @@ export class PaymentsService {
         },
         create: {
           orderId: dto.orderId,
-          amount: dto.amount,
+          amount: order.totalAmount,
           transactionRef,
           idempotencyKey: dto.idempotencyKey,
           qrUrl,
@@ -72,10 +82,14 @@ export class PaymentsService {
       throw new BadRequestException('Trạng thái thanh toán không hợp lệ.');
     }
 
+    await this.inventory.expireReservations(payload.orderId);
     return this.prisma.$transaction(async (tx) => {
       const order = await lockOrder(tx, payload.orderId);
       const payment = await tx.payment.findUnique({ where: { orderId: order.id } });
       if (!payment) throw new NotFoundException(`Payment for order ${order.id} not found`);
+      if (!Number.isSafeInteger(payload.amount) || payload.amount !== order.totalAmount || payload.amount !== payment.amount) {
+        throw new BadRequestException('Số tiền giao dịch không khớp số tiền cần thanh toán.');
+      }
 
       // An exact replay is a no-op, even after preparation or completion.
       if (payment.status === payload.status && payment.transactionRef === payload.transactionRef &&

@@ -1863,11 +1863,11 @@ Hệ thống BrewLite đã được bàn giao chính thức với đầy đủ c
 \subsubsection{Hạ tầng Môi trường Production \& URL Hoạt động}
 Hệ thống được vận hành trên hạ tầng đám mây phân tán toàn cầu, đáp ứng 100\% các tiêu chuẩn an toàn bảo mật:
 \begin{itemize}
-    \item \textbf{Frontend Production Web (PWA):} \url{https://brewlite.vercel.app}  
+    \item \textbf{Frontend Production Web (PWA):} \url{https://assignment2-brewlite.vercel.app}  
     Triển khai trên mạng biên toàn cầu Vercel Global Edge CDN, tích hợp chứng chỉ bảo mật HTTPS/TLS 1.3 tự động, tốc độ tải trang dưới 500~ms.
-    \item \textbf{Backend RESTful API Service:} \url{https://brewlite-api.onrender.com/api}  
+    \item \textbf{Backend RESTful API Service:} \url{https://brewlite-assignment2-api.onrender.com}  
     Vận hành trên Render Cloud Container Platform, kết nối an toàn qua HTTPS reverse proxy.
-    \item \textbf{Endpoint Giám sát Sức khỏe (Health Check):} \url{https://brewlite-api.onrender.com/health}  
+    \item \textbf{Endpoint Giám sát Sức khỏe (Health Check):} \url{https://brewlite-assignment2-api.onrender.com/health}  
     Phục vụ giám sát trạng thái thời gian thực của máy chủ và kết nối cơ sở dữ liệu.
     \item \textbf{Cơ sở Dữ liệu PostgreSQL 16:} Được lưu trữ tại Render Managed Database với ổ cứng mã hóa (Encrypted Persistent Disk). Cơ sở dữ liệu nằm trong mạng riêng nội bộ (Private Network), tuyệt đối không mở cổng trực tiếp ra Internet công cộng.
     \item \textbf{Quản trị Biến môi trường \& Secret:} Toàn bộ biến nhạy cảm (\texttt{DATABASE\_URL}, \texttt{JWT\_SECRET}, \texttt{SEPAY\_SECRET\_KEY}) được mã hóa trực tiếp trên trang quản trị đám mây của Vercel và Render, không xuất hiện trong kho Git hay log CI/CD.
@@ -1898,7 +1898,7 @@ Bảng phân cảnh video demo gồm 6 phân đoạn xuyên suốt thời lượ
 \hline
 \textbf{Scene 1} & 00:00 -- 00:45 & Giới thiệu đề tài, danh sách thành viên nhóm và kiến trúc phân tầng. & Kiệt \\
 \hline
-\textbf{Scene 2} & 00:45 -- 01:45 & Truy cập Web PWA tại \url{https://brewlite.vercel.app}, duyệt menu, tùy biến kích cỡ Size L, lượng đường/đá và topping. & Kiệt \& Luân \\
+\textbf{Scene 2} & 00:45 -- 01:45 & Truy cập Web PWA tại \url{https://assignment2-brewlite.vercel.app}, duyệt menu, tùy biến kích cỡ Size L, lượng đường/đá và topping. & Kiệt \& Luân \\
 \hline
 \textbf{Scene 3} & 01:45 -- 02:45 & Thao tác giỏ hàng, cập nhật số lượng, kiểm tra tổng tiền, nhập thông tin giao hàng tại bàn và ghi chú. & Kiệt \& Luân \\
 \hline
@@ -2092,7 +2092,7 @@ Assignment2--Brewlite/
 \hline
 6 & Pipeline CI/CD chạy thành công & $\boxtimes$ Hoàn thành & \texttt{.github/workflows/ci.yml}\newline\texttt{.github/workflows/cd.yml} \\
 \hline
-7 & URL production, API và health check & $\boxtimes$ Hoàn thành & Web: \url{https://brewlite.vercel.app}\newline API: \url{https://brewlite-api.onrender.com/api}\newline Health: \url{https://brewlite-api.onrender.com/health} \\
+7 & URL production, API và health check & $\boxtimes$ Hoàn thành & Web: \url{https://assignment2-brewlite.vercel.app}\newline API: \url{https://brewlite-assignment2-api.onrender.com}\newline Health: \url{https://brewlite-assignment2-api.onrender.com/health} \\
 \hline
 8 & Release notes, README và hướng dẫn rollback & $\boxtimes$ Hoàn thành & \texttt{docs/release-notes-v1.0.0.md}\newline\texttt{docs/deployment.md}\newline\texttt{README.md} \\
 \hline

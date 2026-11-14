@@ -11,7 +11,7 @@ Ma trận này ánh xạ từng yêu cầu chức năng (FR) trong [SRS](./requi
 | **AD-01** | Activity Diagram – Luồng đặt hàng | [activity-diagram.svg](./diagrams/activity-diagram.svg) ([.png](./diagrams/activity-diagram.png)) | Luồng nghiệp vụ từ xem menu đến nhận đơn; gồm các nhánh nghiệp vụ liên quan. |
 | **SD-01** | Sequence Diagram – Checkout (UC-01) | [sequence-checkout.svg](./diagrams/sequence-checkout.svg) ([.png](./diagrams/sequence-checkout.png), [.puml](./diagrams/sequence-checkout.puml)) | Tương tác Customer → Next.js → NestJS → PostgreSQL → SePay trong luồng đặt và thanh toán. |
 | **CD-01** | Class Diagram – Domain Model | [class-diagram.svg](./diagrams/class-diagram.svg) ([.png](./diagrams/class-diagram-overall.png), [.puml](./diagrams/class-diagram.puml)) | Các lớp miền User, Product, Order, OrderItem, Payment, Promotion, LoyaltyTransaction và quan hệ giữa chúng. |
-| **SM-01** | State Machine – Order | [order-state-machine.md](./order-state-machine.md) | Đồ thị trạng thái, API và bằng chứng unit/integration test theo FR-11/FR-12. |
+| **SM-01** | State Machine – Order | [order-state-machine.ts](../apps/api/src/orders/order-state-machine.ts) | Quy tắc chuyển trạng thái theo FR-11/FR-12; bằng chứng tại [kiểm thử tích hợp](../apps/api/test/order-state-machine.e2e-spec.ts). |
 
 ## Danh mục component
 
@@ -51,21 +51,23 @@ Bảng ma trận truy vết tuân thủ định dạng chuẩn 5 cột theo quy 
 | **FR-09** Xem lại thông tin đơn | US-07, UC-01 | AD-01, SD-01, CD-01 (`Order`, `OrderItem`) | `apps/web/src/components/checkout/CheckoutPageClient.tsx` (Tóm tắt đơn hàng, size, topping) | `UT-CART-01` -> `04` |
 | **FR-10** Tạo đơn hàng | US-08, UC-01 | AD-01, SD-01, CD-01 (`Order`, `OrderItem`) | `POST /orders`<br>`apps/api/src/orders/orders.controller.ts`<br>`apps/web/src/components/checkout/CheckoutPageClient.tsx` | `INT-ORD-01`<br>`UT-ORD-01` |
 | **FR-11** Theo dõi trạng thái đơn | US-09 | AD-01, SD-01, SM-01, CD-01 (`Order`) | *Sprint 2:* `GET /orders/:id/status`, `OrderStatus.tsx` | *Sprint 2:* `E2E-ORD-02` |
-| **FR-12** Cập nhật trạng thái đơn | US-10 | AD-01, SM-01, CD-01 (`Order`, `User`) | `PATCH /orders/:id/status`<br>`orders/order-state-machine.ts` (`assertTransition`)<br>`orders/order-transition.ts` (khóa dòng, transaction) | `UT-SM-01..03`<br>`UT-ORD-04..07`<br>`INT-SM-01..12` |
+| **FR-12** Cập nhật trạng thái đơn | US-10 | AD-01, SM-01, CD-01 (`Order`, `User`) | `GET /staff/orders`, `GET /staff/orders/:id`<br>`PATCH /staff/orders/:id/status`, `PATCH /orders/:id/status`<br>`staff/staff.controller.ts`, `staff/staff.service.ts`<br>`JwtAuthGuard` + `RolesGuard` (`BARISTA`/`ADMIN`)<br>`orders/order-state-machine.ts` (`assertTransition`)<br>`orders/order-transition.ts` (khóa dòng, transaction) | `UT-SM-01..03`<br>`UT-ORD-04..07`<br>`INT-SM-01..12`<br>`INT-STAFF-01..15` |
 | **FR-13** Xem lịch sử đơn hàng | US-14 | CD-01 (`User`, `Order`) | *Sprint 2:* `GET /orders/history`, `OrderHistory.tsx` | *Sprint 2:* `INT-ORD-06` |
 | **FR-14** Đăng ký tài khoản | US-13 | CD-01 (`User`) | `POST /auth/register`<br>`apps/api/src/auth/auth.service.ts` | `UT-AUTH-01`<br>`UT-AUTH-04` |
 | **FR-15** Đăng nhập tài khoản | US-13 | SD-01, CD-01 (`User`) | `POST /auth/login`<br>`apps/api/src/auth/auth.service.ts` | `UT-AUTH-02`<br>`UT-AUTH-03` |
 | **FR-16** Đăng xuất tài khoản | US-13 | CD-01 (`User`) | Phía Client xóa token xác thực | `UT-AUTH-03` |
-| **FR-17** Xác thực truy cập bằng JWT | UC-01 (xác thực) | SD-01, CD-01 (`User`) | `JwtAuthGuard`, `AuthService.verifyToken`<br>`apps/api/src/common/guards/jwt-auth.guard.ts` | `UT-AUTH-02` |
+| **FR-17** Xác thực truy cập bằng JWT | UC-01 (xác thực), US-10 | SD-01, CD-01 (`User`) | `JwtAuthGuard`, `AuthService.verifyToken`, `RolesGuard`<br>`apps/api/src/common/guards/jwt-auth.guard.ts`<br>`apps/api/src/staff/staff.controller.ts` | `UT-AUTH-02`<br>`INT-STAFF-01..04`, `INT-STAFF-15` |
 | **FR-18** Chọn phương thức thanh toán | US-11, UC-01 | AD-01, SD-01, CD-01 (`Payment`) | `POST /payments/sepay/checkout`<br>`apps/web/src/components/checkout/CheckoutPageClient.tsx` (QR/Tiền mặt) | `UT-PAY-01` -> `03` |
 | **FR-19** Xử lý thanh toán mô phỏng | US-12, UC-01 | SD-01, CD-01 (`Payment`, `Order`) | *Sprint 2:* `POST /payments/sepay/checkout`, SePay Gateway | *Sprint 2:* `INT-PAY-01` |
 | **FR-20** Xác nhận kết quả thanh toán | US-12, UC-01 | SD-01, CD-01 (`Payment`, `Order`) | *Sprint 2:* `POST /payments/sepay/webhook-ipn` | *Sprint 2:* `INT-PAY-02` |
 | **FR-21** Ngăn chặn thanh toán trùng lặp | US-12, UC-01 | SD-01, CD-01 (`Payment`) | *Sprint 2:* Idempotency Key Guard, `PaymentsService` | *Sprint 2:* `INT-PAY-03` |
 | **NFR-HEALTH** Giám sát trạng thái hệ thống | Tiêu chí Sprint 1 | CD-01, Deployment Diagram | `GET /health`<br>`apps/api/src/health/health.controller.ts` | `E2E-HEALTH-01`<br>`E2E-HEALTH-02`<br>`UT-HEALTH-01` |
+| **NFR-INVENTORY** Không bán vượt tồn kho khi đặt đồng thời; TTL giữ hàng (hỗ trợ FR-07, FR-10, FR-20) | US-07, US-08, US-12, UC-01 | Transaction, optimistic locking và TTL, SM-01 | `orders/orders.service.ts`<br>`inventory/stock-reservation.ts`<br>`inventory/inventory.service.ts`<br>`orders/order-transition.ts` | `UT-INV-01..16`<br>`INT-INV-01..16` |
+| **UC-01 / AF-01** Áp mã giảm giá hợp lệ (hỗ trợ FR-09, FR-10, FR-19, FR-20) | UC-01, luồng thay thế AF-01 | SD-01, CD-01 (`Promotion`, `Order`), transaction | `POST /promotions/validate`, `POST /orders` (`promotionCode`)<br>`promotions/promotions.service.ts`<br>`orders/order-pricing.ts`<br>`payments/payments.service.ts`<br>`apps/web/src/components/checkout/CheckoutPageClient.tsx`, `PromotionCodeField.tsx`<br>`apps/web/src/lib/promotions.ts` | `UT-PROMO-01..06`<br>`INT-PROMO-01..14`<br>`UT-WEB-PROMO-01..11` |
 
 ## Ghi chú truy vết
 
-- Phần FR-12 được triển khai và kiểm chứng tại [order-state-machine.md](./order-state-machine.md) là quy tắc chuyển trạng thái và tính nguyên tử; phân quyền Admin/Barista cho API vẫn cần triển khai riêng.
+- FR-12 gồm [quy tắc chuyển trạng thái](../apps/api/src/orders/order-state-machine.ts) và [kiểm thử tính nguyên tử](../apps/api/test/order-state-machine.e2e-spec.ts); API nhân viên và phân quyền `BARISTA`/`ADMIN` được mô tả và kiểm chứng tại [staff-api.md](./staff-api.md).
 
 - US-07 bao gồm cả nhập thông tin và xem lại đơn (FR-08, FR-09); FR-07 là điều kiện để bắt đầu UC-01, không có User Story riêng.
 - US-13 gộp đăng ký, đăng nhập và đăng xuất; US-14 ánh xạ tới FR-13. Không tạo mã User Story riêng cho từng FR trong các nhóm này.
