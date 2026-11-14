@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentsService } from './payments.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BadRequestException, ConflictException } from '@nestjs/common';
+import { InventoryService } from '../inventory/inventory.service';
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
@@ -33,6 +34,7 @@ describe('PaymentsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentsService,
+        { provide: InventoryService, useValue: { expireReservations: jest.fn().mockResolvedValue(0) } },
         {
           provide: PrismaService,
           useValue: mockPrisma,

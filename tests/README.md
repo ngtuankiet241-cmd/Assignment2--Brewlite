@@ -2,6 +2,8 @@
 
 Thư mục `tests/` ở thư mục gốc chứa các bộ kiểm thử tích hợp (Integration) và kiểm thử đầu-cuối (End-to-End Smoke Test) cho toàn bộ hệ thống **BrewLite** theo đúng quy định cấu trúc Repository của Assignment 2.
 
+Kiểm thử tồn kho đồng thời qua **HTTP + PostgreSQL thật** nằm tại `apps/api/test/inventory.e2e-spec.ts`. Chạy `npm.cmd --prefix apps/api run test:e2e -- inventory`. Bộ test này tự tạo và xóa schema riêng, không xóa bảng dữ liệu ứng dụng.
+
 ---
 
 ## 📁 Cấu trúc Thư mục

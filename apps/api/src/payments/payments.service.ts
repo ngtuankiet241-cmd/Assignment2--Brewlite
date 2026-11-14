@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException }
 import { OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { changeOrderStatus, lockOrder } from '../orders/order-transition';
+import { InventoryService } from '../inventory/inventory.service';
+import { assertReservationActive } from '../inventory/stock-reservation';
 
 export interface CreatePaymentCheckoutDto {
   orderId: string;
@@ -18,11 +20,16 @@ export interface SepayWebhookPayload {
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly inventory: InventoryService,
+  ) {}
 
   async createCheckout(dto: CreatePaymentCheckoutDto) {
+    await this.inventory.expireReservations(dto.orderId);
     return this.prisma.$transaction(async (tx) => {
       const order = await lockOrder(tx, dto.orderId);
+      assertReservationActive(order);
 
       if (dto.idempotencyKey) {
         const existing = await tx.payment.findUnique({
@@ -72,6 +79,7 @@ export class PaymentsService {
       throw new BadRequestException('Trạng thái thanh toán không hợp lệ.');
     }
 
+    await this.inventory.expireReservations(payload.orderId);
     return this.prisma.$transaction(async (tx) => {
       const order = await lockOrder(tx, payload.orderId);
       const payment = await tx.payment.findUnique({ where: { orderId: order.id } });

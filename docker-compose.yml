@@ -31,6 +31,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-brewlite}?schema=public
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-for-local-docker}
+      STOCK_RESERVATION_TTL_SECONDS: ${STOCK_RESERVATION_TTL_SECONDS:-900}
     depends_on:
       postgres:
         condition: service_healthy

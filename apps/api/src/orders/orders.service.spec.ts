@@ -3,6 +3,7 @@ import { OrdersService } from './orders.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { OrderStatus } from '@prisma/client';
+import { InventoryService } from '../inventory/inventory.service';
 
 describe('OrdersService', () => {
   let service: OrdersService;
@@ -17,16 +18,27 @@ describe('OrdersService', () => {
       findMany: jest.fn(),
       update: jest.fn(),
     },
+    product: { findMany: jest.fn(), updateMany: jest.fn() },
   };
 
   beforeEach(async () => {
     jest.clearAllMocks();
     mockPrisma.$transaction.mockImplementation((work) => work(mockPrisma));
+    mockPrisma.product.findMany.mockResolvedValue([{ id: 'p1', name: 'Coffee', stock: 10, version: 0 }]);
+    mockPrisma.product.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.$queryRaw.mockResolvedValue([{ id: 'ord-123', status: OrderStatus.PENDING }]);
     mockPrisma.order.update.mockImplementation(({ where, data }) => Promise.resolve({ id: where.id, ...data }));
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrdersService,
+        {
+          provide: InventoryService,
+          useValue: {
+            reservationTtlMs: 900000,
+            expireReservations: jest.fn().mockResolvedValue(0),
+            withStockRetry: (work) => mockPrisma.$transaction(work),
+          },
+        },
         {
           provide: PrismaService,
           useValue: mockPrisma,
