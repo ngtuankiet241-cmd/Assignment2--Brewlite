@@ -119,18 +119,27 @@ export default function StaffRefundsClient() {
   }, []);
 
   useEffect(() => {
+  const timer = window.setTimeout(() => {
     void loadRefunds();
-    const token = getToken();
-    if (!token) return;
+  }, 0);
+
+  const token = getToken();
+
+  if (token) {
     void fetch(`${API_URL}/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then(async (response) => response.ok ? response.json() : null)
+      .then(async (response) =>
+        response.ok ? response.json() : null
+      )
       .then((data: { role?: string; user?: { role?: string } } | null) => {
         setRole(data?.role || data?.user?.role || '');
       })
       .catch(() => setRole(''));
-  }, [loadRefunds]);
+  }
+
+  return () => window.clearTimeout(timer);
+}, [loadRefunds]);
 
   async function performAction(refundId: string, action: Action, body?: Record<string, unknown>) {
     if (workingId) return;

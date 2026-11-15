@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -20,11 +19,8 @@ export default function PaymentResultClient() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    if (!orderId) {
-      setState('FAILED');
-      setMessage('Không tìm thấy mã đơn hàng.');
-      return;
-    }
+    // Missing orderId is handled while rendering, not with setState in an effect.
+    if (!orderId) return;
 
     let cancelled = false;
     let attempts = 0;
@@ -41,7 +37,6 @@ export default function PaymentResultClient() {
         if (!res.ok) throw new Error('Không thể kiểm tra trạng thái đơn.');
 
         const order = await res.json();
-
         if (cancelled) return;
 
         if (
@@ -77,7 +72,6 @@ export default function PaymentResultClient() {
     }
 
     void checkPayment();
-
     const interval = window.setInterval(() => {
       if (attempts >= 12) {
         window.clearInterval(interval);
@@ -95,25 +89,22 @@ export default function PaymentResultClient() {
   }, [orderId]);
 
   useEffect(() => {
-  if (!hydrated || state !== 'SUCCESS' || !orderId) {
-    return;
-  }
+    if (!hydrated || state !== 'SUCCESS' || !orderId) return;
 
-  const pendingOrderId = sessionStorage.getItem(
-    'brewlite-pending-cart-order',
-  );
-
-  // Chỉ xóa giỏ hàng của đơn vừa được tạo từ checkout.
-  if (pendingOrderId === orderId) {
-    clearCart();
-
-    sessionStorage.removeItem(
+    const pendingOrderId = sessionStorage.getItem(
       'brewlite-pending-cart-order',
     );
-  }
-}, [hydrated, state, orderId, clearCart]);
-  const success = state === 'SUCCESS';
-  const failed = state === 'FAILED';
+    // Chỉ xóa giỏ hàng của đơn vừa được tạo từ checkout.
+    if (pendingOrderId === orderId) {
+      clearCart();
+      sessionStorage.removeItem('brewlite-pending-cart-order');
+    }
+  }, [hydrated, state, orderId, clearCart]);
+
+  const displayState: PaymentState = orderId ? state : 'FAILED';
+  const displayMessage = orderId ? message : 'Không tìm thấy mã đơn hàng.';
+  const success = displayState === 'SUCCESS';
+  const failed = displayState === 'FAILED';
 
   return (
     <main className="mx-auto flex min-h-[65vh] max-w-xl items-center px-4 py-12">
@@ -123,7 +114,7 @@ export default function PaymentResultClient() {
         </div>
 
         <h1 className="text-2xl font-black text-coffee-950">
-          {state === 'LOADING'
+          {displayState === 'LOADING'
             ? 'Đang kiểm tra thanh toán'
             : success
               ? 'Thanh toán thành công'
@@ -132,14 +123,12 @@ export default function PaymentResultClient() {
                 : 'Đang chờ thanh toán'}
         </h1>
 
-        <p className="mt-3 text-sm text-coffee-600">{message}</p>
-
+        <p className="mt-3 text-sm text-coffee-600">{displayMessage}</p>
         {orderId && (
           <p className="mt-4 break-all text-xs text-coffee-500">
             Mã đơn hàng: {orderId}
           </p>
         )}
-
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link
             href="/orders"
