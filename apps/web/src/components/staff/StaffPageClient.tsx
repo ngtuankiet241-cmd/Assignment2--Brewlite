@@ -19,7 +19,8 @@ const serverReady = () => false;
 function StaffDashboard({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   const { orders, visibleOrders: filtered, selectedId, detail, status, error, refreshedAt,
     pagination, filter, page, search, changeFilter, changePage, changeSearch,
-    selectOrder: chooseOrder, resetFilters, refresh, retryDetail } = useStaffOrders();
+    selectOrder: chooseOrder, resetFilters, refresh, retryDetail,
+    statusUpdatesEnabled, updatingId, notice, updateSelectedOrder } = useStaffOrders();
   const selectOrder = (id: string) => {
     chooseOrder(id);
     if (typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches) {
@@ -38,6 +39,7 @@ function StaffDashboard({ user, onLogout }: { user: AuthUser; onLogout: () => vo
         <div><h1 className="text-2xl font-black tracking-tight sm:text-3xl">Một ca làm việc thật gọn.</h1><p className="mt-1 text-sm text-coffee-600">Theo dõi hàng đợi và chi tiết đơn tại quầy.</p></div>
         <button type="button" onClick={refresh} disabled={status === 'loading'} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-coffee-800 px-5 text-sm font-bold text-white shadow-sm hover:bg-coffee-700 focus-visible:outline-2 focus-visible:outline-coffee-500 disabled:opacity-50"><span aria-hidden="true">↻</span> Làm mới</button>
       </div>
+      {notice && <p role={notice.kind === 'error' ? 'alert' : 'status'} className={`rounded-2xl border p-4 text-sm ${notice.kind === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{notice.message}</p>}
       <section aria-labelledby="staff-orders-heading">
         <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 id="staff-orders-heading" className="text-xl font-black">Hàng đợi đơn hàng</h2><p className="mt-1 text-xs text-coffee-600">{refreshedAt ? `Tải danh sách lúc ${formatStaffTime(refreshedAt)}` : 'Danh sách đơn hàng từ hệ thống'}</p></div>
         </div>
@@ -72,7 +74,7 @@ function StaffDashboard({ user, onLogout }: { user: AuthUser; onLogout: () => vo
           <div id="staff-order-detail" tabIndex={-1} aria-label="Chi tiết đơn hàng" aria-busy={detail.status === 'loading'} className="min-w-0 scroll-mt-6 focus-visible:outline-2 focus-visible:outline-coffee-500 lg:sticky lg:top-6">
             {status === 'ready' && detail.status === 'loading' ? <StaffLoadingState variant="detail" />
               : status === 'ready' && detail.status === 'error' ? <StaffDetailErrorState message={detail.error?.message ?? 'Không thể tải chi tiết đơn.'} notFound={detail.error?.code === 'NOT_FOUND'} onRetry={retryDetail} onRefresh={refresh} />
-              : status === 'ready' && detail.data ? <StaffOrderDetail order={detail.data} />
+              : status === 'ready' && detail.data ? <StaffOrderDetail order={detail.data} updatesEnabled={statusUpdatesEnabled} updating={Boolean(updatingId)} onUpdate={updateSelectedOrder} />
               : <div className="hidden min-h-72 items-center justify-center rounded-3xl border border-dashed border-coffee-200 p-6 text-center text-sm text-coffee-500 lg:flex">Chọn một đơn trong danh sách để xem chi tiết.</div>}
           </div>
         </div>
@@ -82,7 +84,7 @@ function StaffDashboard({ user, onLogout }: { user: AuthUser; onLogout: () => vo
           <button type="button" disabled={page >= pagination.totalPages} onClick={() => changePage(page + 1)} className="min-h-11 rounded-full border border-coffee-200 bg-white px-5 font-bold disabled:opacity-40">Trang sau</button>
         </nav>}
       </section>
-      <footer className="border-t border-coffee-200 pt-3 text-xs text-coffee-500">BrewLite Staff · Cập nhật trạng thái đang khóa</footer>
+      <footer className="border-t border-coffee-200 pt-3 text-xs text-coffee-500">BrewLite Staff · {statusUpdatesEnabled ? 'Quản lý trạng thái pha chế' : 'Cập nhật trạng thái đang khóa'}</footer>
     </main>
   </div>;
 }

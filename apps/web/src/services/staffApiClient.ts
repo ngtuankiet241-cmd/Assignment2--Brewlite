@@ -17,7 +17,7 @@ interface StaffApiOptions {
   getAccessToken: () => string | null;
   fetcher?: typeof fetch;
   timeoutMs?: number;
-  /** Future integration must explicitly opt in. The demo dashboard never uses this client. */
+  /** Opt in only after the backend enforces Staff transitions and payment checks. */
   allowStatusUpdates?: boolean;
 }
 
