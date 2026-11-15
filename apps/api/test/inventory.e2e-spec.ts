@@ -9,14 +9,34 @@ describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
   let context: TestApplication;
   let inventory: InventoryService;
   let staffToken: string;
+  let customerToken: string;
 
   beforeAll(async () => {
+    process.env.SEPAY_IPN_SECRET_KEY ||= 'brewlite-e2e-local-secret';
     context = await createTestApplication();
     // Bind once so all concurrent Supertest requests share the listening server.
     await context.app.listen(0, '127.0.0.1');
     inventory = context.app.get(InventoryService);
     staffToken = context.app.get(AuthService).generateToken({
       userId: 'inventory-staff', email: 'staff@example.test', role: Role.BARISTA, fullName: 'Staff Test',
+    });
+    // Tạo user thực trong PostgreSQL test để khóa ngoại Order.userId hợp lệ.
+    const customer = await context.prisma.user.upsert({
+      where: { id: 'inventory-customer' },
+      update: {},
+      create: {
+        id: 'inventory-customer',
+        email: 'inventory-customer@example.test',
+        password: 'unused-in-e2e-jwt-test',
+        fullName: 'Inventory Customer',
+        role: Role.CUSTOMER,
+      },
+    });
+    customerToken = context.app.get(AuthService).generateToken({
+      userId: customer.id,
+      email: customer.email,
+      role: customer.role,
+      fullName: customer.fullName,
     });
   });
   beforeEach(async () => {
@@ -34,8 +54,11 @@ describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
   const payload = (items: ReturnType<typeof item>[]) => ({
     customerName: 'Inventory Test', customerPhone: '0900000000', items,
   });
-  const place = (items: ReturnType<typeof item>[]) => request(context.app.getHttpServer())
-    .post('/orders').send(payload(items));
+  const place = (items: ReturnType<typeof item>[]) =>
+    request(context.app.getHttpServer())
+      .post('/orders')
+      .auth(customerToken, { type: 'bearer' })
+      .send(payload(items));
   const stock = (id: string) => context.prisma.product.findUniqueOrThrow({ where: { id } });
   const order = (id: string) => context.prisma.order.findUniqueOrThrow({ where: { id } });
   const expire = (id: string) => context.prisma.order.update({
@@ -45,8 +68,30 @@ describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
     .patch(`/orders/${id}/status`).auth(staffToken, { type: 'bearer' }).send({ status });
   const checkout = (orderId: string, amount = 10000) => request(context.app.getHttpServer())
     .post('/payments/sepay/checkout').send({ orderId, amount, idempotencyKey: `key-${orderId}` });
-  const ipn = (orderId: string, status = 'SUCCESS', amount = 10000) => request(context.app.getHttpServer())
-    .post('/payments/sepay/webhook-ipn').send({ orderId, amount, status, transactionRef: `ref-${orderId}` });
+  const gatewayPayload = (orderId: string, amount: number, transactionRef: string) => ({
+      timestamp: Date.now(),
+      notification_type: 'ORDER_PAID',
+      order: {
+        order_invoice_number: orderId,
+        order_status: 'CAPTURED',
+        order_amount: String(amount),
+        order_currency: 'VND',
+      },
+      transaction: {
+        transaction_id: transactionRef,
+        transaction_type: 'PAYMENT',
+        transaction_status: 'APPROVED',
+        transaction_amount: String(amount),
+        transaction_currency: 'VND',
+      },
+    });
+  const ipn = (orderId: string, status = 'SUCCESS', amount = 10000) => {
+    if (status !== 'SUCCESS') throw new Error('SePay Gateway E2E helper only supports approved payments');
+    return request(context.app.getHttpServer())
+      .post('/payments/sepay/webhook-ipn')
+      .set('x-secret-key', process.env.SEPAY_IPN_SECRET_KEY!)
+      .send(gatewayPayload(orderId, amount, `ref-${orderId}`));
+  };
 
   it.each([1, 2, 3])('INT-INV-01: 30 simultaneous orders cannot exceed 7 units (round %s)', async () => {
     const p = await product(7);
@@ -91,6 +136,7 @@ describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
   it.each([0, -1, 1.5, '1', null, 2147483648])('INT-INV-04: invalid quantity %s cannot alter stock', async (quantity) => {
     const p = await product(3);
     await request(context.app.getHttpServer()).post('/orders')
+      .auth(customerToken, { type: 'bearer' })
       .send(payload([{ ...item(p.id), quantity: quantity as number }])).expect(400);
     expect(await stock(p.id)).toEqual(p);
     expect(await context.prisma.order.count()).toBe(0);
@@ -107,9 +153,12 @@ describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
 
   it('INT-INV-06: failed order insertion rolls back the inventory update', async () => {
     const p = await product(3);
-    await expect(context.app.get(OrdersService).create({
-      ...payload([item(p.id, 2)]), userId: 'nonexistent-user',
-    })).rejects.toMatchObject({ code: 'P2003' });
+    await expect(
+      context.app.get(OrdersService).create(
+        payload([item(p.id, 2)]),
+        'nonexistent-user',
+      ),
+    ).rejects.toMatchObject({ code: 'P2003' });
     expect(await stock(p.id)).toEqual(p);
     expect(await context.prisma.order.count()).toBe(0);
   });
@@ -180,16 +229,31 @@ describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
     expect(await stock(p.id)).toMatchObject({ stock: 1, version: 2 });
   });
 
-  it.each(['PENDING', 'PAID'])('INT-INV-12: cancelling %s releases its inventory exactly once', async (status) => {
+  it('INT-INV-12: cancelling a PENDING order releases its inventory exactly once', async () => {
     const p = await product(3);
     const placed = await place([item(p.id, 2)]).expect(201);
-    if (status === 'PAID') await patch(placed.body.id, 'PAID').expect(200);
     await patch(placed.body.id, 'CANCELLED').expect(200);
     const restored = await stock(p.id);
     expect(restored).toMatchObject({ stock: 3, version: 2 });
     await patch(placed.body.id, 'CANCELLED').expect(409);
     await inventory.expireReservations();
     expect(await stock(p.id)).toEqual(restored);
+  });
+
+  it('INT-INV-12B: PAID orders cannot be cancelled directly or restocked without a refund', async () => {
+    const p = await product(3);
+    const placed = await place([item(p.id, 2)]).expect(201);
+    await checkout(placed.body.id, 20000).expect(201);
+    await ipn(placed.body.id, 'SUCCESS', 20000).expect(201);
+    expect(await order(placed.body.id)).toMatchObject({
+      status: 'PAID', reservationStatus: 'CONSUMED',
+    });
+    const afterPayment = await stock(p.id);
+    expect(afterPayment).toMatchObject({ stock: 1, version: 1 });
+    await patch(placed.body.id, 'CANCELLED').expect(409);
+    await inventory.expireReservations();
+    expect(await stock(p.id)).toEqual(afterPayment);
+    expect(await order(placed.body.id)).toMatchObject({ status: 'PAID' });
   });
 
   it('INT-INV-13: PostgreSQL permits only one conditional update using the same stock version', async () => {
@@ -243,7 +307,8 @@ describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
     const heldOrder = await order(second.body.id);
     const before = await stock(p.id);
     await request(context.app.getHttpServer()).post('/payments/sepay/webhook-ipn')
-      .send({ orderId: second.body.id, amount: 10000, status: 'SUCCESS', transactionRef: `ref-${first.body.id}` })
+      .set('x-secret-key', process.env.SEPAY_IPN_SECRET_KEY!)
+      .send(gatewayPayload(second.body.id, 10000, `ref-${first.body.id}`))
       .expect(409);
     expect(await order(second.body.id)).toEqual(heldOrder);
     expect(await stock(p.id)).toEqual(before);

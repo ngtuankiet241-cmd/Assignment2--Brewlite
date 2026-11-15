@@ -1,11 +1,12 @@
 # Idempotency cho đặt đơn và thanh toán
 
-`POST /orders` và `POST /payments/sepay/checkout` nhận header `Idempotency-Key`. Client sinh UUID trước khi gửi, giữ nguyên key và payload khi retry do lỗi mạng/timeout. Một yêu cầu mới có chủ đích phải dùng key mới. Các client cũ không gửi key vẫn hoạt động nhưng không có bảo đảm chống lặp theo key.
+`POST /orders`, `POST /payments/sepay/checkout` (QR cũ) và `POST /payments/sepay/checkout-form` (form SePay Sandbox) nhận header `Idempotency-Key`. Client sinh UUID trước khi gửi, giữ nguyên key và payload khi retry do lỗi mạng/timeout. Một yêu cầu mới có chủ đích phải dùng key mới. Các client cũ không gửi key vẫn hoạt động theo yêu cầu xác thực của endpoint nhưng không có bảo đảm chống lặp theo key.
 
 Ví dụ tạo đơn (hai lần gửi nguyên request này trả cùng đơn, HTTP `201`):
 
 ```http
 POST /orders
+Authorization: Bearer <token>
 Content-Type: application/json
 Idempotency-Key: 8c891c2b-9789-43e3-b52d-3d2309511184
 
@@ -26,12 +27,14 @@ Idempotency-Key: payment-<order-id>
 - Key có phạm vi theo endpoint. Cùng key nhưng payload khác trả `409`, không tạo đơn/payment mới và không giữ thêm tồn kho. Thứ tự thuộc tính của object JSON không làm thay đổi payload.
 - Hỗ trợ `X-Idempotency-Key` để tương thích. Checkout cũng chấp nhận `idempotencyKey` trong body. Nếu gửi nhiều vị trí thì các key phải trùng nhau; khác nhau trả `400`.
 - `POST /orders` replay nguyên kết quả tạo đơn đầu tiên. Dùng `GET /orders/:id/status` để lấy trạng thái mới nhất.
+- Tạo đơn yêu cầu JWT. Hash request bao gồm ID tài khoản lấy từ JWT, nên một tài khoản khác không thể dùng key để lấy kết quả đơn của người trước.
 - Checkout replay payment hiện tại, giữ nguyên giao dịch/QR, không khởi tạo lần nữa. Sau thanh toán thành công trả trạng thái `SUCCESS`. Key cũ vẫn không tạo giao dịch mới sau khi retry bằng key khác.
 - Đơn đã hết hạn/hủy tiếp tục bị từ chối checkout (`409`), kể cả khi gửi key cũ. Webhook thành công lặp đúng `transactionRef` không cập nhật lại payment, thời điểm thanh toán hay tồn kho.
+- `POST /payments/sepay/checkout-form` nhận `{ "orderId": "<order-id>" }`, trả lại cùng form đã lưu khi gửi lại key, không ghi lại payment hay sinh lại chữ ký. Chỉ mở form cho đơn `PENDING`; đơn đã thanh toán không được mở form lại. IPN dùng payload gateway và header xác thực `x-secret-key` theo luồng SePay trên `main`.
 
 `IdempotencyRecord` lưu hash SHA-256 của payload và kết quả thành công trong cùng transaction với thay đổi đơn/payment/tồn kho. PostgreSQL advisory lock theo `(endpoint, key)` tuần tự hóa các request trùng key trên nhiều tiến trình. Lỗi rollback cả thay đổi dữ liệu và bản ghi key, nên có thể retry. Record không tự hết hạn; không xóa key thành công nếu vẫn cần bảo đảm chống lặp. Key được tra theo endpoint, không dựa vào `userId` do client cung cấp; cơ chế này không thay thế xác thực/phân quyền.
 
-Checkout web lưu key cùng payload trong `sessionStorage`, dùng lại sau timeout hoặc tải lại trang và giữ bản trong bộ nhớ nếu storage bị chặn. Khi payload đổi thì tạo key mới; khi hoàn tất thì xóa phiên. Lỗi tạo QR giữ phiên để retry, không chuyển sang màn hình thành công.
+Checkout web lưu key cùng payload trong `sessionStorage`, dùng lại sau timeout hoặc tải lại trang và giữ bản trong bộ nhớ nếu storage bị chặn. Khi payload đổi thì tạo key mới. Form SePay sử dụng key ổn định theo đơn, kể cả khi thanh toán từ lịch sử đơn. Trang kết quả xóa phiên sau khi backend xác nhận đã thanh toán; lỗi tạo form giữ phiên để retry, không chuyển sang màn hình thành công.
 
 Áp dụng database migration trước khi chạy API mới:
 
@@ -52,3 +55,5 @@ npm --prefix apps/web test
 ```
 
 Integration test tự triển khai migration trong schema PostgreSQL riêng và dọn schema sau khi chạy. `INT-IDEM-01/02` kiểm tra hai lần tạo đơn cùng key chỉ có một đơn và trừ kho một lần; `INT-PAY-03` kiểm tra cả checkout và webhook lặp. Các test dùng luồng SePay Sandbox của ứng dụng, không phát sinh chuyển tiền ngân hàng thật.
+
+`INT-IDEM-AUTH` ngăn replay kết quả giữa hai tài khoản. `INT-IDEM-FORM` gửi đồng thời và tuần tự cùng key đến endpoint form, kiểm tra chỉ tạo một payment và gọi SDK tạo trường thanh toán một lần; SDK được giả lập nên test không truy cập gateway thật.

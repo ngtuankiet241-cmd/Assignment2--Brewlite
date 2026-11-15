@@ -40,6 +40,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 
+RUN test -s /app/package.json || (echo "ERROR: package.json is empty" && exit 1)
+
 USER nextjs
 
 EXPOSE 3000

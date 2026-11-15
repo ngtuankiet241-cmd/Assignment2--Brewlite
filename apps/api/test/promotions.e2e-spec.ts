@@ -1,14 +1,29 @@
 import request = require('supertest');
-import { DiscountType, Product } from '@prisma/client';
+import { DiscountType, Product, Role } from '@prisma/client';
+import { AuthService } from '../src/auth/auth.service';
 import { createTestApplication, TestApplication } from './helpers/test-app';
 
 describe('Apply valid promotion (HTTP + PostgreSQL integration)', () => {
   let context: TestApplication;
   let product: Product;
+  let customerToken: string;
 
   beforeAll(async () => {
+    process.env.SEPAY_IPN_SECRET_KEY ||= 'brewlite-e2e-local-secret';
     context = await createTestApplication();
     await context.app.listen(0, '127.0.0.1');
+    const customer = await context.prisma.user.create({
+      data: {
+        email: 'promotions-customer@example.test',
+        password: 'unused-e2e-test-password',
+        fullName: 'Promotion Customer',
+        role: Role.CUSTOMER,
+      },
+    });
+    customerToken = context.app.get(AuthService).generateToken({
+      userId: customer.id, email: customer.email,
+      role: customer.role, fullName: customer.fullName,
+    });
   });
   beforeEach(async () => {
     await context.prisma.order.deleteMany();
@@ -30,7 +45,8 @@ describe('Apply valid promotion (HTTP + PostgreSQL integration)', () => {
     customerName: 'Promotion Customer', customerPhone: '0900000000', promotionCode: 'BREW10',
     items: [{ productId: product.id, quantity: 2 }],
   });
-  const place = (data: object = payload()) => request(context.app.getHttpServer()).post('/orders').send(data);
+  const place = (data: object = payload()) => request(context.app.getHttpServer())
+    .post('/orders').auth(customerToken, { type: 'bearer' }).send(data);
   const storedProduct = () => context.prisma.product.findUniqueOrThrow({ where: { id: product.id } });
   const updatePromotion = (data: Parameters<typeof context.prisma.promotion.update>[0]['data']) =>
     context.prisma.promotion.update({ where: { code: 'BREW10' }, data });
@@ -166,13 +182,32 @@ describe('Apply valid promotion (HTTP + PostgreSQL integration)', () => {
     const payment = await checkout(54000).expect(201);
     expect(payment.body.amount).toBe(54000);
     expect(new URL(payment.body.qrUrl).searchParams.get('amount')).toBe('54000');
-    for (const amount of [60000, 1, '54000']) {
+    const gatewayPayload = (amount: string | number) => ({
+      timestamp: Date.now(),
+      notification_type: 'ORDER_PAID',
+      order: {
+        order_invoice_number: orderId,
+        order_status: 'CAPTURED',
+        order_amount: String(amount),
+        order_currency: 'VND',
+      },
+      transaction: {
+        transaction_id: `promo-txn-${orderId}`,
+        transaction_type: 'PAYMENT',
+        transaction_status: 'APPROVED',
+        transaction_amount: String(amount),
+        transaction_currency: 'VND',
+      },
+    });
+    for (const amount of [60000, 1, '60000']) {
       await request(context.app.getHttpServer()).post('/payments/sepay/webhook-ipn')
-        .send({ orderId, amount, status: 'SUCCESS', transactionRef: `promo-txn-${orderId}` }).expect(400);
+        .set('x-secret-key', process.env.SEPAY_IPN_SECRET_KEY!)
+        .send(gatewayPayload(amount)).expect(409);
       expect((await context.prisma.order.findUniqueOrThrow({ where: { id: orderId } })).status).toBe('PENDING');
     }
     await request(context.app.getHttpServer()).post('/payments/sepay/webhook-ipn')
-      .send({ orderId, amount: 54000, status: 'SUCCESS', transactionRef: `promo-txn-${orderId}` }).expect(201);
+      .set('x-secret-key', process.env.SEPAY_IPN_SECRET_KEY!)
+      .send(gatewayPayload(54000)).expect(201);
     expect((await context.prisma.order.findUniqueOrThrow({ where: { id: orderId } })).status).toBe('PAID');
   });
 

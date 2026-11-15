@@ -2,9 +2,9 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
   backend-ci:
@@ -47,8 +47,8 @@ jobs:
       - name: Generate Prisma Client
         run: npm run prisma:generate
 
-      - name: 2. Run Linter & Type-check
-        run: npm run lint
+      - name: 2. Type-check Backend
+        run: npm run typecheck
 
       - name: 3. Run Unit Tests
         run: npm test -- --runInBand

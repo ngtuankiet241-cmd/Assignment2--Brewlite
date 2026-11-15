@@ -1,11 +1,21 @@
 import request = require('supertest');
+import { AuthService } from '../src/auth/auth.service';
+import * as sepay from '../src/payments/sepay.client';
 import { createTestApplication, TestApplication } from './helpers/test-app';
 
 describe('Idempotency-Key (HTTP + PostgreSQL integration)', () => {
   let context: TestApplication;
+  let customerToken: string;
   beforeAll(async () => {
+    process.env.SEPAY_IPN_SECRET_KEY ||= 'brewlite-e2e-local-secret';
     context = await createTestApplication();
     await context.app.listen(0, '127.0.0.1');
+    const customer = await context.prisma.user.create({
+      data: { email: 'idempotency@example.test', fullName: 'Retry Test', password: 'unused-in-test' },
+    });
+    customerToken = context.app.get(AuthService).generateToken({
+      userId: customer.id, email: customer.email, fullName: customer.fullName, role: customer.role,
+    });
   });
   beforeEach(async () => {
     await context.prisma.idempotencyRecord.deleteMany();
@@ -21,11 +31,18 @@ describe('Idempotency-Key (HTTP + PostgreSQL integration)', () => {
     customerName: 'Retry Test', customerPhone: '0900000000', items: [{ productId, quantity: 1 }],
   });
   const place = (body: object, key: string) => request(context.app.getHttpServer())
-    .post('/orders').set('Idempotency-Key', key).send(body);
+    .post('/orders').auth(customerToken, { type: 'bearer' }).set('Idempotency-Key', key).send(body);
   const checkout = (orderId: string, key: string, amount = 35000) => request(context.app.getHttpServer())
     .post('/payments/sepay/checkout').set('Idempotency-Key', key).send({ orderId, amount });
-  const ipn = (orderId: string, transactionRef: string, status = 'SUCCESS') => request(context.app.getHttpServer())
-    .post('/payments/sepay/webhook-ipn').send({ orderId, transactionRef, amount: 35000, status });
+  const ipn = (orderId: string, transactionRef: string) => request(context.app.getHttpServer())
+    .post('/payments/sepay/webhook-ipn')
+    .set('x-secret-key', process.env.SEPAY_IPN_SECRET_KEY!)
+    .send({
+      timestamp: Date.now(), notification_type: 'ORDER_PAID',
+      order: { order_invoice_number: orderId, order_status: 'CAPTURED', order_amount: '35000', order_currency: 'VND' },
+      transaction: { transaction_id: transactionRef, transaction_type: 'PAYMENT', transaction_status: 'APPROVED',
+        transaction_amount: '35000', transaction_currency: 'VND' },
+    });
   const expectSingleOrderAndStock = async (productId: string) => {
     expect(await context.prisma.order.count()).toBe(1);
     expect(await context.prisma.orderItem.count()).toBe(1);
@@ -76,6 +93,21 @@ describe('Idempotency-Key (HTTP + PostgreSQL integration)', () => {
     expect(second.body.id).not.toBe(first.body.id);
     expect(await context.prisma.order.count()).toBe(2);
     expect((await context.prisma.product.findUniqueOrThrow({ where: { id: p.id } })).stock).toBe(0);
+  });
+
+  it('INT-IDEM-AUTH: one account cannot replay another account\'s order with the same key', async () => {
+    const p = await product();
+    await place(payload(p.id), 'private-order').expect(201);
+    const other = await context.prisma.user.create({
+      data: { email: 'other-idempotency@example.test', fullName: 'Other Customer', password: 'unused-in-test' },
+    });
+    const token = context.app.get(AuthService).generateToken({
+      userId: other.id, email: other.email, fullName: other.fullName, role: other.role,
+    });
+    const response = await request(context.app.getHttpServer()).post('/orders')
+      .auth(token, { type: 'bearer' }).set('Idempotency-Key', 'private-order').send(payload(p.id)).expect(409);
+    expect(response.body).not.toHaveProperty('items');
+    await expectSingleOrderAndStock(p.id);
   });
 
   it('INT-IDEM-06: a failed transaction rolls back stock and key, allowing a corrected retry', async () => {
@@ -142,7 +174,12 @@ describe('Idempotency-Key (HTTP + PostgreSQL integration)', () => {
     const p = await product();
     const order = await place(payload(p.id), 'retry-order').expect(201);
     const failed = await checkout(order.body.id, 'old-key').expect(201);
-    await ipn(order.body.id, failed.body.transactionRef, 'FAILED').expect(201);
+    // The gateway endpoint only accepts successful captures. Model a failed
+    // attempt in the database, as the state-machine integration suite does.
+    await context.prisma.order.update({ where: { id: order.body.id }, data: { status: 'PAYMENT_FAILED' } });
+    await context.prisma.payment.update({
+      where: { id: failed.body.id }, data: { status: 'FAILED', transactionRef: failed.body.transactionRef },
+    });
     await checkout(order.body.id, 'new-key').expect(201);
     const before = await context.prisma.payment.findUniqueOrThrow({ where: { orderId: order.body.id } });
     const replay = await checkout(order.body.id, 'old-key').expect(201);
@@ -179,5 +216,34 @@ describe('Idempotency-Key (HTTP + PostgreSQL integration)', () => {
       .set('Idempotency-Key', 'header-key')
       .send({ orderId: order.body.id, amount: 35000, idempotencyKey: 'body-key' }).expect(400);
     expect(await context.prisma.payment.count()).toBe(0);
+  });
+
+  it('INT-IDEM-FORM: concurrent and sequential form retries do not rewrite payment or regenerate checkout fields', async () => {
+    const originalFrontendUrl = process.env.FRONTEND_URL;
+    process.env.FRONTEND_URL = 'http://localhost:3000';
+    const fields = jest.fn().mockReturnValue({ order_invoice_number: 'stable-invoice', signature: 'test-signature' });
+    const client = jest.spyOn(sepay, 'createSePayClient').mockReturnValue({
+      checkout: { initOneTimePaymentFields: fields, initCheckoutUrl: () => 'https://sandbox.pay.sepay.vn/v1/checkout/init' },
+    } as unknown as ReturnType<typeof sepay.createSePayClient>);
+    try {
+      const p = await product();
+      const order = await place(payload(p.id), 'form-order').expect(201);
+      const send = () => request(context.app.getHttpServer()).post('/payments/sepay/checkout-form')
+        .set('Idempotency-Key', 'same-form').send({ orderId: order.body.id });
+      const responses = await Promise.all([send(), send()]);
+      expect(responses.map((response) => response.status)).toEqual([201, 201]);
+      expect(responses[1].body).toEqual(responses[0].body);
+      const payment = await context.prisma.payment.findUniqueOrThrow({ where: { orderId: order.body.id } });
+      const replay = await send().expect(201);
+      expect(replay.body).toEqual(responses[0].body);
+      expect(fields).toHaveBeenCalledTimes(1);
+      expect(await context.prisma.payment.count()).toBe(1);
+      expect(await context.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } })).toEqual(payment);
+      await expectSingleOrderAndStock(p.id);
+    } finally {
+      client.mockRestore();
+      if (originalFrontendUrl === undefined) delete process.env.FRONTEND_URL;
+      else process.env.FRONTEND_URL = originalFrontendUrl;
+    }
   });
 });

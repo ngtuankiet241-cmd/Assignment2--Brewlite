@@ -3,9 +3,10 @@ import React from 'react';
 interface EmptyStateProps {
   hasFilters: boolean;
   onResetFilters: () => void;
+  onRetry: () => void;
 }
 
-export default function EmptyState({ hasFilters, onResetFilters }: EmptyStateProps) {
+export default function EmptyState({ hasFilters, onResetFilters, onRetry }: EmptyStateProps) {
   return (
     <div
       role="status"
@@ -16,7 +17,7 @@ export default function EmptyState({ hasFilters, onResetFilters }: EmptyStatePro
       </div>
 
       <h3 className="mt-4 text-lg font-bold text-coffee-950 sm:text-xl">
-        Chưa tìm thấy đồ uống phù hợp
+        {hasFilters ? 'Chưa tìm thấy đồ uống phù hợp' : 'Thực đơn hiện chưa có đồ uống'}
       </h3>
 
       <p className="mt-2 max-w-sm text-xs leading-relaxed text-coffee-700/80 sm:text-sm">
@@ -25,15 +26,13 @@ export default function EmptyState({ hasFilters, onResetFilters }: EmptyStatePro
           : 'Hiện tại thực đơn chưa có món nào sẵn sàng phục vụ. Vui lòng quay lại sau!'}
       </p>
 
-      {hasFilters && (
-        <button
-          type="button"
-          onClick={onResetFilters}
-          className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-full border border-coffee-300 bg-white px-5 py-2.5 text-xs font-semibold text-coffee-900 shadow-2xs transition hover:bg-coffee-50 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coffee-500"
-        >
-          <span>Xem lại tất cả đồ uống</span>
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={hasFilters ? onResetFilters : onRetry}
+        className="mt-6 inline-flex min-h-[44px] items-center justify-center rounded-full border border-coffee-300 bg-white px-5 py-2.5 text-xs font-semibold text-coffee-900 shadow-2xs transition hover:bg-coffee-50 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coffee-500"
+      >
+        <span>{hasFilters ? 'Xem lại tất cả đồ uống' : 'Tải lại thực đơn'}</span>
+      </button>
     </div>
   );
 }

@@ -8,6 +8,7 @@ describe('ProductsController', () => {
   const mockProductsService = {
     findAll: jest.fn(),
     findOne: jest.fn(),
+    findConfiguration: jest.fn(),
   };
 
   const product = {
@@ -51,5 +52,19 @@ describe('ProductsController', () => {
     });
 
     expect(mockProductsService.findOne).toHaveBeenCalledWith('p1');
+  });
+
+  it('should return product configuration with standard JSON response', async () => {
+    const configuration = {
+      sizes: [{ id: 'M', label: 'Vừa', priceAdjustment: 0 }],
+      toppings: [{ id: 'pearls', name: 'Trân châu đen', unitPrice: 7000 }],
+    };
+    mockProductsService.findConfiguration.mockResolvedValue(configuration);
+
+    await expect(controller.findConfiguration()).resolves.toEqual({
+      success: true,
+      message: 'Lấy cấu hình sản phẩm thành công',
+      data: configuration,
+    });
   });
 });

@@ -14,7 +14,8 @@ export default function FloatingCartButton({
   const { itemCount, hydrated } = useCart();
   const pathname = usePathname();
 
-  if (!hydrated || itemCount < 1 || pathname === '/cart') {
+  const staffRoute = pathname === '/staff' || pathname?.startsWith('/staff/');
+  if (!hydrated || itemCount < 1 || pathname === '/cart' || staffRoute) {
     return null;
   }
 

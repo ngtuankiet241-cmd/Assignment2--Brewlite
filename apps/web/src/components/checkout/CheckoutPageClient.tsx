@@ -1,14 +1,13 @@
 'use client';
-
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useCart } from '@/context/useCart';
 import { getCartItemUnitPrice } from '@/types/cart';
-import { formatCurrencyVND } from '@/data/mockProducts';
+import { formatCurrencyVND } from '@/lib/formatCurrency';
 import type { CartItem } from '@/types/cart';
 import { requestPromotionQuote, type PromotionQuote } from '@/lib/promotions';
 import PromotionCodeField from './PromotionCodeField';
-import { clearCheckoutAttempt, getCheckoutAttempt, type CheckoutAttempt } from '@/lib/checkout-idempotency';
+import { getCheckoutAttempt, type CheckoutAttempt } from '@/lib/checkout-idempotency';
 
 interface CreatedOrder {
   id: string;
@@ -66,10 +65,44 @@ export default function CheckoutPageClient() {
 
   const [createdOrder, setCreatedOrder] = useState<CreatedOrder | null>(null);
   const [paymentQR, setPaymentQR] = useState<PaymentQR | null>(null);
-  const [simulatingPayment, setSimulatingPayment] = useState(false);
   const [isPaid, setIsPaid] = useState(false);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+
+  const redirectToSePay = (
+    checkoutUrl: string,
+    fields: Record<string, string | number>,
+  ) => {
+    const url = new URL(checkoutUrl);
+
+    if (
+      url.protocol !== 'https:' ||
+      !['sandbox.pay.sepay.vn', 'pay-sandbox.sepay.vn'].includes(
+        url.hostname,
+      )
+    ) {
+      throw new Error('Đường dẫn thanh toán SePay không hợp lệ.');
+    }
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = url.toString();
+    form.style.display = 'none';
+
+    Object.entries(fields).forEach(([key, value]) => {
+      const input = document.createElement('input');
+
+      input.type = 'hidden';
+      input.name = key;
+      input.value = String(value);
+
+      form.appendChild(input);
+    });
+
+    document.body.appendChild(form);
+    form.submit();
+  };
 
   function changePromotionCode(code: string) {
     promotionRequestId.current += 1;
@@ -80,31 +113,73 @@ export default function CheckoutPageClient() {
 
   async function applyPromotion() {
     if (submitting || applyingPromotion) return;
+
     const code = promotionCode.trim();
+
     if (!code) {
-      setPromotionFeedback({ items, status: 'error', message: 'Vui lòng nhập mã giảm giá.' });
+      setPromotionFeedback({
+        items,
+        status: 'error',
+        message: 'Vui lòng nhập mã giảm giá.',
+      });
       return;
     }
+
     promotionRequest.current?.abort();
+
     const controller = new AbortController();
     promotionRequest.current = controller;
+
     const requestId = ++promotionRequestId.current;
-    setPromotionFeedback({ items, status: 'applying' });
+
+    setPromotionFeedback({
+      items,
+      status: 'applying',
+    });
+
     try {
-      const quote = await requestPromotionQuote(apiUrl, code, subtotal, controller.signal);
-      if (controller.signal.aborted || requestId !== promotionRequestId.current) return;
+      const quote = await requestPromotionQuote(
+        apiUrl,
+        code,
+        subtotal,
+        controller.signal,
+      );
+
+      if (
+        controller.signal.aborted ||
+        requestId !== promotionRequestId.current
+      ) {
+        return;
+      }
+
       setPromotionCode(quote.code);
-      setPromotionFeedback({ items, status: 'applied', quote });
-    } catch (error: unknown) {
-      if (controller.signal.aborted || requestId !== promotionRequestId.current) return;
+
       setPromotionFeedback({
-        items, status: 'error',
-        message: error instanceof TypeError
-          ? 'Không thể kết nối để kiểm tra mã. Vui lòng thử lại.'
-          : error instanceof Error ? error.message : 'Không thể áp dụng mã giảm giá. Vui lòng thử lại.',
+        items,
+        status: 'applied',
+        quote,
+      });
+    } catch (error: unknown) {
+      if (
+        controller.signal.aborted ||
+        requestId !== promotionRequestId.current
+      ) {
+        return;
+      }
+
+      setPromotionFeedback({
+        items,
+        status: 'error',
+        message:
+          error instanceof TypeError
+            ? 'Không thể kết nối để kiểm tra mã. Vui lòng thử lại.'
+            : error instanceof Error
+              ? error.message
+              : 'Không thể áp dụng mã giảm giá. Vui lòng thử lại.',
       });
     }
   }
+
 
   if (!hydrated) {
     return (
@@ -235,52 +310,11 @@ export default function CheckoutPageClient() {
 
           {/* Nút mô phỏng thanh toán thành công qua Webhook */}
           <div className="space-y-3">
-            <button
-              className="w-full min-h-12 rounded-full bg-emerald-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
-              disabled={simulatingPayment}
-              onClick={async () => {
-                try {
-                  setSimulatingPayment(true);
-                  setError(null);
-                  const res = await fetch(`${apiUrl}/payments/sepay/webhook-ipn`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      orderId: createdOrder.id,
-                      transactionRef: paymentQR.transactionRef,
-                      amount: createdOrder.totalAmount,
-                      status: 'SUCCESS',
-                    }),
-                  });
-                  if (!res.ok) {
-                    throw new Error('Lỗi kích hoạt webhook SePay');
-                  }
-                  clearCart();
-                  clearCheckoutAttempt();
-                  setIsPaid(true);
-                } catch (e: unknown) {
-                  const error = e as Error;
-                  setError(error.message || 'Mô phỏng thanh toán thất bại');
-                } finally {
-                  setSimulatingPayment(false);
-                }
-              }}
-              type="button"
-            >
-              {simulatingPayment ? 'Đang xử lý giao dịch...' : '⚡ Giả lập thanh toán thành công (Webhook IPN)'}
-            </button>
 
-            <button
-              className="w-full min-h-11 rounded-full border border-coffee-300 text-sm font-semibold text-coffee-800 transition hover:bg-cream-100"
-              onClick={() => {
-                clearCart();
-                clearCheckoutAttempt();
-                setIsPaid(true);
-              }}
-              type="button"
-            >
-              Tôi đã chuyển khoản xong
-            </button>
+
+            <p className="text-center text-xs text-coffee-600">
+              Vui lòng chờ Backend xác nhận giao dịch trước khi đơn hàng được đánh dấu đã thanh toán.
+            </p>
           </div>
         </div>
       </main>
@@ -347,10 +381,12 @@ export default function CheckoutPageClient() {
         }),
       };
 
-      // Gửi yêu cầu tạo đơn hàng POST /orders (kèm JWT nếu đã đăng nhập)
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Bạn cần đăng nhập trước khi đặt hàng và thanh toán.');
+      }
       const orderBody = JSON.stringify(orderPayload);
       checkoutAttempt.current = getCheckoutAttempt(orderBody, checkoutAttempt.current);
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const orderHeaders: HeadersInit = {
         'Content-Type': 'application/json',
         'Idempotency-Key': checkoutAttempt.current.key,
@@ -375,36 +411,29 @@ export default function CheckoutPageClient() {
       const orderData: CreatedOrder = await orderRes.json();
       setCreatedOrder(orderData);
 
-      // Nếu chọn thanh toán SePay QR -> gọi API lấy QR
       if (paymentMethod === 'SEPAY_QR') {
-        const qrRes = await fetch(`${apiUrl}/payments/sepay/checkout`, {
+        const qrRes = await fetch(`${apiUrl}/payments/sepay/checkout-form`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Idempotency-Key': `payment-${orderData.id}` },
-          body: JSON.stringify({
-            orderId: orderData.id,
-            amount: orderData.totalAmount,
-          }),
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': `payment-${orderData.id}`,
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ orderId: orderData.id }),
         });
-
+        const qrData = await qrRes.json();
         if (!qrRes.ok) {
-          const errorData = await qrRes.json().catch(() => null);
-          throw new Error(errorData?.message || 'Không thể khởi tạo thanh toán. Vui lòng thử lại.');
+          throw new Error(qrData?.message || 'Không thể khởi tạo thanh toán SePay.');
         }
-        const qrData: PaymentQR = await qrRes.json();
-        if (qrData.status === 'SUCCESS') {
-          clearCart();
-          clearCheckoutAttempt();
-          setIsPaid(true);
-          return;
+        if (typeof qrData.checkoutUrl !== 'string' || !qrData.fields ||
+            typeof qrData.fields !== 'object' || Array.isArray(qrData.fields)) {
+          throw new Error('Thông tin thanh toán SePay không hợp lệ.');
         }
-        setPaymentQR(qrData);
+        sessionStorage.setItem('brewlite-pending-cart-order', orderData.id);
+        redirectToSePay(qrData.checkoutUrl, qrData.fields);
         return;
       }
-
-      // Nếu thanh toán tiền mặt tại quầy
-      clearCart();
-      clearCheckoutAttempt();
-      setIsPaid(true);
+      throw new Error('Thanh toán tiền mặt chưa được hỗ trợ trong bước tích hợp này.');
     } catch (err: unknown) {
       const error = err as Error;
       setError(error.message || 'Không thể tạo đơn hàng. Vui lòng thử lại.');
@@ -598,6 +627,7 @@ export default function CheckoutPageClient() {
               <span aria-live="polite" className="text-xl font-black text-coffee-900">{formatCurrencyVND(totalAmount)}</span>
             </div>
           </div>
+
 
           <button
             className="mt-4 flex min-h-12 w-full items-center justify-center rounded-full bg-coffee-800 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-coffee-700 active:scale-[0.98] disabled:opacity-50"

@@ -2,14 +2,13 @@
 
 import React from 'react';
 import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
-import HeroSection from '@/components/home/HeroSection';
 import ProductGrid from '@/components/menu/ProductGrid';
 import { useProducts } from '@/hooks/useProducts';
 
 export default function MenuPageClient() {
   const {
     products,
+    isCatalogEmpty,
     loading,
     error,
     selectedCategory,
@@ -27,13 +26,11 @@ export default function MenuPageClient() {
       {/* Brand Header */}
       <Header />
 
-      <main className="flex-1">
-        {/* Compact Hero Banner (~80px) ensuring Menu is immediately visible */}
-        <HeroSection />
-
+      <main className="flex-1 pt-4 sm:pt-6">
         {/* Core Product Menu with Loading, Error, Empty & Success States */}
         <ProductGrid
           products={products}
+          isCatalogEmpty={isCatalogEmpty}
           loading={loading}
           error={error}
           selectedCategory={selectedCategory}
@@ -46,9 +43,6 @@ export default function MenuPageClient() {
           onDemoModeChange={setDemoMode}
         />
       </main>
-
-      {/* Footer */}
-      <Footer />
     </div>
   );
 }

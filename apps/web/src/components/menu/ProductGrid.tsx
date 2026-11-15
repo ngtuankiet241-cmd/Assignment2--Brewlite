@@ -11,6 +11,7 @@ import ProductConfigurator from './ProductConfigurator';
 
 interface ProductGridProps {
   products: Product[];
+  isCatalogEmpty: boolean;
   loading: boolean;
   error: string | null;
   selectedCategory: ProductFilterCategory;
@@ -25,6 +26,7 @@ interface ProductGridProps {
 
 export default function ProductGrid({
   products,
+  isCatalogEmpty,
   loading,
   error,
   selectedCategory,
@@ -189,8 +191,9 @@ export default function ProductGrid({
           {/* 3. Empty State with Reset Filters Button */}
           {!loading && !error && products.length === 0 && (
             <EmptyState
-              hasFilters={hasActiveFilters}
+              hasFilters={!isCatalogEmpty && hasActiveFilters}
               onResetFilters={onResetFilters}
+              onRetry={onRetry}
             />
           )}
 

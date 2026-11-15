@@ -21,6 +21,20 @@ describe('OrdersService', () => {
     },
     product: { findMany: jest.fn(), updateMany: jest.fn() },
     idempotencyRecord: { findUnique: jest.fn(), create: jest.fn() },
+    drinkSizeOption: {
+      findMany: jest.fn().mockResolvedValue([
+        { id: 'S', label: 'Nhỏ', priceAdjustment: -5000 },
+        { id: 'M', label: 'Vừa', priceAdjustment: 0 },
+        { id: 'L', label: 'Lớn', priceAdjustment: 5000 },
+      ]),
+    },
+    toppingOption: {
+      findMany: jest.fn().mockResolvedValue([
+        { id: 'pearls', name: 'Trân châu đen', unitPrice: 7000 },
+        { id: 'peach-jelly', name: 'Thạch đào', unitPrice: 8000 },
+        { id: 'cheese-foam', name: 'Kem cheese', unitPrice: 10000 },
+      ]),
+    },
   };
 
   beforeEach(async () => {
@@ -78,7 +92,7 @@ describe('OrdersService', () => {
       const createdOrder = { id: 'ord-123', totalAmount: 70000, ...dto };
       mockPrisma.order.create.mockResolvedValue(createdOrder);
 
-      const result = await service.create(dto);
+      const result = await service.create(dto, 'test-user-id');
       expect(result).toEqual(createdOrder);
       expect(mockPrisma.order.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -96,8 +110,8 @@ describe('OrdersService', () => {
           customerName: 'Kiệt',
           customerPhone: '0901234567',
           items: [],
-        }),
-      ).rejects.toThrow('Order must contain at least one item');
+        },'test-user-id'),
+      ).rejects.toThrow('Đơn hàng phải có ít nhất một sản phẩm.');
     });
 
     it('UT-ORD-IDEM-01: two submissions with one key create and reserve stock only once', async () => {
@@ -108,8 +122,8 @@ describe('OrdersService', () => {
         return Promise.resolve(data);
       });
 
-      const first = await service.create(dto, 'same-order-key');
-      const second = await service.create(dto, 'same-order-key');
+      const first = await service.create(dto, 'test-user-id', 'same-order-key');
+      const second = await service.create(dto, 'test-user-id', 'same-order-key');
 
       expect(second).toEqual(first);
       expect(mockPrisma.order.create).toHaveBeenCalledTimes(1);
