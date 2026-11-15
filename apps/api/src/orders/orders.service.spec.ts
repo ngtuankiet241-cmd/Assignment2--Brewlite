@@ -90,7 +90,7 @@ describe('OrdersService', () => {
       const createdOrder = { id: 'ord-123', totalAmount: 70000, ...dto };
       mockPrisma.order.create.mockResolvedValue(createdOrder);
 
-      const result = await service.create(dto);
+      const result = await service.create(dto, 'test-user-id');
       expect(result).toEqual(createdOrder);
       expect(mockPrisma.order.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -108,8 +108,8 @@ describe('OrdersService', () => {
           customerName: 'Kiệt',
           customerPhone: '0901234567',
           items: [],
-        }),
-      ).rejects.toThrow('Order must contain at least one item');
+        },'test-user-id'),
+      ).rejects.toThrow('Đơn hàng phải có ít nhất một sản phẩm.');
     });
   });
 

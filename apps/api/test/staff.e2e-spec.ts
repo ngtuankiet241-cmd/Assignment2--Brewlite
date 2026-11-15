@@ -72,7 +72,7 @@ describe('Staff API (HTTP + PostgreSQL integration)', () => {
     const list = await get('/staff/orders', role).expect(200);
     expect(list.body.data.map((entry) => entry.id)).toEqual([order.id]);
     await get(`/staff/orders/${order.id}`, role).expect(200);
-    for (const status of ['PREPARING', 'READY', 'COMPLETED']) {
+    for (const status of ['CONFIRMED', 'PREPARING', 'READY', 'COMPLETED']) {
       const response = await patch(order.id, status, role).expect(200);
       expect(response.body.status).toBe(status);
     }
@@ -159,9 +159,9 @@ describe('Staff API (HTTP + PostgreSQL integration)', () => {
       expect(await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).toEqual(order);
     });
 
-  it('INT-STAFF-12: concurrent preparation and cancellation cannot both succeed', async () => {
-    const order = await createOrder();
-    const responses = await Promise.all([patch(order.id, 'PREPARING'), patch(order.id, 'CANCELLED')]);
+  it('INT-STAFF-12: concurrent payment and cancellation cannot both succeed', async () => {
+    const order = await createOrder(OrderStatus.PENDING);
+    const responses = await Promise.all([patch(order.id, 'PAID'), patch(order.id, 'CANCELLED')]);
     expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
     const winner = responses.find((response) => response.status === 200);
     expect((await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe(winner.body.status);
@@ -171,7 +171,10 @@ describe('Staff API (HTTP + PostgreSQL integration)', () => {
     const product = await context.prisma.product.create({ data: {
       name: 'Cà phê', description: '', price: 30000, imageUrl: '', stock: 2,
     } });
-    const placed = await request(context.app.getHttpServer()).post('/orders').send({
+    const placed = await request(context.app.getHttpServer())
+      .post('/orders')
+      .auth(tokens.CUSTOMER!, { type: 'bearer' })
+      .send({
       customerName: 'Stock Test', customerPhone: '0900000000', items: [{
         productId: product.id, productName: product.name, unitPrice: 30000, quantity: 1, itemTotal: 30000,
       }],

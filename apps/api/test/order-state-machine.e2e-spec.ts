@@ -7,7 +7,7 @@ import { createTestApplication, TestApplication } from './helpers/test-app';
 const allowed: [OrderStatus, OrderStatus][] = [
   ['PENDING', 'PAID'], ['PENDING', 'PAYMENT_FAILED'], ['PENDING', 'CANCELLED'],
   ['PAYMENT_FAILED', 'PENDING'], ['PAYMENT_FAILED', 'CANCELLED'],
-  ['PAID', 'PREPARING'], ['PAID', 'CANCELLED'],
+  ['PAID', 'CONFIRMED'], ['CONFIRMED', 'PREPARING'],
   ['PREPARING', 'READY'], ['READY', 'COMPLETED'],
 ];
 const forbidden = Object.values(OrderStatus).flatMap((from) =>
@@ -19,6 +19,7 @@ describe('Order State Machine (HTTP + PostgreSQL integration)', () => {
   let context: TestApplication;
   let staffToken: string;
   beforeAll(async () => {
+    process.env.SEPAY_IPN_SECRET_KEY ||= 'brewlite-e2e-local-secret';
     context = await createTestApplication();
     staffToken = context.app.get(AuthService).generateToken({
       userId: 'state-machine-staff', email: 'staff@example.test', role: Role.BARISTA, fullName: 'Staff Test',
@@ -38,7 +39,34 @@ describe('Order State Machine (HTTP + PostgreSQL integration)', () => {
   const checkout = (orderId: string, key: string) => request(context.app.getHttpServer())
     .post('/payments/sepay/checkout').send({ orderId, amount: 70000, idempotencyKey: key });
   const ipn = (orderId: string, status: 'SUCCESS' | 'FAILED', transactionRef: string) => request(context.app.getHttpServer())
-    .post('/payments/sepay/webhook-ipn').send({ orderId, status, transactionRef, amount: 70000 });
+    .post('/payments/sepay/webhook-ipn')
+    .set('x-secret-key', process.env.SEPAY_IPN_SECRET_KEY!)
+    .send({
+      timestamp: Date.now(),
+      notification_type: status === 'SUCCESS' ? 'ORDER_PAID' : 'ORDER_FAILED',
+      order: {
+        order_invoice_number: orderId,
+        order_status: status === 'SUCCESS' ? 'CAPTURED' : 'FAILED',
+        order_amount: '70000',
+        order_currency: 'VND',
+      },
+      transaction: {
+        transaction_id: transactionRef,
+        transaction_type: 'PAYMENT',
+        transaction_status: status === 'SUCCESS' ? 'APPROVED' : 'DECLINED',
+        transaction_amount: '70000',
+        transaction_currency: 'VND',
+      },
+    });
+
+  it('INT-SM-AUTH: rejects a webhook without the SePay secret', async () => {
+    const order = await createOrder();
+    await request(context.app.getHttpServer())
+      .post('/payments/sepay/webhook-ipn')
+      .send({ orderId: order.id, status: 'SUCCESS', transactionRef: 'forged', amount: 70000 })
+      .expect(401);
+    expect((await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('PENDING');
+  });
 
   it.each(allowed)('INT-SM-01: persists the allowed transition %s -> %s', async (from, to) => {
     const order = await createOrder(from);
@@ -68,7 +96,7 @@ describe('Order State Machine (HTTP + PostgreSQL integration)', () => {
     const order = await createOrder();
     await checkout(order.id, 'normal-attempt').expect(201);
     await ipn(order.id, 'SUCCESS', 'normal-success').expect(201);
-    for (const status of ['PREPARING', 'READY', 'COMPLETED']) {
+    for (const status of ['CONFIRMED', 'PREPARING', 'READY', 'COMPLETED']) {
       await patch(order.id, status).expect(200);
     }
     expect((await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('COMPLETED');
@@ -78,7 +106,15 @@ describe('Order State Machine (HTTP + PostgreSQL integration)', () => {
   it('INT-SM-06: failed payment can be retried through PAYMENT_FAILED -> PENDING -> PAID', async () => {
     const order = await createOrder();
     await checkout(order.id, 'failed-attempt').expect(201);
-    await ipn(order.id, 'FAILED', 'failed-event').expect(201);
+    // Gateway rejects failed-payment notifications: only ORDER_PAID is accepted.
+    await ipn(order.id, 'FAILED', 'failed-event').expect(400);
+    expect((await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('PENDING');
+    // Simulate a payment failure through the supported staff transition and persisted payment state.
+    await patch(order.id, 'PAYMENT_FAILED').expect(200);
+    await context.prisma.payment.update({
+      where: { orderId: order.id },
+      data: { status: 'FAILED', transactionRef: 'failed-event' },
+    });
     expect((await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('PAYMENT_FAILED');
     expect((await context.prisma.payment.findUniqueOrThrow({ where: { orderId: order.id } })).status).toBe('FAILED');
 
@@ -110,11 +146,12 @@ describe('Order State Machine (HTTP + PostgreSQL integration)', () => {
     const order = await createOrder();
     await checkout(order.id, 'replay-attempt').expect(201);
     await ipn(order.id, 'SUCCESS', 'paid-event').expect(201);
-    for (const status of ['PREPARING', 'READY', 'COMPLETED']) await patch(order.id, status).expect(200);
+    for (const status of ['CONFIRMED', 'PREPARING', 'READY', 'COMPLETED']) await patch(order.id, status).expect(200);
     const before = await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } });
     const payment = await context.prisma.payment.findUniqueOrThrow({ where: { orderId: order.id } });
     await ipn(order.id, 'SUCCESS', 'paid-event').expect(201);
-    await ipn(order.id, 'FAILED', 'late-failure').expect(409);
+    // Failed Gateway events are malformed for this endpoint and cannot downgrade SUCCESS.
+    await ipn(order.id, 'FAILED', 'late-failure').expect(400);
     expect(await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).toEqual(before);
     expect(await context.prisma.payment.findUniqueOrThrow({ where: { orderId: order.id } })).toEqual(payment);
     // Original checkout request is also replayable without starting a new payment.
@@ -122,7 +159,7 @@ describe('Order State Machine (HTTP + PostgreSQL integration)', () => {
     expect(replay.body.status).toBe('SUCCESS');
   });
 
-  it.each(['PAID', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED'] as OrderStatus[])
+  it.each(['PAID', 'CONFIRMED', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED'] as OrderStatus[])
     ('INT-SM-09: checkout cannot create a new attempt for %s', async (status) => {
       const order = await createOrder(status);
       await checkout(order.id, 'new-attempt').expect(409);
@@ -148,13 +185,14 @@ describe('Order State Machine (HTTP + PostgreSQL integration)', () => {
     expect((await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe(winner.body.status);
   });
 
-  it('INT-SM-12: concurrent success/failure callbacks preserve a consistent order and payment pair', async () => {
+  it('INT-SM-12: concurrent approved and invalid Gateway callbacks cannot corrupt payment state', async () => {
     const order = await createOrder();
     await checkout(order.id, 'concurrent-attempt').expect(201);
     const responses = await Promise.all([ipn(order.id, 'SUCCESS', 'concurrent-success'), ipn(order.id, 'FAILED', 'concurrent-failure')]);
-    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 400]);
     const stored = await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } });
     const payment = await context.prisma.payment.findUniqueOrThrow({ where: { orderId: order.id } });
-    expect([['PAID', 'SUCCESS'], ['PAYMENT_FAILED', 'FAILED']]).toContainEqual([stored.status, payment.status]);
+    expect([stored.status, payment.status]).toEqual(['PAID', 'SUCCESS']);
+    expect(payment.transactionRef).toBe('concurrent-success');
   });
 });
