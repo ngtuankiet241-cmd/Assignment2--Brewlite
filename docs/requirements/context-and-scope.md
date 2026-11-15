@@ -40,9 +40,11 @@ Nhiều quán nước và cà phê quy mô nhỏ tại Việt Nam vẫn tiếp n
 7. **Theo dõi và quản lý đơn:** Xem trạng thái, lịch sử đơn hàng; nhân viên cập nhật trạng thái pha chế.
 8. **Triển khai:** Docker, CI/CD qua GitHub Actions, URL production truy cập được qua HTTPS.
 
+**Mở rộng đã triển khai (2026-11-15):** Tích điểm loyalty sau thanh toán, 1 điểm / 1.000đ trên tổng tiền sau giảm giá khi đơn chuyển `PAID`; có số dư và lịch sử của từng tài khoản, chống cộng điểm trùng.
+
 ### Phạm vi mở rộng (Future scope)
 
-- Hệ thống tích điểm khách hàng thân thiết (loyalty program).
+- Sử dụng/đổi điểm và các hạng khách hàng thân thiết (ngoài phần tích điểm sau thanh toán đã triển khai).
 - Mã giảm giá và chương trình khuyến mãi.
 - Giao diện quản trị cho quản lý (admin panel): thêm/sửa/ẩn sản phẩm.
 - Báo cáo và thống kê doanh thu.

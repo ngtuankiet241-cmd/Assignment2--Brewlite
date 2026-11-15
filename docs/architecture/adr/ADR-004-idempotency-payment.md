@@ -125,5 +125,5 @@ SePay                  NestJS API (POST /payments/sepay/webhook-ipn)
 2. **Server (NestJS):** Controller đọc `Idempotency-Key`; service gọi `withIdempotency` trong transaction trước thay đổi dữ liệu. Header cũ `X-Idempotency-Key` và body key của checkout vẫn được hỗ trợ.
 3. **Replay:** Tạo đơn trả snapshot ban đầu. Checkout trả payment hiện tại mà không khởi tạo giao dịch lại; key cũ vẫn được ghi nhớ sau khi đổi key cho retry. Đơn hết hạn/hủy không được mở checkout lại.
 4. **Scope/TTL:** Khóa chính `(scope, key)`, không tự hết hạn. Cùng key với payload khác trả `409`; key không hợp lệ hoặc mâu thuẫn header/body trả `400`. Client không gửi key vẫn hoạt động nhưng không có bảo đảm chống lặp theo key.
-5. **Kiểm chứng:** [Test HTTP + PostgreSQL](../../../apps/api/test/idempotency.e2e-spec.ts), đặc biệt `INT-IDEM-01/02` và `INT-PAY-03`. Xem [hướng dẫn API](../../idempotency-api.md) để áp dụng migration và chạy test.
+5. **Kiểm chứng:** [Test HTTP + PostgreSQL](../../../apps/api/test/idempotency.e2e-spec.ts), đặc biệt `INT-IDEM-01/02` và `INT-PAY-03`.
 
