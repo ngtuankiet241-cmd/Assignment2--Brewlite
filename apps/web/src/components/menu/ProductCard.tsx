@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
+import ProductImage from './ProductImage';
 import { Product } from '@/types/product';
-import { formatCurrencyVND } from '@/data/mockProducts';
+import { formatCurrencyVND } from '@/lib/formatCurrency';
 
 interface ProductCardProps {
   product: Product;
@@ -27,7 +27,8 @@ export default function ProductCard({ product, onViewDetails }: ProductCardProps
           aria-haspopup="dialog"
           className="relative block aspect-square w-full cursor-pointer overflow-hidden rounded-2xl bg-cream-50/80 text-left transition-colors hover:bg-coffee-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coffee-600"
         >
-          <Image
+          <ProductImage
+            productId={product.id}
             src={product.imageUrl}
             alt={`Ảnh minh họa ${product.name}`}
             fill
@@ -36,21 +37,6 @@ export default function ProductCard({ product, onViewDetails }: ProductCardProps
             priority={product.id === 'prod-001' || product.id === 'prod-002'}
           />
 
-          {/* Badge Tag */}
-          {product.badge && (
-            <span className="absolute top-2.5 left-2.5">
-              <span className="inline-flex items-center rounded-full bg-coffee-800/90 px-2.5 py-0.5 text-[10px] font-semibold text-cream-50 shadow-xs backdrop-blur-sm">
-                {product.badge}
-              </span>
-            </span>
-          )}
-
-          {/* Prep Time & Rating */}
-          <span className="absolute bottom-2.5 right-2.5 flex items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-medium text-coffee-800 shadow-2xs backdrop-blur-sm">
-            <span>⭐ {product.rating ?? 4.8}</span>
-            <span className="text-coffee-300">•</span>
-            <span>{product.prepTimeMinutes ?? 3}p</span>
-          </span>
         </button>
 
         {/* Product Information */}

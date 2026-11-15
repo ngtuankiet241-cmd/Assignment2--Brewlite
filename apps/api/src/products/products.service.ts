@@ -12,6 +12,23 @@ export class ProductsService {
     });
   }
 
+  async findConfiguration() {
+    const [sizes, toppings] = await Promise.all([
+      this.prisma.drinkSizeOption.findMany({
+        where: { isActive: true },
+        orderBy: { sortOrder: 'asc' },
+        select: { id: true, label: true, priceAdjustment: true },
+      }),
+      this.prisma.toppingOption.findMany({
+        where: { isActive: true },
+        orderBy: { sortOrder: 'asc' },
+        select: { id: true, name: true, unitPrice: true },
+      }),
+    ]);
+
+    return { sizes, toppings };
+  }
+
   async findOne(id: string) {
     const product = await this.prisma.product.findUnique({
       where: { id },

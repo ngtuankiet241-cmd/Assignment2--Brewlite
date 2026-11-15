@@ -60,12 +60,14 @@ Bảng ma trận truy vết tuân thủ định dạng chuẩn 5 cột theo quy 
 | **FR-18** Chọn phương thức thanh toán | US-11, UC-01 | AD-01, SD-01, CD-01 (`Payment`) | `POST /payments/sepay/checkout`<br>`apps/web/src/components/checkout/CheckoutPageClient.tsx` (QR/Tiền mặt) | `UT-PAY-01` -> `03` |
 | **FR-19** Xử lý thanh toán mô phỏng | US-12, UC-01 | SD-01, CD-01 (`Payment`, `Order`) | *Sprint 2:* `POST /payments/sepay/checkout`, SePay Gateway | *Sprint 2:* `INT-PAY-01` |
 | **FR-20** Xác nhận kết quả thanh toán | US-12, UC-01 | SD-01, CD-01 (`Payment`, `Order`) | *Sprint 2:* `POST /payments/sepay/webhook-ipn` | *Sprint 2:* `INT-PAY-02` |
-| **FR-21** Ngăn chặn thanh toán trùng lặp | US-12, UC-01 | SD-01, CD-01 (`Payment`) | *Sprint 2:* Idempotency Key Guard, `PaymentsService` | *Sprint 2:* `INT-PAY-03` |
+| **FR-21** Ngăn chặn thanh toán trùng lặp | US-12, UC-01 | SD-01, CD-01 (`Payment`) | `withIdempotency`, `OrdersService`, `PaymentsService`, `IdempotencyRecord` | `UT-ORD-IDEM-01`, `UT-PAY-IDEM-01`, [INT-IDEM-01/02, INT-PAY-03](../apps/api/test/idempotency.e2e-spec.ts) |
 | **NFR-HEALTH** Giám sát trạng thái hệ thống | Tiêu chí Sprint 1 | CD-01, Deployment Diagram | `GET /health`<br>`apps/api/src/health/health.controller.ts` | `E2E-HEALTH-01`<br>`E2E-HEALTH-02`<br>`UT-HEALTH-01` |
 | **NFR-INVENTORY** Không bán vượt tồn kho khi đặt đồng thời; TTL giữ hàng (hỗ trợ FR-07, FR-10, FR-20) | US-07, US-08, US-12, UC-01 | Transaction, optimistic locking và TTL, SM-01 | `orders/orders.service.ts`<br>`inventory/stock-reservation.ts`<br>`inventory/inventory.service.ts`<br>`orders/order-transition.ts` | `UT-INV-01..16`<br>`INT-INV-01..16` |
 | **UC-01 / AF-01** Áp mã giảm giá hợp lệ (hỗ trợ FR-09, FR-10, FR-19, FR-20) | UC-01, luồng thay thế AF-01 | SD-01, CD-01 (`Promotion`, `Order`), transaction | `POST /promotions/validate`, `POST /orders` (`promotionCode`)<br>`promotions/promotions.service.ts`<br>`orders/order-pricing.ts`<br>`payments/payments.service.ts`<br>`apps/web/src/components/checkout/CheckoutPageClient.tsx`, `PromotionCodeField.tsx`<br>`apps/web/src/lib/promotions.ts` | `UT-PROMO-01..06`<br>`INT-PROMO-01..14`<br>`UT-WEB-PROMO-01..11` |
 
 ## Ghi chú truy vết
+
+- **Mở rộng loyalty (2026-11-15):** Tích điểm sau `PAID`, 1 điểm / 1.000đ sau giảm giá; yêu cầu bổ sung của chủ dự án. Triển khai tại `orders/order-transition.ts`, `loyalty/loyalty-points.ts`, `GET /loyalty/me` và khối điểm thưởng trong trang Đơn của tôi. Kiểm chứng bằng [unit test](../apps/api/src/loyalty/loyalty-points.spec.ts), [INT-LOYAL-01..12](../apps/api/test/loyalty.e2e-spec.ts), [test frontend](../apps/web/test/loyalty.test.mjs).
 
 - FR-12 gồm [quy tắc chuyển trạng thái](../apps/api/src/orders/order-state-machine.ts) và [kiểm thử tính nguyên tử](../apps/api/test/order-state-machine.e2e-spec.ts); API nhân viên và phân quyền `BARISTA`/`ADMIN` được mô tả và kiểm chứng tại [staff-api.md](./staff-api.md).
 

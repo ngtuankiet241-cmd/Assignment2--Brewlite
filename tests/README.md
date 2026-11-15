@@ -10,6 +10,12 @@ Kiểm thử áp mã giảm giá, tính giá từ backend, rollback và thanh to
 
 Kiểm thử client API khuyến mãi và các trạng thái giao diện nhập mã nằm tại [apps/web/test/promotions.test.mjs](../apps/web/test/promotions.test.mjs). Chạy `npm.cmd --prefix apps/web test`.
 
+Kiểm thử `Idempotency-Key` qua **HTTP + PostgreSQL thật** nằm tại [apps/api/test/idempotency.e2e-spec.ts](../apps/api/test/idempotency.e2e-spec.ts). Chạy `npm.cmd --prefix apps/api run test:e2e -- idempotency`. `INT-IDEM-01` và `INT-IDEM-02` chứng minh gửi hai lần cùng key (tuần tự hoặc đồng thời) chỉ tạo **một đơn**, trừ kho **một lần**. `INT-PAY-03` kiểm tra thêm checkout/IPN lặp vẫn chỉ có một payment và không ghi nhận thanh toán lần hai. Các test còn lại bao phủ payload khác trả `409`, rollback, key cũ sau retry và tương thích header/body. Mỗi suite dùng schema riêng và tự xóa sau khi chạy.
+
+Unit test gửi hai lần cùng key nằm trong `orders.service.spec.ts` (`UT-ORD-IDEM-01`) và `payments.service.spec.ts` (`UT-PAY-IDEM-01`). Test giữ key khi retry/tải lại trang nằm tại [apps/web/test/checkout-idempotency.test.mjs](../apps/web/test/checkout-idempotency.test.mjs).
+
+Kiểm thử cộng điểm sau `PAID` nằm tại [apps/api/test/loyalty.e2e-spec.ts](../apps/api/test/loyalty.e2e-spec.ts), chạy `npm.cmd --prefix apps/api run test:e2e -- loyalty`. Bộ test HTTP + PostgreSQL kiểm tra **1 điểm / 1.000đ sau giảm giá**, cộng đúng một lần khi webhook lặp/đồng thời, tăng số dư nguyên tử giữa các đơn, rollback và chỉ đọc lịch sử của tài khoản đã xác thực. Unit test tính điểm nằm tại `apps/api/src/loyalty/loyalty-points.spec.ts`; client API và hiển thị số dư được kiểm tra tại `apps/web/test/loyalty.test.mjs`.
+
 ---
 
 ## 📁 Cấu trúc Thư mục

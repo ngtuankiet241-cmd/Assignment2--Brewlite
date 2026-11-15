@@ -21,9 +21,6 @@ export interface Product {
   categoryName: string;
   isAvailable: boolean;
   stock?: number;
-  badge?: string; // e.g. "Bán chạy nhất", "Signature", "Gen Z yêu thích"
-  rating?: number; // e.g. 4.9
-  prepTimeMinutes?: number; // Estimated prep time
   createdAt?: string;
   updatedAt?: string;
 }

@@ -1,24 +1,48 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+
+import {
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
+
 import { OrderStatus } from '@prisma/client';
 
 const transitions: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
-  PENDING: [OrderStatus.PAID, OrderStatus.PAYMENT_FAILED, OrderStatus.CANCELLED],
-  PAYMENT_FAILED: [OrderStatus.PENDING, OrderStatus.CANCELLED],
-  PAID: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
+  PENDING: [
+    OrderStatus.PAID,
+    OrderStatus.PAYMENT_FAILED,
+    OrderStatus.CANCELLED,
+  ],
+  PAYMENT_FAILED: [
+    OrderStatus.PENDING,
+    OrderStatus.CANCELLED,
+  ],
+  PAID: [OrderStatus.CONFIRMED],
+  CONFIRMED: [OrderStatus.PREPARING],
   PREPARING: [OrderStatus.READY],
   READY: [OrderStatus.COMPLETED],
   COMPLETED: [],
   CANCELLED: [],
 };
 
-export function assertOrderStatus(value: unknown): asserts value is OrderStatus {
-  if (typeof value !== 'string' || !Object.values(OrderStatus).includes(value as OrderStatus)) {
-    throw new BadRequestException('Trạng thái đơn hàng không hợp lệ.');
+export function assertOrderStatus(
+  value: unknown,
+): asserts value is OrderStatus {
+  if (
+    typeof value !== 'string' ||
+    !Object.values(OrderStatus).includes(value as OrderStatus)
+  ) {
+    throw new BadRequestException(
+      'Trạng thái đơn hàng không hợp lệ.',
+    );
   }
 }
 
-export function assertTransition(from: OrderStatus, to: unknown): asserts to is OrderStatus {
+export function assertTransition(
+  from: OrderStatus,
+  to: unknown,
+): asserts to is OrderStatus {
   assertOrderStatus(to);
+
   if (!transitions[from].includes(to)) {
     throw new ConflictException({
       statusCode: 409,

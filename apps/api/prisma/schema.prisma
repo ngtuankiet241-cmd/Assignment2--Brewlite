@@ -17,6 +17,7 @@ enum OrderStatus {
   PENDING
   PAYMENT_FAILED
   PAID
+  CONFIRMED
   PREPARING
   READY
   COMPLETED
@@ -27,6 +28,14 @@ enum PaymentStatus {
   PENDING
   SUCCESS
   FAILED
+}
+
+enum RefundStatus {
+  REQUESTED
+  PENDING
+  SUCCEEDED
+  FAILED
+  REJECTED
 }
 
 enum PaymentMethod {
@@ -48,6 +57,26 @@ enum LoyaltyType {
 enum DiscountType {
   PERCENTAGE
   FIXED_AMOUNT
+}
+
+model DrinkSizeOption {
+  id              String   @id
+  label           String
+  priceAdjustment Int
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ToppingOption {
+  id        String   @id
+  name      String   @unique
+  unitPrice Int
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model User {
@@ -77,6 +106,7 @@ model Product {
   updatedAt   DateTime    @default(now()) @updatedAt
 }
 
+
 model Order {
   id                   String                  @id @default(cuid())
   userId               String?
@@ -85,23 +115,38 @@ model Order {
   customerPhone        String
   tableNumber          Int?
   notes                String?
+
+  // Quáº£n lÃ½ giÃ¡ vÃ  khuyáº¿n mÃ£i
   subtotalAmount       Int                     @default(0)
   discountAmount       Int                     @default(0)
   totalAmount          Int
+
+  // Tráº¡ng thÃ¡i Ä‘Æ¡n hÃ ng vÃ  giá»¯ tá»“n kho
   status               OrderStatus             @default(PENDING)
   reservationStatus    StockReservationStatus?
   reservationExpiresAt DateTime?
+
+  // Sáº£n pháº©m vÃ  thanh toÃ¡n
   items                OrderItem[]
   payment              Payment?
+
+  // Khuyáº¿n mÃ£i
   promotionId          String?
   promotionCode        String?
   promotion            Promotion?              @relation(fields: [promotionId], references: [id])
+
+  // Äiá»ƒm thÆ°á»Ÿng
   loyaltyTransactions  LoyaltyTransaction[]
+
+  // HoÃ n tiá»n
+  refunds              Refund[]
+
   createdAt            DateTime                @default(now())
   updatedAt            DateTime                @updatedAt
 
   @@index([reservationStatus, reservationExpiresAt])
 }
+
 
 model OrderItem {
   id          String  @id @default(cuid())
@@ -130,6 +175,17 @@ model Payment {
   paidAt         DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  refunds Refund[]
+}
+
+model IdempotencyRecord {
+  scope       String
+  key         String
+  requestHash String
+  response    Json
+  createdAt   DateTime @default(now())
+
+  @@id([scope, key])
 }
 
 model Promotion {
@@ -158,4 +214,65 @@ model LoyaltyTransaction {
   type        LoyaltyType @default(EARN)
   description String?
   createdAt   DateTime    @default(now())
+
+  // One EARN per order is enforced by a partial unique index in the migration.
+  @@index([userId, createdAt])
+}
+
+
+
+model Refund {
+  id                 String       @id @default(cuid())
+
+  // Li├¬n kß║┐t vß╗¢i ─æ╞ín h├áng
+  orderId            String
+  order              Order        @relation(fields: [orderId], references: [id])
+
+  // Li├¬n kß║┐t vß╗¢i giao dß╗ïch thanh to├ín gß╗æc
+  paymentId          String
+  payment            Payment      @relation(fields: [paymentId], references: [id])
+
+  // Th├┤ng tin ho├án tiß╗ün
+  amount             Int
+  status             RefundStatus @default(REQUESTED)
+
+  // Chß╗æng tß║ío y├¬u cß║ºu ho├án tiß╗ün tr├╣ng
+  idempotencyKey     String       @unique
+
+  // Th├┤ng tin giao dß╗ïch SePay ban ─æß║ºu
+  originalTxnRef     String
+  sepayRefundId      String?      @unique
+
+  // Nh├ón vi├¬n x├⌐t duyß╗çt y├¬u cß║ºu
+  approvedBy         String?
+  approvedAt         DateTime?
+
+  // Th├┤ng tin chuyß╗ân khoß║ún ho├án tiß╗ün thß╗º c├┤ng
+  bankTransactionRef String?      @unique
+  evidenceUrl        String?
+  transferRecordedBy String?
+  transferRecordedAt DateTime?
+
+  // Quß║ún l├╜ x├íc minh ho├án tiß╗ün thß║¡t
+  verifiedBy         String?
+  verifiedAt         DateTime?
+
+  // Th├┤ng tin tß╗½ chß╗æi hoß║╖c lß╗ùi
+  rejectionReason    String?
+  errorMessage       String?
+
+  // Ho├án tiß╗ün m├┤ phß╗Ång Sandbox
+  // Kh├┤ng ph├ít sinh chuyß╗ân khoß║ún ng├ón h├áng hoß║╖c ho├án tiß╗ün SePay thß║¡t
+  demoReference      String?      @unique
+  demoCompletedAt    DateTime?
+  demoBy             String?
+
+  // Thß╗¥i gian
+  requestedAt        DateTime     @default(now())
+  completedAt        DateTime?
+  updatedAt          DateTime     @updatedAt
+
+  // Index
+  @@index([orderId])
+  @@index([paymentId])
 }

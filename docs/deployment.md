@@ -109,7 +109,7 @@ NEXT_PUBLIC_APP_NAME=BrewLite
 
 ## 6. Tự động hóa Giao vận & Triển khai Liên tục (CD Pipeline – Task 5.3)
 
-Quy trình Continuous Delivery (CD) được thiết kế và điều phối bởi **Kiệt (Lead)** và **Hùng (DevOps)** thông qua GitHub Actions (`.github/workflows/cd.yml`), tự động kích hoạt mỗi khi có tag phiên bản mới (`v*.*.*`) hoặc mã nguồn được sáp nhập vào nhánh `main`.
+Quy trình CD trong `.github/workflows/cd.yml` chạy khi push vào `main` hoặc kích hoạt thủ công trên `main`. Không có chế độ staging hoặc deploy từ tag. Cấu hình bên dưới phải được hoàn tất trước khi bật pipeline này.
 
 ### 6.1 Sơ đồ Chuỗi Pipeline Đầy đủ (End-to-End CD Stages)
 
@@ -123,26 +123,30 @@ Quy trình Continuous Delivery (CD) được thiết kế và điều phối b�
 [Stage 2 & 3: Docker Packaging] ─── (Multi-stage Build -> Tag SHA / SemVer -> Push GHCR)
      │
      ▼
-[Stage 4: Safe DB Migration] ─── (Zero-downtime Prisma Migration: prisma migrate deploy)
+[Stage 4: Configuration & Migration] ─── (Kiểm tra secrets -> prisma migrate deploy)
      │
      ▼
-[Stage 5: Production Deployment] ─── (Trigger Render PaaS API & Vercel Edge Web via Hooks)
+[Stage 5: Production Deployment] ─── (Render -> Vercel: deploy đúng commit, chờ trạng thái)
      │
      ▼
-[Stage 6: Post-Deploy Smoke Test] ─── (Curl GET /health & Verify Frontend HTTPS 200 OK)
-     │
-     ├── (Nếu thành công) ──> [Hoàn tất Triển khai & Cập nhật Release Notes]
-     └── (Nếu thất bại)   ──> [Stage 7: Rollback Protocol Tức thì & Cảnh báo Sự cố]
+[Stage 6: Smoke Test] ─── (Kiểm tra health, sản phẩm và frontend)
 ```
 
-### 6.2 Bảy Tiêu chí Vận hành Bắt buộc của Pipeline CD
-1. **Quality Gate:** Tuyệt đối không cho phép đóng gói container nếu Unit Test hoặc Lint thất bại.
-2. **Container Versioning:** Image được gắn nhãn kép: commit SHA rút gọn (`sha-xxxxxxx`) và phiên bản ngữ nghĩa (`v1.0.0`).
-3. **Container Registry:** Image được lưu trữ bảo mật tại GitHub Packages (`ghcr.io/ngtuankiet241-cmd/assignment2--brewlite/api` và `web`).
-4. **Bảo mật Secret:** Khóa API, Webhook token và Connection String được lưu trữ trong GitHub Repository Secrets (`RENDER_DEPLOY_HOOK_URL`, `PRODUCTION_DATABASE_URL`).
-5. **Safe Migration:** Di chuyển cấu trúc dữ liệu (`prisma migrate deploy`) thực thi độc lập trước khi kích hoạt container mới để tránh xung đột schema.
-6. **Smoke Testing tự động:** Tự động gửi request kiểm tra tính sống còn qua endpoint `/health` (tối đa 6 lần thử lại trong 60 giây).
-7. **Rollback tự động:** Tự động dừng chuỗi thực thi và kích hoạt kịch bản khôi phục phiên bản trước khi Smoke test không đạt yêu cầu.
+### 6.2 Cấu hình trước khi sử dụng
+
+1. Trên Render, mở **Web Service API → Settings**, tắt auto-deploy theo Git. Ghi lại **service ID `srv-...`** của API; ID database `dpg-...` không phải service ID.
+2. Trên Vercel, bảo đảm Project Root Directory là `apps/web` để đọc `apps/web/vercel.json`. File này tắt auto-deploy của nhánh `main` nhưng không tắt preview của các nhánh khác. Kiểm tra cấu hình thực tế trước khi dùng pipeline.
+3. Trong GitHub **Settings → Secrets and variables → Actions**, tạo repository secrets:
+   - `PRODUCTION_DATABASE_URL`: External Database URL của đúng database production; runner GitHub phải có quyền kết nối.
+   - `RENDER_API_TOKEN`, `RENDER_SERVICE_ID`: token có quyền deploy và ID Web Service Render.
+   - `VERCEL_TOKEN`, `VERCEL_PROJECT_ID`: token có quyền deploy và ID project Vercel.
+   - `VERCEL_TEAM_ID`: ID team sở hữu project, nếu project thuộc team; bỏ trống nếu thuộc tài khoản cá nhân.
+4. Trong cùng trang, tab **Variables**, tạo `VERCEL_PROJECT_NAME` bằng tên chính xác của project Vercel.
+5. Không đưa token, database URL hay backup vào Git hoặc chat. Xác nhận các cấu hình, deploy test và theo dõi cả hai dashboard trước khi coi quy trình là hoạt động.
+
+Pipeline dừng nếu thiếu secret hoặc migration thất bại. Nó yêu cầu Render triển khai commit của run và đợi `live`; sau đó yêu cầu Vercel triển khai cùng commit, đợi `READY` và xác nhận domain production. Nếu API trả lỗi, thiếu thông tin hoặc hết thời gian chờ, pipeline thất bại; kiểm tra dashboard trước khi thử lại để tránh deploy trùng.
+
+**Giới hạn:** Việc tắt auto-deploy trực tiếp là điều kiện bắt buộc để tránh triển khai vượt qua migration. Migration có thể khóa bảng hoặc không tương thích với phiên bản API đang chạy; không đảm bảo zero-downtime. Cần sao lưu, thử migration và chỉ dùng thay đổi schema tương thích trước/sau. Pipeline không tự sao lưu hoặc rollback; nếu Vercel lỗi sau khi Render đã lên, production có thể ở trạng thái phiên bản hỗn hợp. Docker images được đẩy lên GHCR nhưng API deploy ở đây sử dụng commit Git theo cấu hình của Render/Vercel, không chứng minh các nền tảng chạy image GHCR đó.
 
 ---
 
@@ -170,10 +174,9 @@ Khi phát hiện sự cố nghiêm trọng sau triển khai (lỗi chức năng 
   3. Nhấp vào menu ba chấm ($\dots$) $\rightarrow$ Chọn **Instant Rollback**.
   4. Toàn bộ lưu lượng toàn cầu (Global Traffic) sẽ được chuyển hướng tức thì về bản build cũ mà không cần chờ build lại.
 
-### 8.2 Rollback Backend API (Render Manual / Automated Rollback)
+### 8.2 Rollback Backend API (Render Manual)
 - **Thời gian khôi phục:** $1 - 2\text{ phút}$.
-- **Thao tác qua GitHub Actions (Tự động):**
-  - Khi Job `smoke-test` thất bại, Job `rollback-on-failure` tự động kích hoạt webhook gọi Render API để redeploy commit SHA ổn định trước đó.
+- Pipeline không tự động rollback. Khi deploy hoặc smoke test thất bại, kiểm tra trạng thái thực tế trên cả hai dashboard trước khi quyết định khôi phục.
 - **Thao tác thủ công qua Dashboard:**
   1. Đăng nhập vào Render Dashboard $\rightarrow$ Web Service `brewlite-api`.
   2. Vào mục **Events** $\rightarrow$ Tìm commit hoạt động tốt gần nhất.
@@ -181,18 +184,6 @@ Khi phát hiện sự cố nghiêm trọng sau triển khai (lỗi chức năng 
 
 ### 8.3 Rollback Cơ sở Dữ liệu (Prisma Migration Rollback)
 - **Nguyên tắc an toàn:** Không chạy lệnh rollback trực tiếp trên database đang có kết nối sống nếu có nguy cơ mất mát dữ liệu giao dịch của khách hàng.
-- **Quy trình xử lý:**
-  1. Khóa tạm thời truy cập ghi của ứng dụng (chuyển sang chế độ bảo trì nếu cần).
-  2. Tạo migration đảo ngược (Revert Migration) bằng mã SQL:
-     ```bash
-     cd apps/api
-     npx prisma migrate diff --from-schema-datamodel prisma/schema.prisma --to-migrations prisma/migrations --script > rollback.sql
-     ```
-  3. Rà soát kỹ nội dung file `rollback.sql` (bảo đảm không có lệnh `DROP TABLE` nguy hiểm với các bảng `Order`, `Payment`, `User`).
-  4. Thực thi file SQL khắc phục vào database:
-     ```bash
-     npx prisma db execute --file ./rollback.sql
-     ```
-  5. Đẩy commit sửa lỗi lên nhánh `main` để pipeline CD ghi nhận trạng thái schema chính xác.
+- **Quy trình xử lý:** Tạm ngưng ghi, sao lưu trạng thái hiện tại và đánh giá dữ liệu phát sinh sau bản backup. Thử khôi phục bản backup vào database riêng hoặc chuẩn bị migration khắc phục phù hợp; rà soát và thử nghiệm trước khi áp dụng production. Không dùng `migrate reset` hoặc chạy SQL đảo ngược chưa kiểm chứng trên production.
 
 

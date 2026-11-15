@@ -56,3 +56,6 @@ Thumbs.db
 *.run.xml
 *.synctex.gz
 *.toc
+
+# Database backups
+*.dump

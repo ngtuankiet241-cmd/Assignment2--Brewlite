@@ -37,9 +37,13 @@ export default function LoginPageClient() {
       }
 
       const data = await res.json();
-      saveAuthSession(data);
+saveAuthSession(data);
 
-      router.replace('/menu');
+if (data.user?.role === 'BARISTA' || data.user?.role === 'ADMIN') {
+  router.replace('/staff/orders');
+} else {
+  router.replace('/menu');
+}
     } catch (err: unknown) {
       const message = err instanceof TypeError
         ? 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối và thử lại.'

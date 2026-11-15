@@ -1,11 +1,27 @@
 import request = require('supertest');
+import { Role } from '@prisma/client';
+import { AuthService } from '../src/auth/auth.service';
 import { createTestApplication, TestApplication } from './helpers/test-app';
 
 describe('Orders & Checkout Flow (E2E)', () => {
   let context: TestApplication;
+  let customerToken: string;
 
   beforeAll(async () => {
+    process.env.SEPAY_IPN_SECRET_KEY ||= 'brewlite-e2e-local-secret';
     context = await createTestApplication();
+    const customer = await context.prisma.user.create({
+      data: {
+        email: 'orders-customer@example.test',
+        password: 'unused-e2e-test-password',
+        fullName: 'Orders Customer',
+        role: Role.CUSTOMER,
+      },
+    });
+    customerToken = context.app.get(AuthService).generateToken({
+      userId: customer.id, email: customer.email,
+      role: customer.role, fullName: customer.fullName,
+    });
   });
 
   beforeEach(async () => {
@@ -51,6 +67,7 @@ describe('Orders & Checkout Flow (E2E)', () => {
 
     const orderRes = await request(context.app.getHttpServer())
       .post('/orders')
+      .auth(customerToken, { type: 'bearer' })
       .send(orderPayload)
       .expect(201);
 
@@ -76,15 +93,28 @@ describe('Orders & Checkout Flow (E2E)', () => {
     // 4. Simulate SePay Webhook IPN (POST /payments/sepay/webhook-ipn)
     const webhookRes = await request(context.app.getHttpServer())
       .post('/payments/sepay/webhook-ipn')
+      .set('x-secret-key', process.env.SEPAY_IPN_SECRET_KEY!)
       .send({
-        orderId,
-        transactionRef: 'SEPAY_TEST_TXN_999',
-        amount: 88000,
-        status: 'SUCCESS',
-      })
+      timestamp: Date.now(),
+      notification_type: 'ORDER_PAID',
+      order: {
+        order_invoice_number: orderId,
+        order_status: 'CAPTURED',
+        order_amount: String(88000),
+        order_currency: 'VND',
+      },
+      transaction: {
+        transaction_id: 'SEPAY_TEST_TXN_999',
+        transaction_type: 'PAYMENT',
+        transaction_status: 'APPROVED',
+        transaction_amount: String(88000),
+        transaction_currency: 'VND',
+      },
+    })
       .expect(201);
 
-    expect(webhookRes.body.status).toEqual('SUCCESS');
+    expect(webhookRes.body).toMatchObject({ success: true });
+    expect((await context.prisma.payment.findUniqueOrThrow({ where: { orderId } })).status).toBe('SUCCESS');
 
     // 5. Verify Order Status transitioned to PAID (GET /orders/:id/status)
     const statusRes = await request(context.app.getHttpServer())

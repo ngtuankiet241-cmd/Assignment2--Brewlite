@@ -134,11 +134,13 @@ Cơ sở dữ liệu PostgreSQL 16 sẽ sẵn sàng tại cổng `5432`.
 ```bash
 cd apps/api
 npm install
+npx prisma migrate deploy
 npm run prisma:generate
 npm run prisma:seed
 npm run start:dev
 ```
 Backend tự đọc `.env` ở thư mục gốc khi khởi động, kể cả khi chạy từ `apps/api`. Biến môi trường đã đặt trong terminal hoặc Docker được ưu tiên.
+Kích cỡ và topping (bao gồm phần chênh lệch/đơn giá) được lưu trong PostgreSQL; `prisma:seed` chỉ thêm cấu hình mặc định khi chưa có. Không chạy seed trên production vì seed cũng cập nhật giá và tồn kho sản phẩm.
 
 - **Backend NestJS API:** `http://localhost:3001`
 - **Health Check Endpoint:** `http://localhost:3001/health`
@@ -185,7 +187,7 @@ Hệ thống BrewLite được triển khai chính thức trên nền tảng đ�
 ## 🔄 Tự động hóa CI/CD & Cơ chế Khôi phục (Rollback)
 
 - **Continuous Integration (CI):** `.github/workflows/ci.yml` (Quality Gate 4 bước: Install $\rightarrow$ Lint $\rightarrow$ Unit Test $\rightarrow$ Build).
-- **Continuous Delivery (CD):** `.github/workflows/cd.yml` (Chuỗi 7 bước: Push/Tag $\rightarrow$ Lint \& Test $\rightarrow$ Build $\rightarrow$ Docker Image $\rightarrow$ Push GHCR $\rightarrow$ Safe Migration \& Deploy $\rightarrow$ Post-deploy Smoke Test $\rightarrow$ Rollback on Failure).
+- **Continuous Delivery (CD):** `.github/workflows/cd.yml` kiểm tra, migrate và triển khai commit `main` qua API Render/Vercel, sau đó chạy smoke test. Cần cấu hình secrets và tắt auto-deploy trực tiếp theo [hướng dẫn triển khai](docs/deployment.md); rollback là thao tác thủ công.
 - **Quy trình Rollback Khẩn cấp:** Xem chi tiết tại [docs/deployment.md#8-sổ-tay-hướng-dẫn-khôi-phục-sự-cố-rollback-playbook](docs/deployment.md).
 - **Kịch bản Video Demo E2E:** Xem chi tiết kịch bản thuyết minh tại [docs/demo-script.md](docs/demo-script.md).
 - **Bản phát hành Release Notes v1.0.0:** Xem chi tiết tại [docs/release-notes-v1.0.0.md](docs/release-notes-v1.0.0.md).

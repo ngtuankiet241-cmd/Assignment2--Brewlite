@@ -8,7 +8,7 @@
     "start:dev": "nest start --watch",
     "prisma:generate": "prisma generate",
     "prisma:seed": "ts-node prisma/seed.ts",
-    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand",
     "test:watch": "jest --watch",
@@ -20,7 +20,8 @@
     "@nestjs/platform-express": "^10.4.15",
     "@prisma/client": "^5.22.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "sepay-pg-node": "^1.0.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.9",

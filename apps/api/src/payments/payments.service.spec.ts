@@ -14,8 +14,10 @@ describe('PaymentsService', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    idempotencyRecord: { findUnique: jest.fn(), create: jest.fn() },
     payment: {
       findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
       upsert: jest.fn(),
       update: jest.fn(),
     },
@@ -24,6 +26,8 @@ describe('PaymentsService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockPrisma.idempotencyRecord.findUnique.mockResolvedValue(null);
+    mockPrisma.idempotencyRecord.create.mockResolvedValue({});
     mockPrisma.$transaction.mockImplementation((work) => work(mockPrisma));
     mockPrisma.$queryRaw.mockResolvedValue([{ id: 'ord-123', status: 'PENDING', totalAmount: 70000 }]);
     mockPrisma.order.update.mockImplementation(({ where, data }) => Promise.resolve({ id: where.id, ...data }));
@@ -83,6 +87,22 @@ describe('PaymentsService', () => {
 
       expect(result.id).toEqual('pay-1');
       expect(mockPrisma.payment.upsert).not.toHaveBeenCalled();
+    });
+
+    it('UT-PAY-IDEM-01: two checkout calls with one key write only one payment', async () => {
+      mockPrisma.payment.findUnique.mockResolvedValue(null);
+      const payment = { id: 'pay-once', orderId: 'ord-123', amount: 70000, status: 'PENDING' };
+      mockPrisma.payment.upsert.mockResolvedValue(payment);
+      mockPrisma.payment.findUniqueOrThrow.mockResolvedValue(payment);
+      mockPrisma.idempotencyRecord.create.mockImplementation(({ data }) => {
+        mockPrisma.idempotencyRecord.findUnique.mockResolvedValue(data);
+        return Promise.resolve(data);
+      });
+      const dto = { orderId: 'ord-123', amount: 70000, idempotencyKey: 'pay-once-key' };
+
+      expect(await service.createCheckout(dto)).toEqual(payment);
+      expect(await service.createCheckout(dto)).toEqual(payment);
+      expect(mockPrisma.payment.upsert).toHaveBeenCalledTimes(1);
     });
   });
 
