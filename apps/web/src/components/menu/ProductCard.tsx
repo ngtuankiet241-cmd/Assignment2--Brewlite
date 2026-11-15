@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
+import ProductImage from './ProductImage';
 import { Product } from '@/types/product';
 import { formatCurrencyVND } from '@/lib/formatCurrency';
 
@@ -27,7 +27,8 @@ export default function ProductCard({ product, onViewDetails }: ProductCardProps
           aria-haspopup="dialog"
           className="relative block aspect-square w-full cursor-pointer overflow-hidden rounded-2xl bg-cream-50/80 text-left transition-colors hover:bg-coffee-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coffee-600"
         >
-          <Image
+          <ProductImage
+            productId={product.id}
             src={product.imageUrl}
             alt={`Ảnh minh họa ${product.name}`}
             fill
