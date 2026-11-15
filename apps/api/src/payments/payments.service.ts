@@ -275,6 +275,7 @@ async handleGatewayIpn(payload: SePayGatewayIpn) {
     throw new BadRequestException('Thông tin giao dịch không hợp lệ.');
   }
 
+  await this.inventory.expireReservations(orderId);
   return this.prisma.$transaction(async (tx) => {
     const order = await lockOrder(tx, orderId);
 
@@ -320,6 +321,11 @@ async handleGatewayIpn(payload: SePayGatewayIpn) {
     });
 
     return { success: true };
+  }).catch((error) => {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      throw new ConflictException('Mã giao dịch thanh toán đã được sử dụng.');
+    }
+    throw error;
   });
 }
 
