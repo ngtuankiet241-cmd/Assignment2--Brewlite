@@ -207,7 +207,7 @@ describe('Apply valid promotion (HTTP + PostgreSQL integration)', () => {
     }
     await request(context.app.getHttpServer()).post('/payments/sepay/webhook-ipn')
       .set('x-secret-key', process.env.SEPAY_IPN_SECRET_KEY!)
-      .send(gatewayPayload(54000)).expect(201);
+      .send(gatewayPayload(54000)).expect(200);
     expect((await context.prisma.order.findUniqueOrThrow({ where: { id: orderId } })).status).toBe('PAID');
   });
 

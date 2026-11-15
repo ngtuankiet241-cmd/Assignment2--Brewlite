@@ -28,12 +28,21 @@ function tokenExpiresAt(token: string | null): number {
   }
 }
 
-// A stable string snapshot lets React observe the existing localStorage session.
-// Token verification and access control still belong to the API.
-export function getAuthSnapshot(): string | null {
+// Expiry can be checked locally; signature verification still belongs to the API.
+export function getAuthToken(): string | null {
   if (typeof window === 'undefined') return null;
   try {
-    if (tokenExpiresAt(window.localStorage.getItem('token')) <= Date.now()) return null;
+    const token = window.localStorage.getItem('token');
+    return tokenExpiresAt(token) > Date.now() ? token : null;
+  } catch {
+    return null;
+  }
+}
+
+// A stable string snapshot lets React observe the existing localStorage session.
+export function getAuthSnapshot(): string | null {
+  if (!getAuthToken()) return null;
+  try {
     const snapshot = window.localStorage.getItem('user');
     return parseAuthUser(snapshot) ? snapshot : null;
   } catch {

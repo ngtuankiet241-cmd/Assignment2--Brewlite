@@ -41,6 +41,7 @@ enum RefundStatus {
 enum PaymentMethod {
   SEPAY_QR
   CASH
+  LOYALTY
 }
 
 enum StockReservationStatus {
@@ -52,6 +53,7 @@ enum StockReservationStatus {
 enum LoyaltyType {
   EARN
   REDEEM
+  REFUND
 }
 
 enum DiscountType {
@@ -119,6 +121,8 @@ model Order {
   // Quáº£n lÃ½ giÃ¡ vÃ  khuyáº¿n mÃ£i
   subtotalAmount       Int                     @default(0)
   discountAmount       Int                     @default(0)
+  redeemedPoints       Int                     @default(0)
+  loyaltyDiscountAmount Int                    @default(0)
   totalAmount          Int
 
   // Tráº¡ng thÃ¡i Ä‘Æ¡n hÃ ng vÃ  giá»¯ tá»“n kho
@@ -217,6 +221,7 @@ model LoyaltyTransaction {
 
   // One EARN per order is enforced by a partial unique index in the migration.
   @@index([userId, createdAt])
+  @@unique([orderId, type])
 }
 
 

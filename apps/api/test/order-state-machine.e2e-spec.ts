@@ -95,7 +95,7 @@ describe('Order State Machine (HTTP + PostgreSQL integration)', () => {
   it('INT-SM-05: completes the normal payment and preparation flow', async () => {
     const order = await createOrder();
     await checkout(order.id, 'normal-attempt').expect(201);
-    await ipn(order.id, 'SUCCESS', 'normal-success').expect(201);
+    await ipn(order.id, 'SUCCESS', 'normal-success').expect(200);
     for (const status of ['CONFIRMED', 'PREPARING', 'READY', 'COMPLETED']) {
       await patch(order.id, status).expect(200);
     }
@@ -127,7 +127,7 @@ describe('Order State Machine (HTTP + PostgreSQL integration)', () => {
     expect(retry.body.status).toBe('PENDING');
     expect(retry.body.paidAt).toBeNull();
     expect((await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('PENDING');
-    await ipn(order.id, 'SUCCESS', 'retry-success').expect(201);
+    await ipn(order.id, 'SUCCESS', 'retry-success').expect(200);
     expect((await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('PAID');
   });
 
@@ -145,11 +145,11 @@ describe('Order State Machine (HTTP + PostgreSQL integration)', () => {
   it('INT-SM-08: exact IPN replay leaves completed order and payment unchanged; failure cannot downgrade success', async () => {
     const order = await createOrder();
     await checkout(order.id, 'replay-attempt').expect(201);
-    await ipn(order.id, 'SUCCESS', 'paid-event').expect(201);
+    await ipn(order.id, 'SUCCESS', 'paid-event').expect(200);
     for (const status of ['CONFIRMED', 'PREPARING', 'READY', 'COMPLETED']) await patch(order.id, status).expect(200);
     const before = await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } });
     const payment = await context.prisma.payment.findUniqueOrThrow({ where: { orderId: order.id } });
-    await ipn(order.id, 'SUCCESS', 'paid-event').expect(201);
+    await ipn(order.id, 'SUCCESS', 'paid-event').expect(200);
     // Failed Gateway events are malformed for this endpoint and cannot downgrade SUCCESS.
     await ipn(order.id, 'FAILED', 'late-failure').expect(400);
     expect(await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).toEqual(before);
@@ -189,7 +189,7 @@ describe('Order State Machine (HTTP + PostgreSQL integration)', () => {
     const order = await createOrder();
     await checkout(order.id, 'concurrent-attempt').expect(201);
     const responses = await Promise.all([ipn(order.id, 'SUCCESS', 'concurrent-success'), ipn(order.id, 'FAILED', 'concurrent-failure')]);
-    expect(responses.map((response) => response.status).sort()).toEqual([201, 400]);
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 400]);
     const stored = await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } });
     const payment = await context.prisma.payment.findUniqueOrThrow({ where: { orderId: order.id } });
     expect([stored.status, payment.status]).toEqual(['PAID', 'SUCCESS']);

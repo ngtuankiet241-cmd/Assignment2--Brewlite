@@ -66,7 +66,7 @@ describe('Loyalty after PAID (HTTP + PostgreSQL integration)', () => {
     await checkout(order.body.id).expect(201);
     expect(await balance()).toBe(0);
     expect(await context.prisma.loyaltyTransaction.count()).toBe(0);
-    await ipn(order.body.id).expect(201);
+    await ipn(order.body.id).expect(200);
     expect(await balance()).toBe(34);
     expect(await context.prisma.loyaltyTransaction.findMany()).toEqual([
       expect.objectContaining({ userId: customerId, orderId: order.body.id, points: 34, type: 'EARN' }),
@@ -90,13 +90,13 @@ describe('Loyalty after PAID (HTTP + PostgreSQL integration)', () => {
     expect(duplicateOrder.body.id).toBe(order.body.id);
     await checkout(order.body.id).expect(201);
     const responses = await Promise.all([ipn(order.body.id), ipn(order.body.id)]);
-    expect(responses.map((response) => response.status)).toEqual([201, 201]);
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
     const entry = await context.prisma.loyaltyTransaction.findFirstOrThrow();
     await checkout(order.body.id).expect(201);
     for (const status of ['CONFIRMED', 'PREPARING', 'READY', 'COMPLETED']) {
       await patch(order.body.id, status).expect(200);
     }
-    await ipn(order.body.id).expect(201);
+    await ipn(order.body.id).expect(200);
     expect(await balance()).toBe(34);
     expect(await context.prisma.order.count()).toBe(1);
     expect(await context.prisma.loyaltyTransaction.findMany()).toEqual([entry]);
@@ -110,7 +110,7 @@ describe('Loyalty after PAID (HTTP + PostgreSQL integration)', () => {
     await checkout(first.body.id).expect(201);
     await checkout(second.body.id).expect(201);
     const responses = await Promise.all([ipn(first.body.id), ipn(second.body.id)]);
-    expect(responses.map((response) => response.status)).toEqual([201, 201]);
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
     expect(await balance()).toBe(25 + 34 + 34);
     expect(await context.prisma.loyaltyTransaction.count()).toBe(2);
     expect(await balance(otherId)).toBe(0);
@@ -127,7 +127,7 @@ describe('Loyalty after PAID (HTTP + PostgreSQL integration)', () => {
     }).expect(201);
     expect(order.body).toMatchObject({ userId: customerId, subtotalAmount: 59997, discountAmount: 10000, totalAmount: 49997 });
     await checkout(order.body.id, 49997).expect(201);
-    await ipn(order.body.id, 'discounted-payment', 49997).expect(201);
+    await ipn(order.body.id, 'discounted-payment', 49997).expect(200);
     expect(await balance()).toBe(49);
     expect(await balance(otherId)).toBe(0);
   });
@@ -147,7 +147,7 @@ describe('Loyalty after PAID (HTTP + PostgreSQL integration)', () => {
       .toMatchObject({ status: 'PENDING', reservationStatus: 'HELD' });
     expect(await context.prisma.payment.findUniqueOrThrow({ where: { orderId: order.body.id } }))
       .toMatchObject({ status: 'PENDING', paidAt: null });
-    await ipn(order.body.id, 'valid-reference').expect(201);
+    await ipn(order.body.id, 'valid-reference').expect(200);
     expect(await balance()).toBe(34);
     expect(await context.prisma.loyaltyTransaction.count()).toBe(1);
     expect(other.id).not.toBe(order.body.id);
@@ -183,8 +183,9 @@ describe('Loyalty after PAID (HTTP + PostgreSQL integration)', () => {
   it.each([0, 999])('INT-LOYAL-09: a PAID order of %s VND earns zero points', async (amount) => {
     const p = await product(amount);
     const order = await place(p.id).expect(201);
-    // Staff can settle zero-value orders; the gateway requires a positive amount.
-    await patch(order.body.id, 'PAID').expect(200);
+    // Zero-value orders settle locally; the gateway requires a positive amount.
+    if (amount === 0) expect(order.body.status).toBe('PAID');
+    else await patch(order.body.id, 'PAID').expect(200);
     expect(await balance()).toBe(0);
     expect(await context.prisma.loyaltyTransaction.count()).toBe(0);
   });
@@ -194,7 +195,7 @@ describe('Loyalty after PAID (HTTP + PostgreSQL integration)', () => {
       customerName: 'Legacy guest', customerPhone: '0900000000', totalAmount: 34999,
     } });
     await checkout(order.id).expect(201);
-    await ipn(order.id).expect(201);
+    await ipn(order.id).expect(200);
     expect((await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('PAID');
     expect(await context.prisma.loyaltyTransaction.count()).toBe(0);
     expect(await balance()).toBe(0);
@@ -208,7 +209,7 @@ describe('Loyalty after PAID (HTTP + PostgreSQL integration)', () => {
     await patch(order.body.id, 'PAID').expect(200);
     const response = await request(context.app.getHttpServer()).get(`/loyalty/me?userId=${customerId}`)
       .auth(otherToken, { type: 'bearer' }).expect(200);
-    expect(response.body).toEqual({ loyaltyPoints: 0, vndPerPoint: 1000, transactions: [] });
+    expect(response.body).toEqual({ loyaltyPoints: 0, vndPerPoint: 1000, redemptionVndPerPoint: 100, transactions: [] });
   });
 
   it('INT-LOYAL-12: returns only the most recent 20 entries for the authenticated account', async () => {

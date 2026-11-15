@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCart } from '@/context/useCart';
 import { useAuth } from '@/hooks/useAuth';
+import { useLoyaltyAccount } from '@/hooks/useLoyaltyAccount';
+import LoyaltyBalanceBadge from '@/components/loyalty/LoyaltyBalanceBadge';
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -13,6 +15,7 @@ export default function Header() {
   const pathname = usePathname();
   const { itemCount } = useCart();
   const { user, logout } = useAuth();
+  const loyalty = useLoyaltyAccount(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001');
   const router = useRouter();
 
   const handleLogout = () => {
@@ -62,7 +65,7 @@ export default function Header() {
         }
       }}
     >
-      <div className="mx-auto flex min-h-18 max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:px-8">
+      <div className="mx-auto flex min-h-18 max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
         {/* Brand Logo */}
         <Link
           href="/"
@@ -81,7 +84,7 @@ export default function Header() {
             </svg>
           </div>
 
-          <div className="flex flex-col min-w-0">
+          <div className={`flex min-w-0 flex-col ${user ? 'max-[380px]:hidden' : ''}`}>
             <span className="text-base font-black tracking-tight text-coffee-950 sm:text-xl leading-none">
               Brew<span className="text-coffee-600">Lite</span>
             </span>
@@ -107,6 +110,7 @@ export default function Header() {
 
         {/* Desktop actions: cart appears only here in the desktop header. */}
         <div className="hidden items-center justify-self-end gap-2 lg:flex">
+          <LoyaltyBalanceBadge loyalty={loyalty} />
           <Link
             aria-label={`Giỏ hàng, ${itemCount} sản phẩm`}
             aria-current={pathname === '/cart' ? 'page' : undefined}
@@ -142,6 +146,13 @@ export default function Header() {
         </div>
 
         {/* Mobile Menu Hamburger */}
+        <div className="flex items-center gap-2 lg:hidden">
+          <LoyaltyBalanceBadge loyalty={loyalty} compact />
+          <Link href="/cart" aria-label={`Giỏ hàng, ${itemCount} sản phẩm`}
+            className={`relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-coffee-200 bg-white text-coffee-900 ${focusClasses}`}>
+            <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 3h2l2.2 11.2a2 2 0 002 1.6h8.7a2 2 0 002-1.6L21 7H6M10 21h.01M18 21h.01" /></svg>
+            <span className="absolute -right-1 -top-1 rounded-full bg-coffee-800 px-1.5 text-[10px] font-bold text-white">{itemCount}</span>
+          </Link>
         <button
           ref={menuButtonRef}
           type="button"
@@ -161,6 +172,7 @@ export default function Header() {
             </svg>
           )}
         </button>
+        </div>
       </div>
 
       {/* Mobile Drawer */}

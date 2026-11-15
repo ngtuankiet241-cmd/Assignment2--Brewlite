@@ -130,12 +130,12 @@ describe('Idempotency-Key (HTTP + PostgreSQL integration)', () => {
     const replay = await checkout(firstOrder.body.id, 'full-flow').expect(201);
     expect(replay.body).toEqual(first.body);
     expect(first.body.idempotencyKey).toBe('full-flow');
-    await ipn(firstOrder.body.id, first.body.transactionRef).expect(201);
+    await ipn(firstOrder.body.id, first.body.transactionRef).expect(200);
     const paid = await context.prisma.payment.findUniqueOrThrow({ where: { orderId: firstOrder.body.id } });
     const responses = await Promise.all([
       ipn(firstOrder.body.id, first.body.transactionRef), ipn(firstOrder.body.id, first.body.transactionRef),
     ]);
-    expect(responses.map((response) => response.status)).toEqual([201, 201]);
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
     expect(await context.prisma.payment.count()).toBe(1);
     expect(await context.prisma.payment.findUniqueOrThrow({ where: { id: paid.id } })).toEqual(paid);
     expect(await context.prisma.order.findUniqueOrThrow({ where: { id: firstOrder.body.id } }))

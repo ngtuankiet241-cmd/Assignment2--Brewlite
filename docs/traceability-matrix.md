@@ -67,7 +67,7 @@ Bảng ma trận truy vết tuân thủ định dạng chuẩn 5 cột theo quy 
 
 ## Ghi chú truy vết
 
-- **Mở rộng loyalty (2026-11-15):** Tích điểm sau `PAID`, 1 điểm / 1.000đ sau giảm giá; yêu cầu bổ sung của chủ dự án. Triển khai tại `orders/order-transition.ts`, `loyalty/loyalty-points.ts`, `GET /loyalty/me` và khối điểm thưởng trong trang Đơn của tôi. Kiểm chứng bằng [unit test](../apps/api/src/loyalty/loyalty-points.spec.ts), [INT-LOYAL-01..12](../apps/api/test/loyalty.e2e-spec.ts), [test frontend](../apps/web/test/loyalty.test.mjs).
+- **Loyalty (2026-11-15, cập nhật 2026-11-16):** Tích 1 điểm / 1.000đ thực trả sau giảm giá khi `PAID`; đổi 1 điểm = 100đ khi tạo đơn. Điểm hiện tại nằm cạnh giỏ hàng trong `Header`, nhập điểm tại `LoyaltyRedemptionField`; không có trang loyalty riêng. Backend trừ điểm nguyên tử, hoàn điểm một lần khi hủy/hết hạn và xác nhận tại hệ thống nếu tổng tiền còn 0đ. Kiểm chứng bằng [unit test](../apps/api/src/loyalty/loyalty-points.spec.ts), [test tích điểm](../apps/api/test/loyalty.e2e-spec.ts), [test đổi điểm](../apps/api/test/loyalty-redemption.e2e-spec.ts), [test frontend](../apps/web/test/loyalty-ui.test.mjs).
 
 - FR-12 gồm [quy tắc chuyển trạng thái](../apps/api/src/orders/order-state-machine.ts) và [kiểm thử tính nguyên tử](../apps/api/test/order-state-machine.e2e-spec.ts); API nhân viên và phân quyền `BARISTA`/`ADMIN` được mô tả và kiểm chứng tại [staff-api.md](./staff-api.md).
 

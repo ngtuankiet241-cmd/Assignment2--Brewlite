@@ -8,6 +8,7 @@ import {
   UseGuards,
   UnauthorizedException,
   ServiceUnavailableException,
+  HttpCode,
 } from '@nestjs/common';
 
 import { Role } from '@prisma/client';
@@ -16,6 +17,8 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
 import { timingSafeEqual } from 'crypto';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { JwtPayload } from '../auth/auth.service';
 
 import {
   PaymentsService,
@@ -53,7 +56,8 @@ export class PaymentsController {
   }
 
   // API nhận IPN từ SePay
-  @Post('sepay/webhook-ipn')
+  @Post(['sepay/webhook-ipn', 'ipn'])
+  @HttpCode(200)
   handleWebhookIpn(
     @Headers('x-secret-key') receivedKey: string | undefined,
     @Body() payload: SePayGatewayIpn,
@@ -79,6 +83,13 @@ export class PaymentsController {
     }
 
     return this.paymentsService.handleGatewayIpn(payload);
+  }
+
+  @Post('sepay/sync')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  syncPayment(@Body('orderId') orderId: string, @CurrentUser() user: JwtPayload) {
+    return this.paymentsService.syncSePayPayment(orderId, user.userId);
   }
 
 @Get('sepay/test-balance')

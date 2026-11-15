@@ -8,7 +8,7 @@ const source = readFileSync(new URL('../src/lib/auth.ts', import.meta.url), 'utf
 const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 },
 }).outputText;
-const { saveAuthSession, clearAuthSession, getAuthSnapshot, parseAuthUser, subscribeAuthChanges } =
+const { saveAuthSession, clearAuthSession, getAuthToken, getAuthSnapshot, parseAuthUser, subscribeAuthChanges } =
   await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 
 const user = { id: 'user-1', fullName: 'Auth Test', email: 'auth@example.test' };
@@ -53,6 +53,17 @@ describe('Browser authentication session', () => {
     values.set('token', token());
     values.set('user', JSON.stringify(user));
     assert.deepEqual(parseAuthUser(getAuthSnapshot()), user);
+  });
+
+  it('returns only an unexpired token for authenticated requests', () => {
+    assert.equal(getAuthToken(), null);
+    for (const invalid of ['undefined', 'bad.token', token(1), token(Math.floor(Date.now() / 1000))]) {
+      values.set('token', invalid);
+      assert.equal(getAuthToken(), null);
+    }
+    const current = token();
+    values.set('token', current);
+    assert.equal(getAuthToken(), current);
   });
 
   it('logs out without deleting the cart and notifies mounted consumers', () => {
@@ -100,8 +111,10 @@ describe('Browser authentication session', () => {
 
   it('handles server rendering and blocked storage safely', () => {
     delete globalThis.window;
+    assert.equal(getAuthToken(), null);
     assert.equal(getAuthSnapshot(), null);
     globalThis.window = { dispatchEvent() {}, get localStorage() { throw new Error('Blocked'); } };
+    assert.equal(getAuthToken(), null);
     assert.equal(getAuthSnapshot(), null);
     assert.throws(() => saveAuthSession({ accessToken: token(), user }), /Không thể lưu phiên/);
     assert.doesNotThrow(clearAuthSession);

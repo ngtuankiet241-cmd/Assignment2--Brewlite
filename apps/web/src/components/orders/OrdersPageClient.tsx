@@ -2,7 +2,6 @@
 
 import { clearAuthSession } from '@/lib/auth';
 import PayPendingOrderButton from '@/components/payment/PayPendingOrderButton';
-import LoyaltyPanel from '@/components/loyalty/LoyaltyPanel';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
@@ -30,6 +29,8 @@ interface Order {
   id: string;
   status: string;
   totalAmount: number;
+  redeemedPoints: number;
+  loyaltyDiscountAmount: number;
   customerName: string;
   customerPhone: string;
   tableNumber?: number;
@@ -284,7 +285,6 @@ export default function OrdersPageClient() {
         <p className="mt-1 text-sm text-coffee-600">Theo dõi tiến độ pha chế và toàn bộ đơn đã đặt.</p>
       </div>
 
-      <LoyaltyPanel apiUrl={apiUrl} />
 
       {orders.length === 0 ? (
         <div className="rounded-3xl border border-coffee-200 bg-white p-12 text-center shadow-sm">
@@ -337,6 +337,11 @@ export default function OrdersPageClient() {
                 ))}
               </div>
 
+              {order.redeemedPoints > 0 && (
+                <p className="mt-3 text-xs font-semibold text-emerald-700">
+                  Đã dùng {order.redeemedPoints} điểm · Giảm {formatCurrency(order.loyaltyDiscountAmount)}
+                </p>
+              )}
               {/* Tổng + thông tin khách */}
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-coffee-200/70 pt-3">
                 <div className="text-xs text-coffee-600">

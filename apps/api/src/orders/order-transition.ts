@@ -19,7 +19,7 @@ import {
   assertReservationActive,
   releaseStock,
 } from '../inventory/stock-reservation';
-import { awardPaidOrderPoints } from '../loyalty/loyalty-points';
+import { awardPaidOrderPoints, restoreRedeemedOrderPoints } from '../loyalty/loyalty-points';
 
 // Khóa đơn hàng để tránh cập nhật đồng thời.
 // Mọi thao tác chuyển trạng thái phải dùng cùng cơ chế khóa.
@@ -101,6 +101,9 @@ export async function changeOrderStatus(
   if (status === OrderStatus.PAID) {
     await awardPaidOrderPoints(tx, updatedOrder);
   }
+  if (status === OrderStatus.CANCELLED) {
+    await restoreRedeemedOrderPoints(tx, order);
+  }
   return updatedOrder;
 }
 
@@ -156,8 +159,10 @@ export async function finalizeRefundCancellation(
     data.reservationExpiresAt = null;
   }
 
-  return tx.order.update({
+  const cancelled = await tx.order.update({
     where: { id: orderId },
     data,
   });
+  await restoreRedeemedOrderPoints(tx, order);
+  return cancelled;
 }

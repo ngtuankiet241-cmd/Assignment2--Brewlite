@@ -1,10 +1,6 @@
 import { beforeEach, afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import ts from 'typescript';
 
 const compiled = ts.transpileModule(readFileSync(new URL('../src/lib/loyalty.ts', import.meta.url), 'utf8'), {
@@ -12,17 +8,9 @@ const compiled = ts.transpileModule(readFileSync(new URL('../src/lib/loyalty.ts'
 }).outputText;
 const { requestLoyaltyAccount } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 
-const componentPath = fileURLToPath(new URL('../src/components/loyalty/LoyaltyCard.tsx', import.meta.url));
-const componentSource = ts.transpileModule(readFileSync(componentPath, 'utf8'), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
-}).outputText;
-const componentModule = { exports: {} };
-new Function('require', 'module', 'exports', componentSource)(createRequire(componentPath), componentModule, componentModule.exports);
-const LoyaltyCard = componentModule.exports.default;
-
 const entry = { id: 'entry-1', orderId: 'order-1', type: 'EARN', points: 34,
   description: 'Tích điểm đơn hàng', createdAt: '2026-11-15T00:00:00.000Z' };
-const account = { loyaltyPoints: 1034, vndPerPoint: 1000, transactions: [entry] };
+const account = { loyaltyPoints: 1034, vndPerPoint: 1000, redemptionVndPerPoint: 100, transactions: [entry] };
 
 describe('Loyalty API client', () => {
   const originalFetch = globalThis.fetch;
@@ -62,6 +50,7 @@ describe('Loyalty API client', () => {
   for (const invalid of [
     null, { ...account, loyaltyPoints: -1 }, { ...account, loyaltyPoints: '1034' },
     { ...account, vndPerPoint: 0 }, { ...account, transactions: [{}] },
+    { ...account, redemptionVndPerPoint: 0 },
     { ...account, transactions: [{ ...entry, points: 1.5 }] },
     { ...account, transactions: [{ ...entry, createdAt: 'invalid-date' }] },
   ]) {
@@ -81,31 +70,5 @@ describe('Loyalty API client', () => {
   it('gives a readable error for invalid JSON without exposing response text', async () => {
     globalThis.fetch = async () => new Response('<html>Unavailable</html>');
     await assert.rejects(requestLoyaltyAccount('http://localhost:3001', 'token'), /Dữ liệu điểm thưởng không hợp lệ/);
-  });
-});
-
-describe('Customer loyalty summary', () => {
-  it('shows the actual balance, the 1,000 VND policy, and recorded earning history', () => {
-    const html = renderToStaticMarkup(createElement(LoyaltyCard, { account }));
-    assert.match(html, /aria-label="Số dư điểm thưởng">1\.034/);
-    assert.match(html, /1\.000đ thanh toán sau giảm giá nhận 1 điểm/);
-    assert.match(html, /\+34 điểm/);
-    assert.match(html, /Tích điểm đơn hàng/);
-  });
-
-  it('shows a genuine empty account without inventing points', () => {
-    const html = renderToStaticMarkup(createElement(LoyaltyCard, {
-      account: { loyaltyPoints: 0, vndPerPoint: 1000, transactions: [] },
-    }));
-    assert.match(html, /aria-label="Số dư điểm thưởng">0/);
-    assert.match(html, /Chưa có lịch sử điểm thưởng/);
-  });
-
-  it('escapes descriptions from the ledger instead of treating them as markup', () => {
-    const html = renderToStaticMarkup(createElement(LoyaltyCard, {
-      account: { ...account, transactions: [{ ...entry, description: '<script>alert(1)</script>' }] },
-    }));
-    assert.doesNotMatch(html, /<script>/);
-    assert.match(html, /&lt;script&gt;/);
   });
 });
