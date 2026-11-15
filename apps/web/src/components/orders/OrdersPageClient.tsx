@@ -1,7 +1,7 @@
 'use client';
 
 import { clearAuthSession } from '@/lib/auth';
-
+import PayPendingOrderButton from '@/components/payment/PayPendingOrderButton';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
@@ -12,6 +12,17 @@ interface OrderItem {
   size: string;
   toppings?: string;
   itemTotal: number;
+}
+
+interface Refund {
+  id: string;
+  orderId: string;
+  amount: number;
+  status: 'REQUESTED' | 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'REJECTED';
+  errorMessage?: string | null;
+  demoReference?: string | null;
+  demoCompletedAt?: string | null;
+  demoBy?: string | null;
 }
 
 interface Order {
@@ -26,12 +37,13 @@ interface Order {
   items: OrderItem[];
 }
 
-const STATUS_STEPS = ['PENDING', 'PAID', 'PREPARING', 'READY', 'COMPLETED'];
+const STATUS_STEPS = ['PENDING', 'PAID', 'CONFIRMED', 'PREPARING', 'READY', 'COMPLETED'];
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'Chờ thanh toán',
   PAYMENT_FAILED: 'Thanh toán thất bại',
   PAID: 'Đã thanh toán',
+  CONFIRMED: 'Đã xác nhận',
   PREPARING: 'Đang pha chế',
   READY: 'Sẵn sàng nhận',
   COMPLETED: 'Hoàn tất',
@@ -42,6 +54,7 @@ const STATUS_COLOR: Record<string, string> = {
   PENDING: 'bg-gray-100 text-gray-700',
   PAYMENT_FAILED: 'bg-red-100 text-red-700',
   PAID: 'bg-amber-100 text-amber-800',
+  CONFIRMED: 'bg-yellow-100 text-yellow-800',
   PREPARING: 'bg-orange-100 text-orange-800',
   READY: 'bg-blue-100 text-blue-800',
   COMPLETED: 'bg-emerald-100 text-emerald-800',
@@ -109,6 +122,60 @@ export default function OrdersPageClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [refunds, setRefunds] = useState<Record<string, Refund | null>>({});
+  const [refundLoading, setRefundLoading] = useState<string | null>(null);
+  const [refundMessages, setRefundMessages] = useState<Record<string, string>>({});
+
+  async function refreshRefund(orderId: string, token: string): Promise<void> {
+    const response = await fetch(`${apiUrl}/orders/${encodeURIComponent(orderId)}/refund`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    });
+    if (!response.ok) {
+      throw new Error(`Không thể tải trạng thái hoàn tiền (HTTP ${response.status}).`);
+    }
+    const refund: Refund | null = await response.json();
+    setRefunds((previous) => ({ ...previous, [orderId]: refund }));
+  }
+
+  async function requestRefund(orderId: string): Promise<void> {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setRefundMessages((previous) => ({ ...previous, [orderId]: 'Vui lòng đăng nhập lại.' }));
+      return;
+    }
+    if (!window.confirm('Gửi yêu cầu hoàn tiền cho đơn hàng này? SePay chưa thực hiện hoàn tiền ở bước này.')) {
+      return;
+    }
+
+    setRefundLoading(orderId);
+    setRefundMessages((previous) => ({ ...previous, [orderId]: '' }));
+    try {
+      const response = await fetch(`${apiUrl}/orders/${encodeURIComponent(orderId)}/request-refund`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        const message = Array.isArray(data?.message) ? data.message.join(', ') : data?.message;
+        throw new Error(typeof message === 'string' ? message : `Yêu cầu thất bại (HTTP ${response.status}).`);
+      }
+      if (data?.refund) {
+        setRefunds((previous) => ({ ...previous, [orderId]: data.refund as Refund }));
+      }
+      setRefundMessages((previous) => ({
+        ...previous,
+        [orderId]: 'BrewLite đã ghi nhận yêu cầu. Chưa có xác nhận hoàn tiền từ SePay.',
+      }));
+    } catch (err) {
+      setRefundMessages((previous) => ({
+        ...previous,
+        [orderId]: err instanceof Error ? err.message : 'Không gửi được yêu cầu hoàn tiền.',
+      }));
+    } finally {
+      setRefundLoading(null);
+    }
+  }
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -142,6 +209,18 @@ export default function OrdersPageClient() {
         }
         const data: Order[] = await res.json();
         setOrders(data);
+        // Kiểm tra trạng thái hoàn tiền cho từng đơn đã thanh toán.
+        await Promise.all(data.filter((order) => order.status === 'PAID').map(async (order) => {
+          try {
+            await refreshRefund(order.id, token);
+          } catch {
+            // Nếu tra cứu thất bại, không giả định đơn đã được hoàn tiền.
+            setRefundMessages((previous) => ({
+              ...previous,
+              [order.id]: 'Chưa tải được trạng thái hoàn tiền. Vui lòng tải lại trang.',
+            }));
+          }
+        }));
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : 'Lỗi không xác định.';
@@ -268,6 +347,100 @@ export default function OrdersPageClient() {
 
               {order.notes && (
                 <p className="mt-2 text-xs italic text-coffee-500">📝 {order.notes}</p>
+              )}
+
+              {/* Yêu cầu hoàn tiền: chỉ ghi nhận tại BrewLite, chưa chuyển tiền qua SePay */}
+              {order.status === 'PAID' && (
+                <div className="mt-4 border-t border-coffee-100 pt-4">
+                  {refunds[order.id] ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                      <p className="font-semibold">
+                        {refunds[order.id]?.status === 'SUCCEEDED'
+                          ? 'Hoàn tiền đã được xác nhận'
+                          : refunds[order.id]?.status === 'PENDING'
+                            ? 'Đang xử lý yêu cầu hoàn tiền'
+                            : refunds[order.id]?.status === 'REQUESTED'
+                              ? 'Đã ghi nhận yêu cầu hoàn tiền'
+                              : 'Yêu cầu hoàn tiền cần kiểm tra lại'}
+                      </p>
+                      <p className="mt-1">
+                        Số tiền yêu cầu: {formatCurrency(refunds[order.id]!.amount)}.
+                      </p>
+                      {refunds[order.id]?.demoCompletedAt ? (
+                        <div className="mt-3 rounded-lg border border-amber-300 bg-white/70 p-3">
+                          <p className="font-bold">Đã hoàn tất mô phỏng hoàn tiền (Sandbox)</p>
+                          <p className="mt-1 break-all text-xs">
+                            Mã mô phỏng: {refunds[order.id]!.demoReference || 'Chưa có'}
+                          </p>
+                          <p className="mt-1 text-xs">
+                            Thời điểm: {formatDate(refunds[order.id]!.demoCompletedAt!)}
+                          </p>
+                          <p className="mt-2 text-xs font-semibold">
+                            Chỉ là mô phỏng tại BrewLite, không có tiền thật được chuyển.
+                            SePay chưa xác nhận hoàn tiền và trạng thái đơn hàng vẫn giữ nguyên.
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="mt-1 text-xs">
+                          {refunds[order.id]?.status === 'REQUESTED'
+                            ? 'Đang chờ nhân viên xét duyệt; chưa thực hiện hoàn tiền.'
+                            : refunds[order.id]?.status === 'PENDING'
+                              ? 'Yêu cầu đang được xử lý; chưa có xác nhận hoàn tiền thật.'
+                              : refunds[order.id]?.status === 'SUCCEEDED'
+                                ? 'Hoàn tiền thủ công được xác minh bởi nhân viên.'
+                                : 'Vui lòng liên hệ nhân viên để kiểm tra kết quả.'}
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        className="mt-3 rounded-lg border border-amber-400 px-3 py-1.5 text-xs font-semibold hover:bg-amber-100"
+                        disabled={refundLoading === order.id}
+                        onClick={async () => {
+                          const token = localStorage.getItem('token');
+                          if (!token) return;
+                          setRefundLoading(order.id);
+                          try {
+                            await refreshRefund(order.id, token);
+                            setRefundMessages((previous) => ({ ...previous, [order.id]: '' }));
+                          } catch (err) {
+                            setRefundMessages((previous) => ({
+                              ...previous,
+                              [order.id]: err instanceof Error ? err.message : 'Không tải được thông tin hoàn tiền.',
+                            }));
+                          } finally {
+                            setRefundLoading(null);
+                          }
+                        }}
+                      >
+                        Cập nhật kết quả hoàn tiền
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={refundLoading === order.id}
+                      onClick={() => void requestRefund(order.id)}
+                      className="rounded-full border border-red-300 px-5 py-2.5 text-sm font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {refundLoading === order.id ? 'Đang gửi...' : 'Yêu cầu hủy đơn và hoàn tiền'}
+                    </button>
+                  )}
+                  {refundMessages[order.id] && (
+                    <p className="mt-2 text-xs text-coffee-700" role="status">
+                      {refundMessages[order.id]}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Nút thanh toán cho đơn hàng chưa thanh toán */}
+              {order.status === 'PENDING' && (
+                <div className="mt-4 border-t border-coffee-100 pt-4">
+                  <PayPendingOrderButton
+                    orderId={order.id}
+                    status={order.status}
+                  />
+                </div>
               )}
             </div>
           ))}

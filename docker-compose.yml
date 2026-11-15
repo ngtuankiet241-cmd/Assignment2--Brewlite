@@ -1,18 +1,25 @@
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: brewlite-postgres
     restart: unless-stopped
+
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: ${POSTGRES_DB:-brewlite}
+
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-brewlite}"]
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-brewlite}
       interval: 5s
       timeout: 5s
       retries: 10
@@ -21,34 +28,73 @@ services:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
+
     container_name: brewlite-api
     restart: unless-stopped
+
     ports:
       - "3001:3001"
+
     environment:
+      # NestJS chạy bằng production build
       NODE_ENV: production
       PORT: 3001
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-brewlite}?schema=public
+
+      # PostgreSQL nội bộ Docker
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-brewlite}?schema=public
+
+      # Frontend
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-for-local-docker}
+
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+
+      # SePay Payment Gateway Sandbox
+      SEPAY_ENV: ${SEPAY_ENV:?SEPAY_ENV is required}
+      SEPAY_MERCHANT_ID: ${SEPAY_MERCHANT_ID:?SEPAY_MERCHANT_ID is required}
+      SEPAY_SECRET_KEY: ${SEPAY_SECRET_KEY:?SEPAY_SECRET_KEY is required}
+      SEPAY_IPN_SECRET_KEY: ${SEPAY_IPN_SECRET_KEY:?SEPAY_IPN_SECRET_KEY is required}
+      SEPAY_TEST_API_TOKEN: ${SEPAY_TEST_API_TOKEN:-}
+
+      # Chỉ bật trên máy local dùng để demo
+      REFUND_DEMO_ENABLED: ${REFUND_DEMO_ENABLED:-false}
+
     depends_on:
       postgres:
         condition: service_healthy
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   web:
     build:
       context: ./apps/web
       dockerfile: Dockerfile
+
     container_name: brewlite-web
     restart: unless-stopped
+
     ports:
       - "3000:3000"
+
     environment:
       NODE_ENV: production
       PORT: 3000
+
       NEXT_PUBLIC_API_URL: http://localhost:3001
+      API_INTERNAL_URL: http://api:3001
+
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   postgres_data:

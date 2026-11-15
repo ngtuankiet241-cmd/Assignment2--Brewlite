@@ -17,6 +17,7 @@ enum OrderStatus {
   PENDING
   PAYMENT_FAILED
   PAID
+  CONFIRMED
   PREPARING
   READY
   COMPLETED
@@ -27,6 +28,14 @@ enum PaymentStatus {
   PENDING
   SUCCESS
   FAILED
+}
+
+enum RefundStatus {
+  REQUESTED
+  PENDING
+  SUCCEEDED
+  FAILED
+  REJECTED
 }
 
 enum PaymentMethod {
@@ -87,6 +96,7 @@ model Order {
   loyaltyTransactions LoyaltyTransaction[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
+  refunds Refund[]
 }
 
 model OrderItem {
@@ -116,6 +126,7 @@ model Payment {
   paidAt         DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  refunds Refund[]
 }
 
 model Promotion {
@@ -146,3 +157,59 @@ model LoyaltyTransaction {
   createdAt   DateTime    @default(now())
 }
 
+
+model Refund {
+  id                 String       @id @default(cuid())
+
+  // Liên kết với đơn hàng
+  orderId            String
+  order              Order        @relation(fields: [orderId], references: [id])
+
+  // Liên kết với giao dịch thanh toán gốc
+  paymentId          String
+  payment            Payment      @relation(fields: [paymentId], references: [id])
+
+  // Thông tin hoàn tiền
+  amount             Int
+  status             RefundStatus @default(REQUESTED)
+
+  // Chống tạo yêu cầu hoàn tiền trùng
+  idempotencyKey     String       @unique
+
+  // Thông tin giao dịch SePay ban đầu
+  originalTxnRef     String
+  sepayRefundId      String?      @unique
+
+  // Nhân viên xét duyệt yêu cầu
+  approvedBy         String?
+  approvedAt         DateTime?
+
+  // Thông tin chuyển khoản hoàn tiền thủ công
+  bankTransactionRef String?      @unique
+  evidenceUrl        String?
+  transferRecordedBy String?
+  transferRecordedAt DateTime?
+
+  // Quản lý xác minh hoàn tiền thật
+  verifiedBy         String?
+  verifiedAt         DateTime?
+
+  // Thông tin từ chối hoặc lỗi
+  rejectionReason    String?
+  errorMessage       String?
+
+  // Hoàn tiền mô phỏng Sandbox
+  // Không phát sinh chuyển khoản ngân hàng hoặc hoàn tiền SePay thật
+  demoReference      String?      @unique
+  demoCompletedAt    DateTime?
+  demoBy             String?
+
+  // Thời gian
+  requestedAt        DateTime     @default(now())
+  completedAt        DateTime?
+  updatedAt          DateTime     @updatedAt
+
+  // Index
+  @@index([orderId])
+  @@index([paymentId])
+}

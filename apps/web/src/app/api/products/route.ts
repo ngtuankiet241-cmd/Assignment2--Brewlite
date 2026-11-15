@@ -4,7 +4,10 @@ import { parseProductsResponse } from '@/lib/productResponse';
 const responseHeaders = { 'Cache-Control': 'no-store' };
 
 export async function GET() {
-  const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://brewlite-api.onrender.com';
+  const backendUrl =
+  process.env.API_INTERNAL_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  'https://brewlite-api.onrender.com';
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 6000);
 
