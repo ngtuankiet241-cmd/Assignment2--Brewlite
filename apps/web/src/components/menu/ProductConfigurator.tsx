@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Image from 'next/image';
+import ProductImage from './ProductImage';
 import type { DrinkSize, ProductConfiguration, Topping } from '@/types/cart';
 import type { Product } from '@/types/product';
 import { useCart } from '@/context/useCart';
@@ -150,7 +150,8 @@ export default function ProductConfigurator({
 
         <div className="flex items-center gap-3 pr-9">
           <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-cream-50 sm:h-24 sm:w-24">
-            <Image
+            <ProductImage
+              productId={product.id}
               alt={product.name}
               className="object-contain p-2"
               fill

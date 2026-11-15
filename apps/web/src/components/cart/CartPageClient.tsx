@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import ProductImage from '@/components/menu/ProductImage';
 import Link from 'next/link';
 import { useCart } from '@/context/useCart';
 import { getCartItemUnitPrice } from '@/types/cart';
@@ -83,7 +83,8 @@ export default function CartPageClient() {
                   key={item.id}
                 >
                   <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-cream-50 sm:h-28 sm:w-28">
-                    <Image
+                    <ProductImage
+                      productId={item.productId}
                       alt={item.productName}
                       className="object-contain p-2"
                       fill
