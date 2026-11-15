@@ -16,6 +16,7 @@ import {
 import { createSePayClient } from './sepay.client';
 import { InventoryService } from '../inventory/inventory.service';
 import { assertReservationActive } from '../inventory/stock-reservation';
+import { withIdempotency } from '../common/idempotency';
 
 export interface CreatePaymentCheckoutDto {
   orderId: string;
@@ -61,50 +62,56 @@ export class PaymentsService {
     return this.prisma.$transaction(async (tx) => {
       const order = await lockOrder(tx, dto.orderId);
       assertReservationActive(order);
-      if (!Number.isSafeInteger(dto.amount) || dto.amount !== order.totalAmount) {
-        throw new BadRequestException('Số tiền thanh toán phải khớp tổng tiền sau giảm giá của đơn hàng.');
-      }
 
-      if (dto.idempotencyKey) {
-        const existing = await tx.payment.findUnique({
-          where: { idempotencyKey: dto.idempotencyKey },
-        });
-        if (existing) {
-          if (existing.orderId !== order.id) {
-            throw new ConflictException('Idempotency key đã được sử dụng cho đơn hàng khác.');
+      return withIdempotency(tx, 'POST /payments/sepay/checkout', dto.idempotencyKey,
+        { orderId: dto.orderId, amount: dto.amount }, async () => {
+          if (!Number.isSafeInteger(dto.amount) || dto.amount !== order.totalAmount) {
+            throw new BadRequestException('Số tiền thanh toán phải khớp tổng tiền sau giảm giá của đơn hàng.');
           }
-          return existing;
-        }
-      }
 
-      if (order.status === OrderStatus.PAYMENT_FAILED) {
-        await changeOrderStatus(tx, order.id, OrderStatus.PENDING);
-      } else if (order.status !== OrderStatus.PENDING) {
-        throw new ConflictException(`Không thể tạo thanh toán cho đơn ở trạng thái ${order.status}.`);
-      }
+          // Recognize keys saved by older versions before IdempotencyRecord.
+          if (dto.idempotencyKey) {
+            const existing = await tx.payment.findUnique({
+              where: { idempotencyKey: dto.idempotencyKey },
+            });
+            if (existing) {
+              if (existing.orderId !== order.id) {
+                throw new ConflictException('Idempotency key đã được sử dụng cho đơn hàng khác.');
+              }
+              return existing;
+            }
+          }
 
-      const transactionRef = `SEPAY_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      const qrUrl = `https://qr.sepay.vn/img?acc=BREWLITE&bank=MBBank&amount=${order.totalAmount}&des=${transactionRef}`;
+          if (order.status === OrderStatus.PAYMENT_FAILED) {
+            await changeOrderStatus(tx, order.id, OrderStatus.PENDING);
+          } else if (order.status !== OrderStatus.PENDING) {
+            throw new ConflictException(`Không thể tạo thanh toán cho đơn ở trạng thái ${order.status}.`);
+          }
 
-      return tx.payment.upsert({
-        where: { orderId: dto.orderId },
-        update: {
-          amount: order.totalAmount,
-          transactionRef,
-          idempotencyKey: dto.idempotencyKey,
-          qrUrl,
-          status: 'PENDING',
-          paidAt: null,
-        },
-        create: {
-          orderId: dto.orderId,
-          amount: order.totalAmount,
-          transactionRef,
-          idempotencyKey: dto.idempotencyKey,
-          qrUrl,
-          status: 'PENDING',
-        },
-      });
+          const transactionRef = `SEPAY_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+          const qrUrl = `https://qr.sepay.vn/img?acc=BREWLITE&bank=MBBank&amount=${order.totalAmount}&des=${transactionRef}`;
+
+          return tx.payment.upsert({
+            where: { orderId: dto.orderId },
+            update: {
+              amount: order.totalAmount,
+              transactionRef,
+              idempotencyKey: dto.idempotencyKey,
+              qrUrl,
+              status: 'PENDING',
+              paidAt: null,
+            },
+            create: {
+              orderId: dto.orderId,
+              amount: order.totalAmount,
+              transactionRef,
+              idempotencyKey: dto.idempotencyKey,
+              qrUrl,
+              status: 'PENDING',
+            },
+          });
+        // Replay returns current SUCCESS/FAILED without starting another attempt.
+        }, (payment) => tx.payment.findUniqueOrThrow({ where: { id: payment.id } }));
     });
   }
 
@@ -150,7 +157,7 @@ export class PaymentsService {
   }
 
   
-async createSePayCheckoutForm(orderId: string) {
+async createSePayCheckoutForm(orderId: string, idempotencyKey?: string) {
   if (typeof orderId !== 'string' || !orderId.trim()) {
     throw new BadRequestException('Mã đơn hàng không hợp lệ.');
   }
@@ -185,64 +192,66 @@ async createSePayCheckoutForm(orderId: string) {
       );
     }
 
-    const existingPayment = await tx.payment.findUnique({
-      where: { orderId: order.id },
-    });
-
-    if (existingPayment?.status === 'SUCCESS') {
-      throw new ConflictException(
-        'Đơn hàng đã được thanh toán.',
-      );
-    }
-
-    // Lưu giao dịch đang chờ thanh toán.
-    if (existingPayment) {
-      await tx.payment.update({
-        where: { id: existingPayment.id },
-        data: {
-          amount: order.totalAmount,
-          method: 'SEPAY_QR',
-          status: 'PENDING',
-          transactionRef: null,
-          idempotencyKey: null,
-          qrUrl: null,
-          paidAt: null,
-        },
+    return withIdempotency(tx, 'POST /payments/sepay/checkout-form', idempotencyKey, { orderId }, async () => {
+      const existingPayment = await tx.payment.findUnique({
+        where: { orderId: order.id },
       });
-    } else {
-      await tx.payment.create({
-        data: {
-          orderId: order.id,
-          amount: order.totalAmount,
-          method: 'SEPAY_QR',
-          status: 'PENDING',
-        },
+
+      if (existingPayment?.status === 'SUCCESS') {
+        throw new ConflictException(
+          'Đơn hàng đã được thanh toán.',
+        );
+      }
+
+      // Lưu giao dịch đang chờ thanh toán.
+      if (existingPayment) {
+        await tx.payment.update({
+          where: { id: existingPayment.id },
+          data: {
+            amount: order.totalAmount,
+            method: 'SEPAY_QR',
+            status: 'PENDING',
+            transactionRef: null,
+            idempotencyKey: null,
+            qrUrl: null,
+            paidAt: null,
+          },
+        });
+      } else {
+        await tx.payment.create({
+          data: {
+            orderId: order.id,
+            amount: order.totalAmount,
+            method: 'SEPAY_QR',
+            status: 'PENDING',
+          },
+        });
+      }
+
+      const resultUrl =
+        `${frontendUrl.replace(/\/$/, '')}/payment/result` +
+        `?orderId=${encodeURIComponent(order.id)}`;
+
+      // Tạo biểu mẫu thanh toán từ SDK SePay.
+      const fields = client.checkout.initOneTimePaymentFields({
+        operation: 'PURCHASE',
+        payment_method: 'BANK_TRANSFER',
+        order_invoice_number: order.id,
+        order_amount: order.totalAmount,
+        currency: 'VND',
+        order_description: `Thanh toan BrewLite ${order.id}`,
+        success_url: resultUrl,
+        error_url: resultUrl,
+        cancel_url: resultUrl,
       });
-    }
 
-    const resultUrl =
-      `${frontendUrl.replace(/\/$/, '')}/payment/result` +
-      `?orderId=${encodeURIComponent(order.id)}`;
-
-    // Tạo biểu mẫu thanh toán từ SDK SePay.
-    const fields = client.checkout.initOneTimePaymentFields({
-      operation: 'PURCHASE',
-      payment_method: 'BANK_TRANSFER',
-      order_invoice_number: order.id,
-      order_amount: order.totalAmount,
-      currency: 'VND',
-      order_description: `Thanh toan BrewLite ${order.id}`,
-      success_url: resultUrl,
-      error_url: resultUrl,
-      cancel_url: resultUrl,
+      return {
+        checkoutUrl: client.checkout.initCheckoutUrl(),
+        fields,
+        orderId: order.id,
+        amount: order.totalAmount,
+      };
     });
-
-    return {
-      checkoutUrl: client.checkout.initCheckoutUrl(),
-      fields,
-      orderId: order.id,
-      amount: order.totalAmount,
-    };
   });
 }
 

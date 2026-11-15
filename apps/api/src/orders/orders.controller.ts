@@ -9,6 +9,7 @@ import {
   Req,
   UseGuards,
   UnauthorizedException,
+  Headers,
 } from '@nestjs/common';
 
 import { Role } from '@prisma/client';
@@ -21,6 +22,7 @@ import {
 import { Roles } from '../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { resolveIdempotencyKey } from '../common/idempotency';
 
 
 type AuthenticatedRequest = {
@@ -56,8 +58,10 @@ export class OrdersController {
   create(
     @Body() dto: CreateOrderDto,
     @Req() req: AuthenticatedRequest,
+    @Headers('idempotency-key') key?: string,
+    @Headers('x-idempotency-key') legacyKey?: string,
   ) {
-    return this.ordersService.create(dto, this.getUserId(req));
+    return this.ordersService.create(dto, this.getUserId(req), resolveIdempotencyKey(key, legacyKey));
   }
 
   // Nhân viên xem tất cả đơn

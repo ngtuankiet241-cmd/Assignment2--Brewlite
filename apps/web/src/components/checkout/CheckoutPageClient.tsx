@@ -7,6 +7,7 @@ import { formatCurrencyVND } from '@/lib/formatCurrency';
 import type { CartItem } from '@/types/cart';
 import { requestPromotionQuote, type PromotionQuote } from '@/lib/promotions';
 import PromotionCodeField from './PromotionCodeField';
+import { getCheckoutAttempt, type CheckoutAttempt } from '@/lib/checkout-idempotency';
 
 interface CreatedOrder {
   id: string;
@@ -48,6 +49,7 @@ export default function CheckoutPageClient() {
   const [promotionFeedback, setPromotionFeedback] = useState<PromotionFeedback | null>(null);
   const promotionRequest = useRef<AbortController | null>(null);
   const promotionRequestId = useRef(0);
+  const checkoutAttempt = useRef<CheckoutAttempt | null>(null);
 
   // Immutable cart arrays bind each quote to exactly the cart that was checked.
   const currentPromotion = promotionFeedback?.items === items ? promotionFeedback : null;
@@ -308,7 +310,7 @@ export default function CheckoutPageClient() {
 
           {/* Nút mô phỏng thanh toán thành công qua Webhook */}
           <div className="space-y-3">
-            
+
 
             <p className="text-center text-xs text-coffee-600">
               Vui lòng chờ Backend xác nhận giao dịch trước khi đơn hàng được đánh dấu đã thanh toán.
@@ -379,25 +381,23 @@ export default function CheckoutPageClient() {
         }),
       };
 
-      // Gửi yêu cầu tạo đơn hàng POST /orders (kèm JWT nếu đã đăng nhập)
-      // Lấy JWT của tài khoản đang đăng nhập
-const token = localStorage.getItem('token');
-
-if (!token) {
-  throw new Error(
-    'Bạn cần đăng nhập trước khi đặt hàng và thanh toán.'
-  );
-}
-
-
-      const orderHeaders: HeadersInit = { 'Content-Type': 'application/json' };
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Bạn cần đăng nhập trước khi đặt hàng và thanh toán.');
+      }
+      const orderBody = JSON.stringify(orderPayload);
+      checkoutAttempt.current = getCheckoutAttempt(orderBody, checkoutAttempt.current);
+      const orderHeaders: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': checkoutAttempt.current.key,
+      };
       if (token) {
         orderHeaders['Authorization'] = `Bearer ${token}`;
       }
       const orderRes = await fetch(`${apiUrl}/orders`, {
         method: 'POST',
         headers: orderHeaders,
-        body: JSON.stringify(orderPayload),
+        body: orderBody,
       });
 
       if (!orderRes.ok) {
@@ -411,56 +411,29 @@ if (!token) {
       const orderData: CreatedOrder = await orderRes.json();
       setCreatedOrder(orderData);
 
-      // Nếu chọn thanh toán SePay QR -> gọi API lấy QR
-      
-if (paymentMethod === 'SEPAY_QR') {
-  const qrRes = await fetch(
-    `${apiUrl}/payments/sepay/checkout-form`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token
-          ? { Authorization: `Bearer ${token}` }
-          : {}),
-      },
-      body: JSON.stringify({
-        orderId: orderData.id,
-      }),
-    },
-  );
-
-  const qrData = await qrRes.json();
-
-  if (!qrRes.ok) {
-    throw new Error(
-      qrData?.message || 'Không thể khởi tạo thanh toán SePay.',
-    );
-  }
-
-  if (
-    typeof qrData.checkoutUrl !== 'string' ||
-    !qrData.fields ||
-    typeof qrData.fields !== 'object'
-  ) {
-    throw new Error('Thông tin thanh toán SePay không hợp lệ.');
-  }
-
-  // Ghi nhớ đơn vừa tạo từ giỏ hàng hiện tại.
-sessionStorage.setItem(
-  'brewlite-pending-cart-order',
-  orderData.id,
-);
-
-redirectToSePay(qrData.checkoutUrl, qrData.fields);
-return;
-}
-
-throw new Error(
-  'Thanh toán tiền mặt chưa được hỗ trợ trong bước tích hợp này.',
-);
-      // Nếu thanh toán tiền mặt tại quầy
-      
+      if (paymentMethod === 'SEPAY_QR') {
+        const qrRes = await fetch(`${apiUrl}/payments/sepay/checkout-form`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': `payment-${orderData.id}`,
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ orderId: orderData.id }),
+        });
+        const qrData = await qrRes.json();
+        if (!qrRes.ok) {
+          throw new Error(qrData?.message || 'Không thể khởi tạo thanh toán SePay.');
+        }
+        if (typeof qrData.checkoutUrl !== 'string' || !qrData.fields ||
+            typeof qrData.fields !== 'object' || Array.isArray(qrData.fields)) {
+          throw new Error('Thông tin thanh toán SePay không hợp lệ.');
+        }
+        sessionStorage.setItem('brewlite-pending-cart-order', orderData.id);
+        redirectToSePay(qrData.checkoutUrl, qrData.fields);
+        return;
+      }
+      throw new Error('Thanh toán tiền mặt chưa được hỗ trợ trong bước tích hợp này.');
     } catch (err: unknown) {
       const error = err as Error;
       setError(error.message || 'Không thể tạo đơn hàng. Vui lòng thử lại.');

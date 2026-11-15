@@ -39,6 +39,7 @@ export default function PayPendingOrderButton({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Idempotency-Key': `payment-${orderId}`,
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ orderId }),

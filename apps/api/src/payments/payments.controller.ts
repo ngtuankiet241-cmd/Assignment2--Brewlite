@@ -1,3 +1,4 @@
+import { resolveIdempotencyKey } from '../common/idempotency';
 import {
   Controller,
   Post,
@@ -32,19 +33,23 @@ export class PaymentsController {
   @Post('sepay/checkout')
   createCheckout(
     @Body() dto: CreatePaymentCheckoutDto,
-    @Headers('x-idempotency-key') idempotencyHeader?: string,
+    @Headers('idempotency-key') idempotencyHeader?: string,
+    @Headers('x-idempotency-key') legacyHeader?: string,
   ) {
-    if (idempotencyHeader && !dto.idempotencyKey) {
-      dto.idempotencyKey = idempotencyHeader;
-    }
-
-    return this.paymentsService.createCheckout(dto);
+    return this.paymentsService.createCheckout({
+      ...dto,
+      idempotencyKey: resolveIdempotencyKey(idempotencyHeader, legacyHeader, dto?.idempotencyKey),
+    });
   }
 
   // API tạo biểu mẫu thanh toán SePay Sandbox
   @Post('sepay/checkout-form')
-  createCheckoutForm(@Body('orderId') orderId: string) {
-    return this.paymentsService.createSePayCheckoutForm(orderId);
+  createCheckoutForm(
+    @Body('orderId') orderId: string,
+    @Headers('idempotency-key') key?: string,
+    @Headers('x-idempotency-key') legacyKey?: string,
+  ) {
+    return this.paymentsService.createSePayCheckoutForm(orderId, resolveIdempotencyKey(key, legacyKey));
   }
 
   // API nhận IPN từ SePay

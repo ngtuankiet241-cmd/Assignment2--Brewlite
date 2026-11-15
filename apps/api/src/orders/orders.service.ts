@@ -13,6 +13,7 @@ import { InventoryService } from '../inventory/inventory.service';
 import { aggregateQuantities, reserveStock } from '../inventory/stock-reservation';
 import { PromotionsService } from '../promotions/promotions.service';
 import { priceOrderItems } from './order-pricing';
+import { withIdempotency } from '../common/idempotency';
 
 export interface CreateOrderItemDto {
   productId: string;
@@ -43,7 +44,7 @@ export class OrdersService {
 
   // Giá, khuyến mãi và giữ tồn kho được tính từ dữ liệu phía máy chủ;
   // userId chỉ lấy từ phiên đăng nhập đã xác thực.
-  async create(dto: CreateOrderDto, userId: string) {
+  async create(dto: CreateOrderDto, userId: string, idempotencyKey?: string) {
     if (!userId) {
       throw new ForbiddenException('Bạn cần đăng nhập để đặt hàng.');
     }
@@ -54,7 +55,8 @@ export class OrdersService {
     const quantities = aggregateQuantities(dto.items);
     await this.inventory.expireReservations();
 
-    return this.inventory.withStockRetry(async (tx) => {
+    // Retrying reruns the entire transaction, including all product reads.
+    return this.inventory.withStockRetry((tx) => withIdempotency(tx, 'POST /orders', idempotencyKey, { userId, payload: dto }, async () => {
       const products = await reserveStock(tx, quantities);
       const [sizes, toppings] = await Promise.all([
         tx.drinkSizeOption.findMany({ where: { isActive: true } }),
@@ -96,7 +98,7 @@ export class OrdersService {
         },
         include: { items: true },
       });
-    });
+    }));
   }
 
   async getStatus(id: string) {

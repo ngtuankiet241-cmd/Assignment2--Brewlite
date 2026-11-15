@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useCart } from '@/context/useCart';
+import { clearCheckoutAttempt } from '@/lib/checkout-idempotency';
 
 type PaymentState = 'LOADING' | 'SUCCESS' | 'PENDING' | 'FAILED';
 
@@ -97,6 +98,7 @@ export default function PaymentResultClient() {
     // Chỉ xóa giỏ hàng của đơn vừa được tạo từ checkout.
     if (pendingOrderId === orderId) {
       clearCart();
+      clearCheckoutAttempt();
       sessionStorage.removeItem('brewlite-pending-cart-order');
     }
   }, [hydrated, state, orderId, clearCart]);
