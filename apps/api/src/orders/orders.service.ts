@@ -14,6 +14,7 @@ import { aggregateQuantities, reserveStock } from '../inventory/stock-reservatio
 import { PromotionsService } from '../promotions/promotions.service';
 import { priceOrderItems } from './order-pricing';
 import { withIdempotency } from '../common/idempotency';
+import { calculateRedemption, redeemOrderPoints } from '../loyalty/loyalty-points';
 
 export interface CreateOrderItemDto {
   productId: string;
@@ -31,6 +32,7 @@ export interface CreateOrderDto {
   tableNumber?: number;
   notes?: string;
   promotionCode?: string;
+  redeemedPoints?: number;
   items: CreateOrderItemDto[];
 }
 
@@ -77,7 +79,11 @@ export class OrdersService {
               tx,
             );
 
-      return tx.order.create({
+      const redeemedPoints = dto.redeemedPoints ?? 0;
+      const amountAfterPromotion = promotion?.totalAmount ?? subtotalAmount;
+      const loyaltyDiscountAmount = calculateRedemption(redeemedPoints, amountAfterPromotion);
+      const totalAmount = amountAfterPromotion - loyaltyDiscountAmount;
+      const order = await tx.order.create({
         data: {
           userId,
           customerName: dto.customerName,
@@ -86,7 +92,9 @@ export class OrdersService {
           notes: dto.notes,
           subtotalAmount,
           discountAmount: promotion?.discountAmount ?? 0,
-          totalAmount: promotion?.totalAmount ?? subtotalAmount,
+          redeemedPoints,
+          loyaltyDiscountAmount,
+          totalAmount,
           promotionId: promotion?.promotionId,
           promotionCode: promotion?.code,
           status: OrderStatus.PENDING,
@@ -98,6 +106,16 @@ export class OrdersService {
         },
         include: { items: true },
       });
+      await redeemOrderPoints(tx, { id: order.id, userId, redeemedPoints });
+      if (totalAmount === 0) {
+        await changeOrderStatus(tx, order.id, OrderStatus.PAID);
+        await tx.payment.create({ data: {
+          orderId: order.id, amount: 0, method: 'LOYALTY', status: 'SUCCESS',
+          transactionRef: `POINTS_${order.id}`, paidAt: new Date(),
+        } });
+        return { ...order, status: OrderStatus.PAID, reservationStatus: 'CONSUMED', reservationExpiresAt: null };
+      }
+      return order;
     }));
   }
 
@@ -111,6 +129,8 @@ export class OrdersService {
         totalAmount: true,
         subtotalAmount: true,
         discountAmount: true,
+        redeemedPoints: true,
+        loyaltyDiscountAmount: true,
         promotionCode: true,
         customerName: true,
         updatedAt: true,

@@ -7,7 +7,12 @@ import { formatCurrencyVND } from '@/lib/formatCurrency';
 import type { CartItem } from '@/types/cart';
 import { requestPromotionQuote, type PromotionQuote } from '@/lib/promotions';
 import PromotionCodeField from './PromotionCodeField';
-import { getCheckoutAttempt, type CheckoutAttempt } from '@/lib/checkout-idempotency';
+import { clearCheckoutAttempt, getCheckoutAttempt, type CheckoutAttempt } from '@/lib/checkout-idempotency';
+import { clearAuthSession, getAuthToken } from '@/lib/auth';
+import { parseProductsResponse } from '@/lib/productResponse';
+import { useLoyaltyAccount } from '@/hooks/useLoyaltyAccount';
+import { notifyLoyaltyChanged } from '@/lib/loyalty';
+import LoyaltyRedemptionField from './LoyaltyRedemptionField';
 
 interface CreatedOrder {
   id: string;
@@ -16,6 +21,8 @@ interface CreatedOrder {
   tableNumber?: number;
   subtotalAmount: number;
   discountAmount: number;
+  redeemedPoints: number;
+  loyaltyDiscountAmount: number;
   promotionCode: string | null;
   totalAmount: number;
   status: string;
@@ -35,7 +42,10 @@ type PromotionFeedback = { items: CartItem[] } & (
 );
 
 export default function CheckoutPageClient() {
-  const { items, itemCount, subtotal, hydrated, clearCart } = useCart();
+  const { items, itemCount, subtotal, hydrated, removeItem, clearCart } = useCart();
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const loyalty = useLoyaltyAccount(apiUrl);
+  const [pointsToUse, setPointsToUse] = useState(0);
 
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -45,18 +55,27 @@ export default function CheckoutPageClient() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsLogin, setNeedsLogin] = useState(false);
+  const [needsCartUpdate, setNeedsCartUpdate] = useState(false);
+  const [unavailableProductIds, setUnavailableProductIds] = useState<string[]>([]);
   const [promotionCode, setPromotionCode] = useState('');
   const [promotionFeedback, setPromotionFeedback] = useState<PromotionFeedback | null>(null);
   const promotionRequest = useRef<AbortController | null>(null);
   const promotionRequestId = useRef(0);
   const checkoutAttempt = useRef<CheckoutAttempt | null>(null);
+  const [hasCheckoutAttempt, setHasCheckoutAttempt] = useState(false);
 
   // Immutable cart arrays bind each quote to exactly the cart that was checked.
   const currentPromotion = promotionFeedback?.items === items ? promotionFeedback : null;
   const appliedPromotion = currentPromotion?.status === 'applied' ? currentPromotion.quote : null;
   const applyingPromotion = currentPromotion?.status === 'applying';
   const promotionError = currentPromotion?.status === 'error' ? currentPromotion.message : undefined;
-  const totalAmount = appliedPromotion?.totalAmount ?? subtotal;
+  const amountAfterPromotion = appliedPromotion?.totalAmount ?? subtotal;
+  const redemptionRate = loyalty.account?.redemptionVndPerPoint ?? 0;
+  const maxPoints = redemptionRate ? Math.min(loyalty.account!.loyaltyPoints, Math.floor(amountAfterPromotion / redemptionRate)) : 0;
+  const loyaltyDiscountAmount = pointsToUse * redemptionRate;
+  const totalAmount = Math.max(0, amountAfterPromotion - loyaltyDiscountAmount);
+  const unavailableItems = items.filter((item) => unavailableProductIds.includes(item.productId));
 
   useEffect(() => () => {
     promotionRequestId.current += 1;
@@ -67,8 +86,12 @@ export default function CheckoutPageClient() {
   const [paymentQR, setPaymentQR] = useState<PaymentQR | null>(null);
   const [isPaid, setIsPaid] = useState(false);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+  function requireLogin(): never {
+    clearAuthSession();
+    setNeedsLogin(true);
+    throw new Error('Phiên đăng nhập không còn hợp lệ. Vui lòng đăng nhập lại để tiếp tục đặt hàng.');
+  }
 
   const redirectToSePay = (
     checkoutUrl: string,
@@ -231,6 +254,12 @@ export default function CheckoutPageClient() {
                 </div>
               </>
             )}
+            {createdOrder.redeemedPoints > 0 && (
+              <div className="flex justify-between gap-3 py-1 text-emerald-700">
+                <span>Đã dùng {createdOrder.redeemedPoints} điểm:</span>
+                <span className="shrink-0 font-semibold">−{formatCurrencyVND(createdOrder.loyaltyDiscountAmount)}</span>
+              </div>
+            )}
             <div className="flex justify-between py-1 border-t border-coffee-200/60 mt-2 pt-2">
               <span className="text-coffee-600">Tổng thanh toán:</span>
               <span className="text-base font-extrabold text-coffee-900">
@@ -356,6 +385,9 @@ export default function CheckoutPageClient() {
     try {
       setSubmitting(true);
       setError(null);
+      setNeedsLogin(false);
+      setNeedsCartUpdate(false);
+      setUnavailableProductIds([]);
 
       const orderPayload = {
         customerName: customerName.trim(),
@@ -363,6 +395,7 @@ export default function CheckoutPageClient() {
         tableNumber: tableNumber ? parseInt(tableNumber, 10) : undefined,
         notes: notes.trim() || undefined,
         promotionCode: appliedPromotion?.code,
+        redeemedPoints: pointsToUse,
         items: items.map((item) => {
           const unitPrice = getCartItemUnitPrice(item);
           const toppingString = item.toppings
@@ -381,28 +414,52 @@ export default function CheckoutPageClient() {
         }),
       };
 
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Bạn cần đăng nhập trước khi đặt hàng và thanh toán.');
-      }
+      const token = getAuthToken();
+      if (!token) requireLogin();
       const orderBody = JSON.stringify(orderPayload);
+      // Replaying the same request must work even after its first attempt
+      // debited points but the browser missed the order/payment response.
+      if (pointsToUse > 0 && (!loyalty.account || pointsToUse > maxPoints) && checkoutAttempt.current?.request !== orderBody) {
+        throw new Error('Số điểm sử dụng vượt số dư hoặc giá trị đơn. Vui lòng cập nhật điểm và thử lại.');
+      }
       checkoutAttempt.current = getCheckoutAttempt(orderBody, checkoutAttempt.current);
+      setHasCheckoutAttempt(true);
       const orderHeaders: HeadersInit = {
         'Content-Type': 'application/json',
         'Idempotency-Key': checkoutAttempt.current.key,
+        Authorization: `Bearer ${token}`,
       };
-      if (token) {
-        orderHeaders['Authorization'] = `Bearer ${token}`;
-      }
       const orderRes = await fetch(`${apiUrl}/orders`, {
         method: 'POST',
         headers: orderHeaders,
         body: orderBody,
       });
 
+      if (orderRes.status === 401) requireLogin();
+      if (orderRes.status === 404) {
+        setNeedsCartUpdate(true);
+        let unavailable: CartItem[] = [];
+        try {
+          const catalogRes = await fetch(`${apiUrl.replace(/\/$/, '')}/products`, {
+            cache: 'no-store',
+            headers: { Accept: 'application/json' },
+            signal: AbortSignal.timeout(6000),
+          });
+          if (catalogRes.ok) {
+            const catalog = parseProductsResponse(await catalogRes.json());
+            const availableIds = new Set(catalog.map((product) => String(product.id)));
+            unavailable = items.filter((item) => !availableIds.has(item.productId));
+          }
+        } catch { /* Preserve the cart if the current catalog cannot be verified. */ }
+        setUnavailableProductIds(unavailable.map((item) => item.productId));
+        throw new Error(unavailable.length
+          ? `Các món không còn trong thực đơn hiện tại: ${[...new Set(unavailable.map((item) => item.productName))].join(', ')}. Vui lòng xóa món cũ và chọn lại từ thực đơn.`
+          : 'Một món trong giỏ hàng không còn tồn tại. Vui lòng kiểm tra giỏ hàng và chọn lại món từ thực đơn.');
+      }
       if (!orderRes.ok) {
         const errorData = await orderRes.json().catch(() => null);
-        if (orderRes.status === 400 && appliedPromotion) {
+        if (orderRes.status === 400 && pointsToUse > 0) loyalty.refresh();
+        if (orderRes.status === 400 && appliedPromotion && pointsToUse === 0) {
           setPromotionFeedback({ items, status: 'error', message: 'Mã cần được kiểm tra lại. Vui lòng áp dụng lại mã hoặc xóa mã để tiếp tục.' });
         }
         throw new Error(errorData?.message || `Lỗi máy chủ (${orderRes.status})`);
@@ -410,6 +467,14 @@ export default function CheckoutPageClient() {
 
       const orderData: CreatedOrder = await orderRes.json();
       setCreatedOrder(orderData);
+      notifyLoyaltyChanged();
+
+      if (orderData.status === 'PAID' && orderData.totalAmount === 0) {
+        clearCart();
+        clearCheckoutAttempt();
+        setIsPaid(true);
+        return;
+      }
 
       if (paymentMethod === 'SEPAY_QR') {
         const qrRes = await fetch(`${apiUrl}/payments/sepay/checkout-form`, {
@@ -421,6 +486,7 @@ export default function CheckoutPageClient() {
           },
           body: JSON.stringify({ orderId: orderData.id }),
         });
+        if (qrRes.status === 401) requireLogin();
         const qrData = await qrRes.json();
         if (!qrRes.ok) {
           throw new Error(qrData?.message || 'Không thể khởi tạo thanh toán SePay.');
@@ -459,6 +525,27 @@ export default function CheckoutPageClient() {
       {error && (
         <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-semibold text-red-800" role="alert">
           {error}
+          {needsLogin && (
+            <Link className="mt-3 block font-bold underline" href="/login">
+              Đăng nhập lại →
+            </Link>
+          )}
+          {needsCartUpdate && (
+            <div className="mt-3 flex flex-wrap gap-4">
+              {unavailableItems.length > 0 && (
+                <button className="font-bold underline" type="button" onClick={() => {
+                  unavailableItems.forEach((item) => removeItem(item.id));
+                  setUnavailableProductIds([]);
+                  setNeedsCartUpdate(false);
+                  setError(null);
+                }}>
+                  Xóa món không còn trong thực đơn
+                </button>
+              )}
+              <Link className="font-bold underline" href="/cart">Kiểm tra giỏ hàng</Link>
+              <Link className="font-bold underline" href="/menu">Chọn lại món</Link>
+            </div>
+          )}
         </div>
       )}
 
@@ -611,6 +698,9 @@ export default function CheckoutPageClient() {
             onRemove={() => changePromotionCode('')}
           />
 
+          <LoyaltyRedemptionField loyalty={loyalty} points={pointsToUse} maxPoints={maxPoints}
+            onChange={setPointsToUse} disabled={submitting || applyingPromotion} />
+
           <div className="border-t border-coffee-200/70 pt-3">
             <div className="flex justify-between text-sm text-coffee-600">
               <span>Tạm tính</span>
@@ -622,6 +712,12 @@ export default function CheckoutPageClient() {
                 <span className="shrink-0 font-semibold">−{formatCurrencyVND(appliedPromotion.discountAmount)}</span>
               </div>
             )}
+            {pointsToUse > 0 && (
+              <div className="mt-2 flex justify-between gap-3 text-sm text-emerald-700">
+                <span>Dùng {pointsToUse} điểm</span>
+                <span className="shrink-0 font-semibold">−{formatCurrencyVND(loyaltyDiscountAmount)}</span>
+              </div>
+            )}
             <div className="mt-2 flex items-center justify-between">
               <span className="text-sm font-bold text-coffee-950">Tổng thanh toán</span>
               <span aria-live="polite" className="text-xl font-black text-coffee-900">{formatCurrencyVND(totalAmount)}</span>
@@ -631,7 +727,8 @@ export default function CheckoutPageClient() {
 
           <button
             className="mt-4 flex min-h-12 w-full items-center justify-center rounded-full bg-coffee-800 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-coffee-700 active:scale-[0.98] disabled:opacity-50"
-            disabled={submitting || applyingPromotion}
+            disabled={submitting || applyingPromotion || unavailableItems.length > 0 ||
+              (pointsToUse > 0 && (!loyalty.account || pointsToUse > maxPoints) && !hasCheckoutAttempt)}
             type="submit"
           >
             {submitting ? 'Đang khởi tạo đơn hàng...' : 'Xác nhận đặt hàng →'}

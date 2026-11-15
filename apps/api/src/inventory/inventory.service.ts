@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { lockOrder } from '../orders/order-transition';
 import { OptimisticStockConflict, releaseStock, reservationExpired } from './stock-reservation';
+import { restoreRedeemedOrderPoints } from '../loyalty/loyalty-points';
 
 @Injectable()
 export class InventoryService implements OnModuleInit, OnModuleDestroy {
@@ -77,6 +78,7 @@ export class InventoryService implements OnModuleInit, OnModuleDestroy {
           where: { id: order.id },
           data: { status: 'CANCELLED', reservationStatus: 'RELEASED', reservationExpiresAt: null },
         });
+        await restoreRedeemedOrderPoints(tx, order);
         return 1;
       });
     }

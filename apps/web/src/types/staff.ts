@@ -44,7 +44,7 @@ export interface StaffOrder {
   payment: {
     id: string;
     amount: number;
-    method: 'SEPAY_QR' | 'CASH';
+    method: 'SEPAY_QR' | 'CASH' | 'LOYALTY';
     status: 'PENDING' | 'SUCCESS' | 'FAILED';
     paidAt: string | null;
   } | null;

@@ -208,11 +208,11 @@ describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
     const p = await product(3);
     const placed = await place([item(p.id)]).expect(201);
     await checkout(placed.body.id).expect(201);
-    await ipn(placed.body.id).expect(201);
+    await ipn(placed.body.id).expect(200);
     expect(await order(placed.body.id)).toMatchObject({ status: 'PAID', reservationStatus: 'CONSUMED', reservationExpiresAt: null });
     const afterPayment = await stock(p.id);
     expect(afterPayment).toMatchObject({ stock: 2, version: 1 });
-    await ipn(placed.body.id).expect(201);
+    await ipn(placed.body.id).expect(200);
     await inventory.expireReservations();
     expect(await stock(p.id)).toEqual(afterPayment);
   });
@@ -244,7 +244,7 @@ describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
     const p = await product(3);
     const placed = await place([item(p.id, 2)]).expect(201);
     await checkout(placed.body.id, 20000).expect(201);
-    await ipn(placed.body.id, 'SUCCESS', 20000).expect(201);
+    await ipn(placed.body.id, 'SUCCESS', 20000).expect(200);
     expect(await order(placed.body.id)).toMatchObject({
       status: 'PAID', reservationStatus: 'CONSUMED',
     });
@@ -302,7 +302,7 @@ describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
     const first = await place([item(p.id)]).expect(201);
     const second = await place([item(p.id)]).expect(201);
     await checkout(first.body.id).expect(201);
-    await ipn(first.body.id).expect(201);
+    await ipn(first.body.id).expect(200);
     await checkout(second.body.id).expect(201);
     const heldOrder = await order(second.body.id);
     const before = await stock(p.id);

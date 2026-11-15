@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { LOYALTY_VND_PER_POINT } from './loyalty-points';
+import { LOYALTY_VND_PER_POINT, LOYALTY_REDEMPTION_VND_PER_POINT } from './loyalty-points';
 
 @Injectable()
 export class LoyaltyService {
@@ -23,7 +23,8 @@ export class LoyaltyService {
         take: 20,
         select: { id: true, orderId: true, type: true, points: true, description: true, createdAt: true },
       });
-      return { loyaltyPoints: user.loyaltyPoints, vndPerPoint: LOYALTY_VND_PER_POINT, transactions };
+      return { loyaltyPoints: user.loyaltyPoints, vndPerPoint: LOYALTY_VND_PER_POINT,
+        redemptionVndPerPoint: LOYALTY_REDEMPTION_VND_PER_POINT, transactions };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
 }

@@ -59,7 +59,7 @@ function isOrder(value: unknown): value is StaffOrderDetails {
       && text(item.id) && item.orderId === value.id && text(item.productId) && text(item.productName) && amount(item.unitPrice)
       && integer(item.quantity, 1) && text(item.size) && nullableText(item.toppings) && amount(item.itemTotal))
     && (payment === null || (record(payment) && text(payment.id)
-      && amount(payment.amount) && ['SEPAY_QR', 'CASH'].includes(String(payment.method))
+      && amount(payment.amount) && ['SEPAY_QR', 'CASH', 'LOYALTY'].includes(String(payment.method))
       && ['PENDING', 'SUCCESS', 'FAILED'].includes(String(payment.status))
       && (payment.paidAt === null || date(payment.paidAt))));
 }

@@ -13,7 +13,7 @@ import {
   lockOrder,
 } from '../orders/order-transition';
 
-import { createSePayClient } from './sepay.client';
+import { createSePayClient, retrieveSePayOrder } from './sepay.client';
 import { InventoryService } from '../inventory/inventory.service';
 import { assertReservationActive } from '../inventory/stock-reservation';
 import { withIdempotency } from '../common/idempotency';
@@ -41,6 +41,7 @@ export interface SePayGatewayIpn {
     order_currency: string;
   };
   transaction: {
+    id?: string;
     transaction_id: string;
     transaction_type: string;
     transaction_status: string;
@@ -268,6 +269,7 @@ async handleGatewayIpn(payload: SePayGatewayIpn) {
 
   const orderId = payload.order.order_invoice_number;
   const transactionRef = payload.transaction.transaction_id;
+  const transactionReferences = [transactionRef, payload.transaction.id];
 
   const amount = Number(payload.transaction.transaction_amount);
   const orderAmount = Number(payload.order.order_amount);
@@ -302,7 +304,7 @@ async handleGatewayIpn(payload: SePayGatewayIpn) {
 
     // Chỉ chấp nhận việc gửi lại đúng giao dịch đã xử lý.
     if (payment.status === 'SUCCESS') {
-      if (payment.transactionRef !== transactionRef) {
+      if (!payment.transactionRef || !transactionReferences.includes(payment.transactionRef)) {
         throw new ConflictException('Giao dịch đã được thanh toán.');
       }
 
@@ -336,6 +338,51 @@ async handleGatewayIpn(payload: SePayGatewayIpn) {
     }
     throw error;
   });
+}
+
+async syncSePayPayment(orderId: string, userId: string) {
+  if (typeof orderId !== 'string' || !orderId.trim()) {
+    throw new BadRequestException('Mã đơn hàng không hợp lệ.');
+  }
+  const order = await this.prisma.order.findUnique({
+    where: { id: orderId }, include: { payment: true },
+  });
+  // Do not let a customer reconcile somebody else's order or probe its details.
+  if (!order || !userId || order.userId !== userId) {
+    throw new NotFoundException('Không tìm thấy đơn hàng.');
+  }
+  const result = () => ({ orderId: order.id, status: order.status, paymentStatus: order.payment?.status ?? null });
+  if (order.payment?.status === 'SUCCESS' || order.status !== 'PENDING') return result();
+  if (!order.payment || order.payment.method !== 'SEPAY_QR' || order.payment.status !== 'PENDING') return result();
+
+  const response = await retrieveSePayOrder(orderId);
+  if (response === null) return result();
+  const isRecord = (value: unknown): value is Record<string, unknown> =>
+    value !== null && typeof value === 'object' && !Array.isArray(value);
+  const remote = isRecord(response) && isRecord(response.data) ? response.data : null;
+  if (!remote || remote.order_invoice_number !== orderId || remote.order_currency !== 'VND' ||
+      Number(remote.order_amount) !== order.totalAmount || !Array.isArray(remote.transactions)) {
+    throw new ConflictException('Thông tin đơn hàng SePay không khớp.');
+  }
+  if (remote.order_status !== 'CAPTURED') return result();
+  const transaction = remote.transactions.find((entry: unknown) => isRecord(entry) &&
+    entry.transaction_type === 'PAYMENT' && entry.transaction_status === 'APPROVED' &&
+    entry.transaction_currency === 'VND' && Number(entry.transaction_amount) === order.totalAmount &&
+    typeof (entry.transaction_id ?? entry.id) === 'string' && Boolean(entry.transaction_id ?? entry.id));
+  if (!transaction) throw new ConflictException('SePay chưa có giao dịch thanh toán hợp lệ cho đơn hàng.');
+
+  // The REST API may expose only the transaction UUID. IPN includes that UUID
+  // alongside transaction_id, so a subsequent IPN remains an idempotent replay.
+  await this.handleGatewayIpn({
+    timestamp: Date.now(), notification_type: 'ORDER_PAID',
+    order: { order_invoice_number: orderId, order_status: 'CAPTURED',
+      order_amount: String(remote.order_amount), order_currency: 'VND' },
+    transaction: { id: transaction.id, transaction_id: transaction.transaction_id ?? transaction.id,
+      transaction_type: 'PAYMENT', transaction_status: 'APPROVED',
+      transaction_amount: String(transaction.transaction_amount), transaction_currency: 'VND' },
+  });
+  const updated = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { payment: true } });
+  return { orderId: updated.id, status: updated.status, paymentStatus: updated.payment?.status ?? null };
 }
 
 async getSePayTestBalance() {

@@ -42,9 +42,11 @@ Nhiều quán nước và cà phê quy mô nhỏ tại Việt Nam vẫn tiếp n
 
 **Mở rộng đã triển khai (2026-11-15):** Tích điểm loyalty sau thanh toán, 1 điểm / 1.000đ trên tổng tiền sau giảm giá khi đơn chuyển `PAID`; có số dư và lịch sử của từng tài khoản, chống cộng điểm trùng.
 
+**Cập nhật theo yêu cầu (2026-11-16):** Hiện điểm hiện có cạnh giỏ hàng trên trang chủ/thực đơn, sử dụng điểm trực tiếp khi đặt hàng với mức 1 điểm = 100đ, sau mã giảm giá. Backend trừ điểm cùng giao dịch tạo đơn, chống dùng vượt số dư và chống trừ trùng khi gửi lại. Đơn bị hủy hoặc hết hạn thanh toán được hoàn điểm một lần; đơn còn 0đ được xác nhận tại hệ thống, không gửi thanh toán SePay. Không có trang `/loyalty` riêng.
+
 ### Phạm vi mở rộng (Future scope)
 
-- Sử dụng/đổi điểm và các hạng khách hàng thân thiết (ngoài phần tích điểm sau thanh toán đã triển khai).
+- Các hạng khách hàng thân thiết.
 - Mã giảm giá và chương trình khuyến mãi.
 - Giao diện quản trị cho quản lý (admin panel): thêm/sửa/ẩn sản phẩm.
 - Báo cáo và thống kê doanh thu.

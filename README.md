@@ -152,8 +152,12 @@ Mở một terminal mới:
 ```bash
 cd apps/web
 npm install
+cp .env.example .env.local
 npm run dev
 ```
+
+Next.js đọc cấu hình trong `apps/web/.env.local`, không tự đọc `.env` ở gốc repo. Mẫu cấu hình đặt `NEXT_PUBLIC_API_URL=http://localhost:3001`; chỉnh lại nếu backend chạy ở địa chỉ khác và khởi động lại frontend sau khi thay đổi.
+
 - **Frontend Next.js:** `http://localhost:3000`
 - **Màn hình Thực đơn:** `http://localhost:3000/menu`
 - **Chạy Tests:** `npm test`

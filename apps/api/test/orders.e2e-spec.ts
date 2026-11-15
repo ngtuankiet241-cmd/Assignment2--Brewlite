@@ -111,7 +111,7 @@ describe('Orders & Checkout Flow (E2E)', () => {
         transaction_currency: 'VND',
       },
     })
-      .expect(201);
+      .expect(200);
 
     expect(webhookRes.body).toMatchObject({ success: true });
     expect((await context.prisma.payment.findUniqueOrThrow({ where: { orderId } })).status).toBe('SUCCESS');
