@@ -20,10 +20,12 @@ describe('OrdersService', () => {
       update: jest.fn(),
     },
     product: { findMany: jest.fn(), updateMany: jest.fn() },
+    idempotencyRecord: { findUnique: jest.fn(), create: jest.fn() },
   };
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockPrisma.idempotencyRecord.findUnique.mockResolvedValue(null);
     mockPrisma.$transaction.mockImplementation((work) => work(mockPrisma));
     mockPrisma.product.findMany.mockResolvedValue([{ id: 'p1', name: 'Coffee', price: 35000, stock: 10, version: 0 }]);
     mockPrisma.product.updateMany.mockResolvedValue({ count: 1 });
@@ -96,6 +98,23 @@ describe('OrdersService', () => {
           items: [],
         }),
       ).rejects.toThrow('Order must contain at least one item');
+    });
+
+    it('UT-ORD-IDEM-01: two submissions with one key create and reserve stock only once', async () => {
+      const dto = { customerName: 'Retry', customerPhone: '0900000000', items: [{ productId: 'p1', quantity: 1 }] };
+      mockPrisma.order.create.mockResolvedValue({ id: 'ord-idempotent', totalAmount: 35000 });
+      mockPrisma.idempotencyRecord.create.mockImplementation(({ data }) => {
+        mockPrisma.idempotencyRecord.findUnique.mockResolvedValue(data);
+        return Promise.resolve(data);
+      });
+
+      const first = await service.create(dto, 'same-order-key');
+      const second = await service.create(dto, 'same-order-key');
+
+      expect(second).toEqual(first);
+      expect(mockPrisma.order.create).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.product.updateMany).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.idempotencyRecord.create).toHaveBeenCalledTimes(1);
     });
   });
 

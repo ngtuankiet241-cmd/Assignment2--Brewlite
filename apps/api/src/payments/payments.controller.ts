@@ -1,5 +1,6 @@
 import { Controller, Post, Body, Headers } from '@nestjs/common';
 import { PaymentsService, CreatePaymentCheckoutDto, SepayWebhookPayload } from './payments.service';
+import { resolveIdempotencyKey } from '../common/idempotency';
 
 @Controller('payments')
 export class PaymentsController {
@@ -8,12 +9,13 @@ export class PaymentsController {
   @Post('sepay/checkout')
   createCheckout(
     @Body() dto: CreatePaymentCheckoutDto,
-    @Headers('x-idempotency-key') idempotencyHeader?: string,
+    @Headers('idempotency-key') idempotencyHeader?: string,
+    @Headers('x-idempotency-key') legacyHeader?: string,
   ) {
-    if (idempotencyHeader && !dto.idempotencyKey) {
-      dto.idempotencyKey = idempotencyHeader;
-    }
-    return this.paymentsService.createCheckout(dto);
+    return this.paymentsService.createCheckout({
+      ...dto,
+      idempotencyKey: resolveIdempotencyKey(idempotencyHeader, legacyHeader, dto?.idempotencyKey),
+    });
   }
 
   @Post('sepay/webhook-ipn')

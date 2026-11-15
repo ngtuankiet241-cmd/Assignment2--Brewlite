@@ -6,6 +6,7 @@ import { InventoryService } from '../inventory/inventory.service';
 import { aggregateQuantities, reserveStock } from '../inventory/stock-reservation';
 import { PromotionsService } from '../promotions/promotions.service';
 import { priceOrderItems } from './order-pricing';
+import { withIdempotency } from '../common/idempotency';
 
 export interface CreateOrderItemDto {
   productId: string;
@@ -35,7 +36,7 @@ export class OrdersService {
     private readonly promotions: PromotionsService,
   ) {}
 
-  async create(dto: CreateOrderDto) {
+  async create(dto: CreateOrderDto, idempotencyKey?: string) {
     if (!dto || !Array.isArray(dto.items) || dto.items.length === 0) {
       throw new BadRequestException('Order must contain at least one item');
     }
@@ -44,7 +45,7 @@ export class OrdersService {
     await this.inventory.expireReservations();
 
     // Retrying reruns the entire transaction, including all product reads.
-    return this.inventory.withStockRetry(async (tx) => {
+    return this.inventory.withStockRetry((tx) => withIdempotency(tx, 'POST /orders', idempotencyKey, dto, async () => {
       const products = await reserveStock(tx, quantities);
       const { items, subtotalAmount } = priceOrderItems(dto.items, products);
       // Recheck against authoritative prices within the order/stock transaction.
@@ -74,7 +75,7 @@ export class OrdersService {
           items: true,
         },
       });
-    });
+    }));
   }
 
   async getStatus(id: string) {

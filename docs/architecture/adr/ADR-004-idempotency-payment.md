@@ -27,7 +27,7 @@ Hậu quả nếu không xử lý:
 
 Áp dụng **Idempotency Key pattern** cho hai endpoint nhạy cảm:
 - `POST /orders` – Tạo đơn hàng
-- `POST /payments/create` – Khởi tạo thanh toán
+- `POST /payments/sepay/checkout` – Khởi tạo thanh toán
 
 **Cơ chế:**
 - Client gửi kèm header `Idempotency-Key: <uuid-v4>` do client sinh ra.
@@ -61,48 +61,47 @@ Client (Next.js)                     NestJS API
     │  idempotencyKey = uuidv4()          │
     │  POST /orders                       │
     │  Idempotency-Key: <key>  ─────────►│
-    │                                     │── IdempotencyMiddleware kiểm tra DB/Cache
+    │                                     │── withIdempotency khóa key và kiểm tra DB
     │                                     │   Nếu key chưa tồn tại:
     │                                     │     → Xử lý tạo đơn bình thường
-    │                                     │     → Lưu { key, response, status } vào DB
+    │                                     │     → Lưu { scope, key, requestHash, response } cùng transaction
     │◄─ 201 Created { orderId } ──────── │
     │                                     │
     │  [Retry do timeout]                 │
     │  POST /orders                       │
     │  Idempotency-Key: <key> ──────────►│
-    │                                     │── IdempotencyMiddleware tìm thấy key trong DB
+    │                                     │── withIdempotency tìm thấy key trong DB
     │◄─ 201 Created { orderId } ──────── │   → Trả về response đã lưu, KHÔNG tạo đơn mới
 ```
 
 ### Schema Prisma – Bảng `IdempotencyRecord`
 ```prisma
 model IdempotencyRecord {
-  id         String   @id @default(uuid())
-  key        String   @unique          // Idempotency-Key từ header
-  endpoint   String                   // "POST /orders" hoặc "POST /payments/create"
-  userId     String                   // Chủ sở hữu (ngăn key bị dùng chéo user)
-  statusCode Int                      // HTTP status code đã trả về
-  response   Json                     // Body response đã lưu
-  createdAt  DateTime @default(now())
-  expiresAt  DateTime                 // TTL: 24 giờ sau khi tạo
+  scope       String
+  key         String
+  requestHash String
+  response    Json
+  createdAt   DateTime @default(now())
+
+  @@id([scope, key])
 }
 ```
 
-> **Lưu ý bảo mật:** `userId` được lấy từ JWT đã xác thực, không phải từ client. Cùng `Idempotency-Key` nhưng khác `userId` → xử lý như request mới (không cho phép "mượn" key của người khác).
+> **Triển khai 2026-11-15:** Dự án hỗ trợ checkout khách vãng lai nên key có phạm vi theo endpoint, không dựa vào `userId` trong body. Hash payload ngăn tái sử dụng key cho nội dung khác (`409`). Key không thay thế xác thực/phân quyền. PostgreSQL advisory lock theo endpoint/key và bản ghi trong cùng transaction bảo vệ cả request đồng thời, kể cả khi chỉ còn một sản phẩm. Request lỗi không lưu key; record thành công không tự hết hạn.
 
 ### Xử lý Webhook IPN từ SePay
 
 ```
-SePay                  NestJS API (POST /payments/ipn)
+SePay                  NestJS API (POST /payments/sepay/webhook-ipn)
   │                         │
-  │── IPN payload ─────────►│── Kiểm tra transactionId trong bảng Payment
-  │                         │   Nếu Payment.status đã là SUCCESS:
-  │◄── 200 OK ──────────── │     → Trả 200 OK ngay, KHÔNG cập nhật lại
-  │                         │   Nếu Payment.status = PROCESSING:
-  │◄── 200 OK ──────────── │     → Cập nhật → SUCCESS, cập nhật Order → PAID
+  │── IPN payload ─────────►│── Khóa đơn và kiểm tra Payment
+  │                         │   Nếu status, transactionRef, amount trùng:
+  │◄── 201 Created ─────── │     → Trả payment cũ, KHÔNG cập nhật lại
+  │                         │   Nếu giao dịch mới hợp lệ:
+  │◄── 201 Created ─────── │     → Cập nhật → SUCCESS, cập nhật Order → PAID
 ```
 
-`Payment.transactionId` có **Unique Constraint** → không thể INSERT cùng transactionId hai lần → ngăn IPN retry gây duplicate record.
+`Payment.transactionRef` và `Payment.orderId` có **Unique Constraint**. Khóa đơn và transaction bảo đảm IPN lặp không ghi nhận thành công hoặc tiêu thụ tồn kho lần hai; callback lỗi không hạ trạng thái payment đã thành công.
 
 ---
 
@@ -111,19 +110,20 @@ SePay                  NestJS API (POST /payments/ipn)
 **Tích cực:**
 - Loại bỏ hoàn toàn nguy cơ tạo đơn trùng và trừ tiền trùng (FR-21).
 - Hoạt động đúng kể cả khi có network retry tự động (axios retry, SePay IPN retry).
-- Có thể tái sử dụng middleware cho bất kỳ endpoint "write" nào trong tương lai.
+- Có thể tái sử dụng helper `withIdempotency` trong transaction của endpoint ghi khác.
 
 **Tiêu cực / Đánh đổi:**
-- Cần thêm bảng `IdempotencyRecord` và logic middleware.
+- Cần thêm bảng `IdempotencyRecord` và helper xử lý trong transaction.
 - Client phải sinh và lưu `Idempotency-Key` trước khi submit form (UUID v4, dễ implement).
-- Cần job dọn dẹp (cleanup) record đã hết TTL (24h) để bảng không phình to. *(Có thể dùng `pg_cron` hoặc NestJS scheduled task)*
+- Bản ghi tăng theo số key thành công. Hiện không tự xóa để tránh request cũ tạo đơn/giao dịch lại sau khi hết TTL; nếu bổ sung cleanup cần quy định rõ thời hạn bảo đảm chống lặp.
 
 ---
 
 ## Quy ước áp dụng
 
-1. **Client (Next.js):** Sinh `idempotencyKey = uuidv4()` khi user mở form checkout, lưu vào React state. Dùng lại key này cho mọi lần retry trong cùng phiên thanh toán.
-2. **Server (NestJS):** `IdempotencyMiddleware` đọc header `Idempotency-Key`, kiểm tra DB, xử lý hoặc trả cache.
-3. **TTL:** Bản ghi `IdempotencyRecord` hết hạn sau **24 giờ** – đủ để cover mọi retry hợp lệ mà không giữ dữ liệu vĩnh viễn.
-4. **Scope key:** Mỗi key gắn với một `(userId, endpoint)` – không cho phép tái sử dụng chéo endpoint hay chéo user.
+1. **Client (Next.js):** Sinh UUID trước submit, lưu cùng payload trong `sessionStorage` và ref. Dùng lại key cho retry/tải lại trang; đổi key khi payload đổi và xóa phiên sau hoàn tất.
+2. **Server (NestJS):** Controller đọc `Idempotency-Key`; service gọi `withIdempotency` trong transaction trước thay đổi dữ liệu. Header cũ `X-Idempotency-Key` và body key của checkout vẫn được hỗ trợ.
+3. **Replay:** Tạo đơn trả snapshot ban đầu. Checkout trả payment hiện tại mà không khởi tạo giao dịch lại; key cũ vẫn được ghi nhớ sau khi đổi key cho retry. Đơn hết hạn/hủy không được mở checkout lại.
+4. **Scope/TTL:** Khóa chính `(scope, key)`, không tự hết hạn. Cùng key với payload khác trả `409`; key không hợp lệ hoặc mâu thuẫn header/body trả `400`. Client không gửi key vẫn hoạt động nhưng không có bảo đảm chống lặp theo key.
+5. **Kiểm chứng:** [Test HTTP + PostgreSQL](../../../apps/api/test/idempotency.e2e-spec.ts), đặc biệt `INT-IDEM-01/02` và `INT-PAY-03`. Xem [hướng dẫn API](../../idempotency-api.md) để áp dụng migration và chạy test.
 

@@ -8,6 +8,7 @@ import { formatCurrencyVND } from '@/data/mockProducts';
 import type { CartItem } from '@/types/cart';
 import { requestPromotionQuote, type PromotionQuote } from '@/lib/promotions';
 import PromotionCodeField from './PromotionCodeField';
+import { clearCheckoutAttempt, getCheckoutAttempt, type CheckoutAttempt } from '@/lib/checkout-idempotency';
 
 interface CreatedOrder {
   id: string;
@@ -49,6 +50,7 @@ export default function CheckoutPageClient() {
   const [promotionFeedback, setPromotionFeedback] = useState<PromotionFeedback | null>(null);
   const promotionRequest = useRef<AbortController | null>(null);
   const promotionRequestId = useRef(0);
+  const checkoutAttempt = useRef<CheckoutAttempt | null>(null);
 
   // Immutable cart arrays bind each quote to exactly the cart that was checked.
   const currentPromotion = promotionFeedback?.items === items ? promotionFeedback : null;
@@ -254,6 +256,7 @@ export default function CheckoutPageClient() {
                     throw new Error('Lỗi kích hoạt webhook SePay');
                   }
                   clearCart();
+                  clearCheckoutAttempt();
                   setIsPaid(true);
                 } catch (e: unknown) {
                   const error = e as Error;
@@ -271,6 +274,7 @@ export default function CheckoutPageClient() {
               className="w-full min-h-11 rounded-full border border-coffee-300 text-sm font-semibold text-coffee-800 transition hover:bg-cream-100"
               onClick={() => {
                 clearCart();
+                clearCheckoutAttempt();
                 setIsPaid(true);
               }}
               type="button"
@@ -344,15 +348,20 @@ export default function CheckoutPageClient() {
       };
 
       // Gửi yêu cầu tạo đơn hàng POST /orders (kèm JWT nếu đã đăng nhập)
+      const orderBody = JSON.stringify(orderPayload);
+      checkoutAttempt.current = getCheckoutAttempt(orderBody, checkoutAttempt.current);
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      const orderHeaders: HeadersInit = { 'Content-Type': 'application/json' };
+      const orderHeaders: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': checkoutAttempt.current.key,
+      };
       if (token) {
         orderHeaders['Authorization'] = `Bearer ${token}`;
       }
       const orderRes = await fetch(`${apiUrl}/orders`, {
         method: 'POST',
         headers: orderHeaders,
-        body: JSON.stringify(orderPayload),
+        body: orderBody,
       });
 
       if (!orderRes.ok) {
@@ -370,23 +379,31 @@ export default function CheckoutPageClient() {
       if (paymentMethod === 'SEPAY_QR') {
         const qrRes = await fetch(`${apiUrl}/payments/sepay/checkout`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Idempotency-Key': `payment-${orderData.id}` },
           body: JSON.stringify({
             orderId: orderData.id,
             amount: orderData.totalAmount,
-            idempotencyKey: `idem-${orderData.id}`,
           }),
         });
 
-        if (qrRes.ok) {
-          const qrData: PaymentQR = await qrRes.json();
-          setPaymentQR(qrData);
+        if (!qrRes.ok) {
+          const errorData = await qrRes.json().catch(() => null);
+          throw new Error(errorData?.message || 'Không thể khởi tạo thanh toán. Vui lòng thử lại.');
+        }
+        const qrData: PaymentQR = await qrRes.json();
+        if (qrData.status === 'SUCCESS') {
+          clearCart();
+          clearCheckoutAttempt();
+          setIsPaid(true);
           return;
         }
+        setPaymentQR(qrData);
+        return;
       }
 
       // Nếu thanh toán tiền mặt tại quầy
       clearCart();
+      clearCheckoutAttempt();
       setIsPaid(true);
     } catch (err: unknown) {
       const error = err as Error;

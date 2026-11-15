@@ -132,6 +132,16 @@ model Payment {
   updatedAt      DateTime      @updatedAt
 }
 
+model IdempotencyRecord {
+  scope       String
+  key         String
+  requestHash String
+  response    Json
+  createdAt   DateTime @default(now())
+
+  @@id([scope, key])
+}
+
 model Promotion {
   id            String       @id @default(cuid())
   code          String       @unique
