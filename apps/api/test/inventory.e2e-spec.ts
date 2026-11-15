@@ -107,9 +107,14 @@ describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
 
   it('INT-INV-06: failed order insertion rolls back the inventory update', async () => {
     const p = await product(3);
-    await expect(context.app.get(OrdersService).create({
-      ...payload([item(p.id, 2)]), userId: 'nonexistent-user',
-    })).rejects.toMatchObject({ code: 'P2003' });
+    await expect(
+  context.app.get(OrdersService).create(
+    {
+      ...payload([item(p.id, 2)]),
+    },
+    'nonexistent-user',
+  ),
+).rejects.toMatchObject({ code: 'P2003' });
     expect(await stock(p.id)).toEqual(p);
     expect(await context.prisma.order.count()).toBe(0);
   });
