@@ -56,8 +56,11 @@ services:
       SEPAY_IPN_SECRET_KEY: ${SEPAY_IPN_SECRET_KEY:?SEPAY_IPN_SECRET_KEY is required}
       SEPAY_TEST_API_TOKEN: ${SEPAY_TEST_API_TOKEN:-}
 
-      # Chỉ bật trên máy local dùng để demo
+      # Hoàn tiền mô phỏng Sandbox
       REFUND_DEMO_ENABLED: ${REFUND_DEMO_ENABLED:-false}
+
+      # Thời gian giữ tồn kho (cấu hình từ main)
+      STOCK_RESERVATION_TTL_SECONDS: ${STOCK_RESERVATION_TTL_SECONDS:-900}
 
     depends_on:
       postgres:

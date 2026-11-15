@@ -43,6 +43,12 @@ enum PaymentMethod {
   CASH
 }
 
+enum StockReservationStatus {
+  HELD
+  CONSUMED
+  RELEASED
+}
+
 enum LoyaltyType {
   EARN
   REDEEM
@@ -51,6 +57,26 @@ enum LoyaltyType {
 enum DiscountType {
   PERCENTAGE
   FIXED_AMOUNT
+}
+
+model DrinkSizeOption {
+  id              String   @id
+  label           String
+  priceAdjustment Int
+  sortOrder       Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ToppingOption {
+  id        String   @id
+  name      String   @unique
+  unitPrice Int
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model User {
@@ -74,43 +100,66 @@ model Product {
   price       Int
   imageUrl    String
   stock       Int
+  version     Int         @default(0)
   orderItems  OrderItem[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @default(now()) @updatedAt
 }
 
+
 model Order {
-  id                  String               @id @default(cuid())
-  userId              String?
-  user                User?                @relation(fields: [userId], references: [id])
-  customerName        String
-  customerPhone       String
-  tableNumber         Int?
-  notes               String?
-  totalAmount         Int
-  status              OrderStatus          @default(PENDING)
-  items               OrderItem[]
-  payment             Payment?
-  promotionId         String?
-  promotion           Promotion?           @relation(fields: [promotionId], references: [id])
-  loyaltyTransactions LoyaltyTransaction[]
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  refunds Refund[]
+  id                   String                  @id @default(cuid())
+  userId               String?
+  user                 User?                   @relation(fields: [userId], references: [id])
+  customerName         String
+  customerPhone        String
+  tableNumber          Int?
+  notes                String?
+
+  // Quáº£n lÃ½ giÃ¡ vÃ  khuyáº¿n mÃ£i
+  subtotalAmount       Int                     @default(0)
+  discountAmount       Int                     @default(0)
+  totalAmount          Int
+
+  // Tráº¡ng thÃ¡i Ä‘Æ¡n hÃ ng vÃ  giá»¯ tá»“n kho
+  status               OrderStatus             @default(PENDING)
+  reservationStatus    StockReservationStatus?
+  reservationExpiresAt DateTime?
+
+  // Sáº£n pháº©m vÃ  thanh toÃ¡n
+  items                OrderItem[]
+  payment              Payment?
+
+  // Khuyáº¿n mÃ£i
+  promotionId          String?
+  promotionCode        String?
+  promotion            Promotion?              @relation(fields: [promotionId], references: [id])
+
+  // Äiá»ƒm thÆ°á»Ÿng
+  loyaltyTransactions  LoyaltyTransaction[]
+
+  // HoÃ n tiá»n
+  refunds              Refund[]
+
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  @@index([reservationStatus, reservationExpiresAt])
 }
 
+
 model OrderItem {
-  id                  String   @id @default(cuid())
-  orderId             String
-  order               Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId           String
-  product             Product  @relation(fields: [productId], references: [id])
-  productName         String
-  unitPrice           Int
-  quantity            Int
-  size                String   @default("M")
-  toppings            String?
-  itemTotal           Int
+  id          String  @id @default(cuid())
+  orderId     String
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+  productName String
+  unitPrice   Int
+  quantity    Int
+  size        String  @default("M")
+  toppings    String?
+  itemTotal   Int
 }
 
 model Payment {
@@ -158,53 +207,54 @@ model LoyaltyTransaction {
 }
 
 
+
 model Refund {
   id                 String       @id @default(cuid())
 
-  // Liên kết với đơn hàng
+  // Li├¬n kß║┐t vß╗¢i ─æ╞ín h├áng
   orderId            String
   order              Order        @relation(fields: [orderId], references: [id])
 
-  // Liên kết với giao dịch thanh toán gốc
+  // Li├¬n kß║┐t vß╗¢i giao dß╗ïch thanh to├ín gß╗æc
   paymentId          String
   payment            Payment      @relation(fields: [paymentId], references: [id])
 
-  // Thông tin hoàn tiền
+  // Th├┤ng tin ho├án tiß╗ün
   amount             Int
   status             RefundStatus @default(REQUESTED)
 
-  // Chống tạo yêu cầu hoàn tiền trùng
+  // Chß╗æng tß║ío y├¬u cß║ºu ho├án tiß╗ün tr├╣ng
   idempotencyKey     String       @unique
 
-  // Thông tin giao dịch SePay ban đầu
+  // Th├┤ng tin giao dß╗ïch SePay ban ─æß║ºu
   originalTxnRef     String
   sepayRefundId      String?      @unique
 
-  // Nhân viên xét duyệt yêu cầu
+  // Nh├ón vi├¬n x├⌐t duyß╗çt y├¬u cß║ºu
   approvedBy         String?
   approvedAt         DateTime?
 
-  // Thông tin chuyển khoản hoàn tiền thủ công
+  // Th├┤ng tin chuyß╗ân khoß║ún ho├án tiß╗ün thß╗º c├┤ng
   bankTransactionRef String?      @unique
   evidenceUrl        String?
   transferRecordedBy String?
   transferRecordedAt DateTime?
 
-  // Quản lý xác minh hoàn tiền thật
+  // Quß║ún l├╜ x├íc minh ho├án tiß╗ün thß║¡t
   verifiedBy         String?
   verifiedAt         DateTime?
 
-  // Thông tin từ chối hoặc lỗi
+  // Th├┤ng tin tß╗½ chß╗æi hoß║╖c lß╗ùi
   rejectionReason    String?
   errorMessage       String?
 
-  // Hoàn tiền mô phỏng Sandbox
-  // Không phát sinh chuyển khoản ngân hàng hoặc hoàn tiền SePay thật
+  // Ho├án tiß╗ün m├┤ phß╗Ång Sandbox
+  // Kh├┤ng ph├ít sinh chuyß╗ân khoß║ún ng├ón h├áng hoß║╖c ho├án tiß╗ün SePay thß║¡t
   demoReference      String?      @unique
   demoCompletedAt    DateTime?
   demoBy             String?
 
-  // Thời gian
+  // Thß╗¥i gian
   requestedAt        DateTime     @default(now())
   completedAt        DateTime?
   updatedAt          DateTime     @updatedAt

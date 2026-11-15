@@ -1553,17 +1553,17 @@ Sơ đồ UML Deployment Diagram thể hiện kiến trúc vật lý và hạ t�
 \textbf{Các node triển khai chính:}
 \begin{itemize}
     \item \textbf{Client Device / PWA Browser:} Thiết bị người dùng chạy giao diện Next.js PWA; \texttt{localStorage} lưu JWT Token và trạng thái giỏ hàng.
-    \item \textbf{Vercel Global Edge Network (Frontend):} Phục vụ \texttt{apps/web} (Next.js~14 App Router) qua HTTPS/TLS~1.3 cổng~443 với Global CDN. Tự động triển khai khi push lên nhánh \texttt{main}.
+    \item \textbf{Vercel Global Edge Network (Frontend):} Phục vụ \texttt{apps/web} (Next.js~14 App Router) qua HTTPS/TLS~1.3 cổng~443 với Global CDN. Production được triển khai bởi workflow CD qua Vercel API; auto-deploy trực tiếp từ nhánh \texttt{main} được tắt để tránh triển khai vượt qua migration.
     \item \textbf{Render.com Docker Container (Backend API):} Chạy \texttt{apps/api} (NestJS~10) trên Linux Container Node.js~20~LTS, cổng nội bộ \texttt{3001} được Render SSL Reverse Proxy chuyển tiếp ra cổng~443. Trang bị Health Check Endpoint \texttt{GET /health} và LoggingInterceptor xuất nhật ký ra stdout.
     \item \textbf{Render Managed PostgreSQL~16 (Database):} Kết nối nội bộ Private Network cổng \texttt{5432/SSL}; gắn đĩa lưu trữ bền vững có mã hóa với sao lưu tự động hàng ngày. Không mở IP public trực tiếp ra Internet.
     \item \textbf{SePay Sandbox Gateway (External):} Tiếp nhận yêu cầu thanh toán (\texttt{POST /payment/create}) và gửi thông báo kết quả thời gian thực qua Webhook IPN (\texttt{POST /payments/ipn}) có xác thực chữ ký bí mật.
-    \item \textbf{GitHub Actions CI/CD:} Pipeline tự động chạy Quality Gates (ESLint, type-check, Jest) rồi kích hoạt triển khai Vercel và Render khi CI qua thành công.
+    \item \textbf{GitHub Actions CI/CD:} CI chạy khi có Pull Request nhắm vào \texttt{main}/\texttt{develop} hoặc push vào một trong hai nhánh này. CD là workflow riêng, chỉ chạy khi push vào \texttt{main} hoặc được kích hoạt thủ công; workflow tự chạy quality gate, migration, triển khai qua Render/Vercel API và smoke test.
 \end{itemize}
 
 \textbf{Ranh giới môi trường:}
 \begin{itemize}
     \item \textit{Local Development:} \texttt{docker-compose.yml} khởi chạy ba container: Next.js (\texttt{localhost:3000}), NestJS (\texttt{localhost:3001}), PostgreSQL (\texttt{localhost:5432}).
-    \item \textit{CI / Testing:} GitHub Actions Ubuntu Runner -- chạy test, lint, build; không triển khai tự động trừ khi nhánh \texttt{main} được merge thành công.
+    \item \textit{CI / Testing:} GitHub Actions Ubuntu Runner -- CI kiểm tra Pull Request nhắm vào \texttt{main}/\texttt{develop} và push lên hai nhánh này; CD chạy riêng trên push \texttt{main} hoặc khi được kích hoạt thủ công. CD không chờ workflow CI riêng hoàn tất, mà chạy quality gate của chính nó trước khi triển khai.
     \item \textit{Production:} Vercel (Web) + Render.com (API + DB) -- HTTPS, secret mã hóa, persistent storage, health check.
 \end{itemize}
 
@@ -1638,7 +1638,7 @@ Hệ thống thiết lập bộ kiểm thử toàn diện trên cả Backend và
 
 \subsection{Task 4.4 – Continuous Integration}
 
-Hệ thống CI tự động được thiết lập thông qua \textbf{GitHub Actions} (file cấu hình \texttt{.github/workflows/ci.yml}), tự động kích hoạt mỗi khi có commit push hoặc Pull Request vào nhánh \texttt{main}.
+Hệ thống CI tự động được thiết lập thông qua \textbf{GitHub Actions} (file cấu hình \texttt{.github/workflows/ci.yml}), kích hoạt khi có commit push vào \texttt{main}/\texttt{develop} hoặc Pull Request nhắm vào một trong hai nhánh này.
 
 Pipeline tuân thủ nghiêm ngặt quy trình Quality Gate 4 bước bắt buộc theo yêu cầu đề bài:
 \begin{center}
@@ -1651,7 +1651,7 @@ Pipeline tuân thủ nghiêm ngặt quy trình Quality Gate 4 bước bắt bu�
     \begin{enumerate}
         \item \textit{Install:} Cài đặt chính xác các phụ thuộc thông qua \texttt{npm ci}.
         \item \textit{Generate Prisma:} Sinh Prisma Client từ \texttt{schema.prisma}.
-        \item \textit{Lint \& Type-check:} Kiểm tra kiểu dữ liệu tĩnh và lỗi cú pháp với TypeScript compiler (\texttt{npm run lint} $\rightarrow$ \texttt{tsc --noEmit}).
+        \item \textit{Type-check:} Kiểm tra kiểu dữ liệu tĩnh với TypeScript compiler (\texttt{npm run typecheck} $\rightarrow$ \texttt{tsc --noEmit}); Backend hiện chưa cấu hình linter riêng.
         \item \textit{Unit Test:} Thực thi toàn bộ Unit Tests với Jest (\texttt{npm test -- --runInBand}).
         \item \textit{Build:} Biên dịch mã nguồn Backend NestJS (\texttt{npm run build}).
     \end{enumerate}
@@ -1669,6 +1669,7 @@ Nhánh \texttt{main} được cấu hình chính sách \textbf{Branch Protection
 \begin{itemize}
     \item Bắt buộc mọi thay đổi phải thông qua Pull Request (tuyệt đối cấm commit trực tiếp lên \texttt{main}).
     \item Yêu cầu bắt buộc toàn bộ các bước kiểm tra (Status Checks) của \texttt{Backend API CI} và \texttt{Frontend Web CI} phải vượt qua thành công (\textit{Passed}) mới cho phép kích hoạt nút Merge.
+    \item Workflow CI cũng chạy cho Pull Request nhắm vào \texttt{develop}. Để chặn merge khi CI thất bại trên nhánh này, cần cấu hình Branch Protection riêng cho \texttt{develop} trong GitHub Settings và yêu cầu hai status check tương ứng; workflow YAML không tự bật chính sách bảo vệ nhánh.
 \end{itemize}
 
 \noindent\textbf{Minh chứng 1 -- Pipeline phát hiện lỗi (Quality Gate Blocked -- Status: Failed):}
@@ -1783,14 +1784,14 @@ Nhằm đảm bảo tính tin cậy cao nhất cho phiên bản release, nhóm �
 
 \noindent\textit{Thành viên thực hiện chính: Kiệt (Nhóm trưởng) \& Hùng (DevOps Engineer).}
 
-Quy trình giao vận và triển khai liên tục (CD) được thiết kế theo đúng chuẩn mực DevSecOps và quy định tại Mục 7.3 của đề bài. Toàn bộ pipeline được cấu hình thông qua workflow GitHub Actions (\texttt{.github/workflows/cd.yml}), tự động kích hoạt mỗi khi có Git Tag mới theo chuẩn Semantic Versioning (ví dụ: \texttt{v1.0.0}) hoặc khi nhánh \texttt{main} được cập nhật.
+Quy trình giao vận và triển khai liên tục (CD) được cấu hình trong workflow GitHub Actions (\texttt{.github/workflows/cd.yml}). Workflow chạy khi có push vào nhánh \texttt{main} hoặc khi được kích hoạt thủ công (\texttt{workflow\_dispatch}). Bước preflight chỉ cho phép triển khai từ \texttt{main} và từ chối nếu commit của lần chạy không còn là commit mới nhất trên nhánh này. Workflow hiện tại không được kích hoạt bởi Git Tag.
 
 \subsubsection{Sơ đồ Chuỗi Pipeline Giao vận Đầy đủ}
 
-Pipeline tuân thủ nghiêm ngặt chuỗi tiến trình 7 bước tuần tự:
+Pipeline gồm trigger và các bước triển khai sau:
 
 \begin{center}
-\textbf{Push/Tag} $\longrightarrow$ \textbf{Lint \& Test} $\longrightarrow$ \textbf{Build} $\longrightarrow$ \textbf{Docker Image} $\longrightarrow$ \textbf{Push Registry} $\longrightarrow$ \textbf{Deploy} $\longrightarrow$ \textbf{Smoke Test}
+\textbf{Push main / Manual} $\longrightarrow$ \textbf{Quality Gate} $\longrightarrow$ \textbf{Build \& Push GHCR} $\longrightarrow$ \textbf{Migration} $\longrightarrow$ \textbf{Deploy đúng SHA} $\longrightarrow$ \textbf{Smoke Test}
 \end{center}
 
 \begin{figure}[H]
@@ -1800,15 +1801,15 @@ Pipeline tuân thủ nghiêm ngặt chuỗi tiến trình 7 bước tuần tự:
         box/.style={draw, rectangle, rounded corners=3pt, align=center, fill=blue!5, font=\footnotesize\bfseries, minimum height=0.8cm, inner sep=4pt},
         arrow/.style={->, >=stealth, thick, color=blue!80!black}
     ]
-        \node (tag) [box, fill=gray!20] {1. Push / Tag\\(\texttt{v1.0.0})};
+        \node (tag) [box, fill=gray!20] {1. Push \texttt{main} /\\Manual dispatch};
         \node (qg) [box, right=of tag] {2. Quality Gate\\(Lint, Test, Build)};
-        \node (docker) [box, right=of qg] {3. Multi-stage\\Docker Packaging};
+        \node (docker) [box, right=of qg] {3. Build\\Docker Images};
         \node (push) [box, right=of docker] {4. Push to Registry\\(GitHub GHCR)};
         
-        \node (mig) [box, below=1.2cm of tag] {5. Safe Database\\Migration (\texttt{Prisma})};
-        \node (deploy) [box, right=of mig] {6. Zero-downtime\\Cloud Deploy};
+        \node (mig) [box, below=1.2cm of tag] {5. Database Migration\\(\texttt{Prisma})};
+        \node (deploy) [box, right=of mig] {6. Render/Vercel API\\Deploy đúng SHA};
         \node (smoke) [box, right=of deploy, fill=green!15] {7. Post-Deploy\\Smoke Test (\texttt{/health})};
-        \node (rollback) [box, right=of smoke, fill=red!15] {Rollback Protocol\\(If Failed)};
+        \node (rollback) [box, right=of smoke, fill=red!15] {Manual Rollback\\(If Failed)};
 
         \draw [arrow] (tag) -- (qg);
         \draw [arrow] (qg) -- (docker);
@@ -1818,7 +1819,7 @@ Pipeline tuân thủ nghiêm ngặt chuỗi tiến trình 7 bước tuần tự:
         \draw [arrow] (deploy) -- (smoke);
         \draw [arrow, dashed, color=red] (smoke) -- node[above, font=\tiny\color{red}]{\textbf{Failed}} (rollback);
     \end{tikzpicture}
-    \caption{Quy trình Continuous Delivery và Tự động hóa Triển khai Production của BrewLite}
+    \caption{Quy trình Continuous Delivery và triển khai Production của BrewLite}
     \label{fig:cd-pipeline}
 \end{figure}
 
@@ -1826,31 +1827,31 @@ Pipeline tuân thủ nghiêm ngặt chuỗi tiến trình 7 bước tuần tự:
 
 \begin{enumerate}
     \item \textbf{Cổng kiểm soát chất lượng (Quality Gate):}
-    Trước khi đóng gói, hệ thống chạy toàn bộ kiểm tra tĩnh TypeScript, linter và bộ kiểm thử tự động của cả hai ứng dụng Backend và Frontend. Nếu có bất kỳ lỗi nào xuất hiện, pipeline dừng ngay lập tức và hủy bỏ tiến trình giao vận.
+    Trước khi đóng gói, CD chạy type-check và unit test cho Backend; linter, unit/component test và kiểm thử script triển khai cho Frontend; sau đó build cả hai ứng dụng. E2E Backend với PostgreSQL chạy trong CI của Pull Request, nhưng hiện không được lặp lại trong quality gate của CD. Backend chưa cấu hình linter riêng. Nếu một bước trong quality gate thất bại, các job phụ thuộc sẽ không chạy.
 
     \item \textbf{Gắn nhãn định danh Container Image:}
-    Mỗi container image được đóng gói độc lập thông qua \texttt{apps/api/Dockerfile} và \texttt{apps/web/Dockerfile} sử dụng kiến trúc multi-stage build (dựa trên base image siêu nhẹ \texttt{node:20-alpine} và người dùng phi đặc quyền \texttt{non-root user}). Image được tự động gắn nhãn (\textit{tag}) kép: Commit SHA rút gọn (\texttt{sha-<hash>}) để phục vụ truy vết mã nguồn và nhãn phiên bản (\texttt{v1.0.0}, \texttt{latest}).
+    Mỗi container image được build độc lập từ \texttt{apps/api/Dockerfile} và \texttt{apps/web/Dockerfile}. Workflow tạo tag theo commit SHA rút gọn (\texttt{sha-<hash>}) và tag \texttt{latest} trên nhánh mặc định. Dù metadata có khai báo mẫu tag Semantic Versioning, workflow không có trigger Git Tag nên không tự phát hành theo tag phiên bản.
 
     \item \textbf{Lưu trữ Container trên Registry:}
-    Container images được đẩy trực tiếp lên kho chứa bảo mật \textbf{GitHub Packages Container Registry} (\texttt{ghcr.io/ngtuankiet241-cmd/assignment2--brewlite/api} và \texttt{web}) có cơ chế cache tầng buildx giúp rút ngắn thời gian đóng gói xuống dưới 45 giây.
+    Container images được đẩy lên \textbf{GitHub Container Registry (GHCR)} tại \texttt{ghcr.io/\{owner\}/\{repository\}/api} và \texttt{web}. Các image được lưu trên registry; bước triển khai bên dưới không kéo các image này về chạy.
 
     \item \textbf{Triển khai vào Production bằng Secret của CI:}
-    Quy trình triển khai đám mây được kích hoạt tự động thông qua các Webhook bí mật được cấu hình trong GitHub Repository Secrets (\texttt{RENDER\_DEPLOY\_HOOK\_URL}, \texttt{VERCEL\_DEPLOY\_HOOK\_URL}). Tuyệt đối không lưu trữ bất kỳ mật khẩu hoặc thông tin nhạy cảm nào trong mã nguồn Git.
+    Workflow dùng các GitHub Secrets như \texttt{RENDER\_API\_TOKEN}, \texttt{RENDER\_SERVICE\_ID}, \texttt{VERCEL\_TOKEN}, \texttt{VERCEL\_PROJECT\_ID} và \texttt{PRODUCTION\_DATABASE\_URL}; \texttt{VERCEL\_TEAM\_ID} là tùy chọn, còn tên project được cấu hình bằng Actions Variable. Script gọi Render/Vercel API để triển khai đúng commit Git SHA, không dùng deploy hook và không triển khai image GHCR. Secret không được lưu trong repository.
 
     \item \textbf{Cơ chế di chuyển cơ sở dữ liệu an toàn (Safe Database Migration):}
-    Lệnh di chuyển dữ liệu \texttt{npx prisma migrate deploy} được thực thi độc lập trong một container chuyên biệt kết nối tới Render Managed PostgreSQL thông qua kết nối bảo mật SSL. Quá trình này hoàn tất thành công trước khi hệ thống chuyển hướng lưu lượng truy cập sang phiên bản ứng dụng mới, ngăn chặn tình trạng bất tương thích schema giữa code và database.
+    Sau khi kiểm tra cấu hình provider và xác nhận đây là commit mới nhất trên \texttt{main}, runner cài Prisma CLI và chạy \texttt{npx prisma migrate deploy} bằng \texttt{PRODUCTION\_DATABASE\_URL}. Migration hoàn tất trước khi gọi API triển khai Render rồi Vercel. Pipeline không tự tạo backup hay rollback migration; thay đổi schema vẫn cần được thiết kế tương thích với phiên bản đang chạy và không bảo đảm zero-downtime.
 
     \item \textbf{Kiểm thử khói tự động sau triển khai (Smoke Test \& Health Check):}
-    Sau khi nhà cung cấp đám mây báo cáo hoàn tất việc cập nhật, Job \texttt{smoke-test} tự động gửi request thăm dò endpoint \texttt{GET /health} của Backend API (thực hiện cơ chế retry tối đa 6 lần trong vòng 60 giây để chờ ứng dụng khởi động xong). Chỉ khi endpoint phản hồi mã trạng thái HTTP 200 OK cùng trạng thái \texttt{"status":"ok"} và Frontend trả về HTTP 200, lượt triển khai mới được công nhận là thành công.
+    Sau khi cả hai nhà cung cấp báo trạng thái triển khai thành công, job \texttt{smoke-test} gọi \texttt{/health}, \texttt{/products}, trang chủ Frontend và \texttt{/api/products}. Mỗi URL phải trả HTTP 200; lệnh \texttt{curl} có retry khi lỗi. Bước này kiểm tra mã HTTP, không xác minh nội dung JSON hoặc trạng thái nghiệp vụ của response.
 
     \item \textbf{Cơ chế dừng pipeline và phục hồi khẩn cấp (Rollback on Failure):}
-    Nếu bước triển khai hoặc bước Smoke Test thất bại, Job \texttt{rollback-on-failure} sẽ được kích hoạt tức thời nhờ điều kiện \texttt{if: failure()}. Hệ thống gửi cảnh báo lỗi nghiêm trọng về trung tâm thông báo, dừng việc định tuyến lưu lượng và tự động kích hoạt webhook rollback đưa ứng dụng về phiên bản ổn định liền trước.
+    Nếu migration, deploy hoặc smoke test thất bại, workflow đánh dấu lần chạy là thất bại và không chạy các job phụ thuộc tiếp theo. Workflow hiện tại \textbf{không có job tự động rollback}; nếu một provider đã triển khai trước khi lỗi xảy ra, hai dịch vụ có thể ở trạng thái phiên bản không đồng nhất. Nhóm thực hiện rollback thủ công trên dashboard Vercel/Render theo \texttt{docs/deployment.md}; database cần được sao lưu, đánh giá và khôi phục hoặc áp dụng migration khắc phục riêng, không tự động đảo migration.
 \end{enumerate}
 
 \begin{figure}[H]
     \centering
     \reportimage[width=0.95\linewidth]{assets/cd-pipeline-full-success.png}
-    \caption{Minh chứng toàn bộ 7 giai đoạn của CD Pipeline GitHub Actions thực thi thành công hoàn chỉnh (Merge PR \#9)}
+    \caption{Ảnh chụp lịch sử một lần chạy CD sau Merge PR \#9. Các job triển khai trong ảnh thành công; job rollback bị bỏ qua do không có lỗi. Ảnh thuộc cấu hình workflow tại thời điểm chạy và không chứng minh workflow hiện tại có rollback tự động.}
     \label{fig:cd-success}
 \end{figure}
 
@@ -1863,11 +1864,11 @@ Hệ thống BrewLite đã được bàn giao chính thức với đầy đủ c
 \subsubsection{Hạ tầng Môi trường Production \& URL Hoạt động}
 Hệ thống được vận hành trên hạ tầng đám mây phân tán toàn cầu, đáp ứng 100\% các tiêu chuẩn an toàn bảo mật:
 \begin{itemize}
-    \item \textbf{Frontend Production Web (PWA):} \url{https://brewlite.vercel.app}  
+    \item \textbf{Frontend Production Web (PWA):} \url{https://assignment2-brewlite.vercel.app}  
     Triển khai trên mạng biên toàn cầu Vercel Global Edge CDN, tích hợp chứng chỉ bảo mật HTTPS/TLS 1.3 tự động, tốc độ tải trang dưới 500~ms.
-    \item \textbf{Backend RESTful API Service:} \url{https://brewlite-api.onrender.com/api}  
+    \item \textbf{Backend RESTful API Service:} \url{https://brewlite-assignment2-api.onrender.com}  
     Vận hành trên Render Cloud Container Platform, kết nối an toàn qua HTTPS reverse proxy.
-    \item \textbf{Endpoint Giám sát Sức khỏe (Health Check):} \url{https://brewlite-api.onrender.com/health}  
+    \item \textbf{Endpoint Giám sát Sức khỏe (Health Check):} \url{https://brewlite-assignment2-api.onrender.com/health}  
     Phục vụ giám sát trạng thái thời gian thực của máy chủ và kết nối cơ sở dữ liệu.
     \item \textbf{Cơ sở Dữ liệu PostgreSQL 16:} Được lưu trữ tại Render Managed Database với ổ cứng mã hóa (Encrypted Persistent Disk). Cơ sở dữ liệu nằm trong mạng riêng nội bộ (Private Network), tuyệt đối không mở cổng trực tiếp ra Internet công cộng.
     \item \textbf{Quản trị Biến môi trường \& Secret:} Toàn bộ biến nhạy cảm (\texttt{DATABASE\_URL}, \texttt{JWT\_SECRET}, \texttt{SEPAY\_SECRET\_KEY}) được mã hóa trực tiếp trên trang quản trị đám mây của Vercel và Render, không xuất hiện trong kho Git hay log CI/CD.
@@ -1880,8 +1881,8 @@ Dự án đã chính thức gắn nhãn phát hành phiên bản \textbf{\texttt
 Tài liệu \texttt{docs/deployment.md} và \texttt{README.md} đã cung cấp hướng dẫn chi tiết về quy trình chạy cục bộ, biên dịch, đóng gói và quy trình Rollback theo 3 cấp độ:
 \begin{itemize}
     \item \textbf{Rollback Frontend (Vercel):} Tính năng \textit{Instant Rollback} trên Vercel Dashboard cho phép đảo ngược toàn bộ lưu lượng toàn cầu về bản build ổn định trước đó trong thời gian dưới 30 giây.
-    \item \textbf{Rollback Backend (Render):} Khôi phục container về commit SHA trước đó thông qua tính năng \textit{Roll back to this deploy} hoặc kích hoạt qua webhook khẩn cấp của CI.
-    \item \textbf{Rollback Cơ sở dữ liệu (Prisma):} Quy trình tạo file SQL đảo ngược (\texttt{npx prisma migrate diff}) bảo đảm không làm mất mát dữ liệu giao dịch của khách hàng.
+    \item \textbf{Rollback Backend (Render):} Thực hiện thủ công trên Render Dashboard bằng thao tác \textit{Roll back to this deploy}; pipeline hiện không gọi webhook rollback.
+    \item \textbf{Khôi phục Cơ sở dữ liệu:} Pipeline không tự rollback migration. Tạm ngưng ghi khi cần, sao lưu trạng thái hiện tại, thử khôi phục trên database riêng hoặc chuẩn bị migration khắc phục; không chạy SQL đảo ngược chưa kiểm chứng trên production.
 \end{itemize}
 
 \subsubsection{Kịch bản Video Demo Trực tiếp Luồng End-to-End}
@@ -1898,7 +1899,7 @@ Bảng phân cảnh video demo gồm 6 phân đoạn xuyên suốt thời lượ
 \hline
 \textbf{Scene 1} & 00:00 -- 00:45 & Giới thiệu đề tài, danh sách thành viên nhóm và kiến trúc phân tầng. & Kiệt \\
 \hline
-\textbf{Scene 2} & 00:45 -- 01:45 & Truy cập Web PWA tại \url{https://brewlite.vercel.app}, duyệt menu, tùy biến kích cỡ Size L, lượng đường/đá và topping. & Kiệt \& Luân \\
+\textbf{Scene 2} & 00:45 -- 01:45 & Truy cập Web PWA tại \url{https://assignment2-brewlite.vercel.app}, duyệt menu, tùy biến kích cỡ Size L, lượng đường/đá và topping. & Kiệt \& Luân \\
 \hline
 \textbf{Scene 3} & 01:45 -- 02:45 & Thao tác giỏ hàng, cập nhật số lượng, kiểm tra tổng tiền, nhập thông tin giao hàng tại bàn và ghi chú. & Kiệt \& Luân \\
 \hline
@@ -2092,7 +2093,7 @@ Assignment2--Brewlite/
 \hline
 6 & Pipeline CI/CD chạy thành công & $\boxtimes$ Hoàn thành & \texttt{.github/workflows/ci.yml}\newline\texttt{.github/workflows/cd.yml} \\
 \hline
-7 & URL production, API và health check & $\boxtimes$ Hoàn thành & Web: \url{https://brewlite.vercel.app}\newline API: \url{https://brewlite-api.onrender.com/api}\newline Health: \url{https://brewlite-api.onrender.com/health} \\
+7 & URL production, API và health check & $\boxtimes$ Hoàn thành & Web: \url{https://assignment2-brewlite.vercel.app}\newline API: \url{https://brewlite-assignment2-api.onrender.com}\newline Health: \url{https://brewlite-assignment2-api.onrender.com/health} \\
 \hline
 8 & Release notes, README và hướng dẫn rollback & $\boxtimes$ Hoàn thành & \texttt{docs/release-notes-v1.0.0.md}\newline\texttt{docs/deployment.md}\newline\texttt{README.md} \\
 \hline

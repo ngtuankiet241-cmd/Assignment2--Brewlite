@@ -48,7 +48,8 @@ function isCartItem(value: unknown): value is CartItem {
     typeof item.basePrice === 'number' &&
     Number.isFinite(item.basePrice) &&
     item.basePrice >= 0 &&
-    (item.size === 'S' || item.size === 'M' || item.size === 'L') &&
+    typeof item.size === 'string' &&
+    item.size.trim() !== '' &&
     typeof item.sizePriceAdjustment === 'number' &&
     Number.isFinite(item.sizePriceAdjustment) &&
     Array.isArray(item.toppings) &&
@@ -155,8 +156,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addItem = useCallback((input: AddCartItemInput) => {
-    const sizePriceAdjustment =
-      input.size === 'S' ? -5000 : input.size === 'L' ? 5000 : 0;
     const newItem: CartItem = {
       id: crypto.randomUUID(),
       productId: input.product.id,
@@ -166,7 +165,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       categoryName: input.product.categoryName,
       basePrice: input.product.price,
       size: input.size,
-      sizePriceAdjustment,
+      sizePriceAdjustment: input.sizePriceAdjustment,
       toppings: input.toppings.filter((topping) => topping.quantity > 0),
       quantity: input.quantity,
       stock: input.product.stock,

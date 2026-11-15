@@ -1,3 +1,4 @@
+
 import {
   ConflictException,
   NotFoundException,
@@ -14,7 +15,13 @@ import {
   assertTransition,
 } from './order-state-machine';
 
-// Khóa đơn hàng để tránh cập nhật đồng thời
+import {
+  assertReservationActive,
+  releaseStock,
+} from '../inventory/stock-reservation';
+
+// Khóa đơn hàng để tránh cập nhật đồng thời.
+// Mọi thao tác chuyển trạng thái phải dùng cùng cơ chế khóa.
 export async function lockOrder(
   tx: Prisma.TransactionClient,
   id: string,
@@ -23,16 +30,15 @@ export async function lockOrder(
     SELECT * FROM "Order" WHERE "id" = ${id} FOR UPDATE
   `;
 
-  if (!orders[0]) {
-    throw new NotFoundException(
-      `Order with id ${id} not found`,
-    );
+  if (!orders.length) {
+    throw new NotFoundException('Không tìm thấy đơn hàng.');
   }
 
   return orders[0];
 }
 
-// Chuyển trạng thái đơn hàng
+// Chuyển trạng thái đơn hàng.
+// Kết hợp quản lý tồn kho và kiểm tra yêu cầu hoàn tiền.
 export async function changeOrderStatus(
   tx: Prisma.TransactionClient,
   id: string,
@@ -43,7 +49,7 @@ export async function changeOrderStatus(
   const order = await lockOrder(tx, id);
   assertTransition(order.status, status);
 
-  // Không cho xác nhận đơn đang có yêu cầu hoàn tiền
+  // Không cho xác nhận đơn đang có yêu cầu hoàn tiền.
   if (
     order.status === OrderStatus.PAID &&
     status === OrderStatus.CONFIRMED
@@ -64,13 +70,37 @@ export async function changeOrderStatus(
     }
   }
 
+  const data: Prisma.OrderUpdateInput = {
+    status,
+  };
+
+  // Khi hủy đơn, giải phóng tồn kho theo logic của main.
+  if (status === OrderStatus.CANCELLED && order.reservationStatus) {
+    await releaseStock(tx, order);
+
+    data.reservationStatus = 'RELEASED';
+    data.reservationExpiresAt = null;
+  } else {
+    assertReservationActive(order);
+
+    // Khi thanh toán thành công, chuyển tồn kho từ HELD sang CONSUMED.
+    if (
+      status === OrderStatus.PAID &&
+      order.reservationStatus === 'HELD'
+    ) {
+      data.reservationStatus = 'CONSUMED';
+      data.reservationExpiresAt = null;
+    }
+  }
+
   return tx.order.update({
     where: { id },
-    data: { status },
+    data,
   });
 }
 
-// Hoàn tất hủy đơn sau khi hoàn tiền thành công
+// Hoàn tất hủy đơn sau khi có xác nhận hoàn tiền thật từ SePay.
+// Không sử dụng hàm này để hoàn tất giao dịch Demo.
 export async function finalizeRefundCancellation(
   tx: Prisma.TransactionClient,
   orderId: string,
@@ -109,8 +139,20 @@ export async function finalizeRefundCancellation(
     );
   }
 
+  const data: Prisma.OrderUpdateInput = {
+    status: OrderStatus.CANCELLED,
+  };
+
+  // Đồng bộ xử lý tồn kho khi hủy đơn.
+  if (order.reservationStatus) {
+    await releaseStock(tx, order);
+
+    data.reservationStatus = 'RELEASED';
+    data.reservationExpiresAt = null;
+  }
+
   return tx.order.update({
     where: { id: orderId },
-    data: { status: OrderStatus.CANCELLED },
+    data,
   });
 }

@@ -1,5 +1,6 @@
 import request = require('supertest');
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, Role } from '@prisma/client';
+import { AuthService } from '../src/auth/auth.service';
 import { createTestApplication, TestApplication } from './helpers/test-app';
 
 // Allowed edges taken from the requested state diagram, not from the code under test.
@@ -16,7 +17,13 @@ const forbidden = Object.values(OrderStatus).flatMap((from) =>
 
 describe('Order State Machine (HTTP + PostgreSQL integration)', () => {
   let context: TestApplication;
-  beforeAll(async () => { context = await createTestApplication(); });
+  let staffToken: string;
+  beforeAll(async () => {
+    context = await createTestApplication();
+    staffToken = context.app.get(AuthService).generateToken({
+      userId: 'state-machine-staff', email: 'staff@example.test', role: Role.BARISTA, fullName: 'Staff Test',
+    });
+  });
   beforeEach(async () => {
     await context.prisma.payment.deleteMany();
     await context.prisma.order.deleteMany();
@@ -27,7 +34,7 @@ describe('Order State Machine (HTTP + PostgreSQL integration)', () => {
     data: { status, customerName: 'State Machine Test', customerPhone: '0900000000', totalAmount: 70000 },
   });
   const patch = (id: string, status: unknown) => request(context.app.getHttpServer())
-    .patch(`/orders/${id}/status`).send({ status });
+    .patch(`/orders/${id}/status`).auth(staffToken, { type: 'bearer' }).send({ status });
   const checkout = (orderId: string, key: string) => request(context.app.getHttpServer())
     .post('/payments/sepay/checkout').send({ orderId, amount: 70000, idempotencyKey: key });
   const ipn = (orderId: string, status: 'SUCCESS' | 'FAILED', transactionRef: string) => request(context.app.getHttpServer())

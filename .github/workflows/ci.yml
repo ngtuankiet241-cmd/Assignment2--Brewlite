@@ -2,14 +2,30 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
   backend-ci:
     name: Backend API CI (Install, Lint, Test, Build)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: brewlite_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d brewlite_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/brewlite_test?schema=public
     defaults:
       run:
         working-directory: apps/api
@@ -31,11 +47,14 @@ jobs:
       - name: Generate Prisma Client
         run: npm run prisma:generate
 
-      - name: 2. Run Linter & Type-check
-        run: npm run lint
+      - name: 2. Type-check Backend
+        run: npm run typecheck
 
       - name: 3. Run Unit Tests
         run: npm test -- --runInBand
+
+      - name: Run HTTP and PostgreSQL integration tests
+        run: npm run test:e2e
 
       - name: 4. Build Backend Application
         run: npm run build

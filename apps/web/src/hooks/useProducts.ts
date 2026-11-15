@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Product, ProductCategory, ProductFilterCategory } from '@/types/product';
 import { parseProductsResponse, type BackendProduct } from '@/lib/productResponse';
+import { resolveProductImage } from '@/lib/productImage';
 
 export type DemoMode = 'normal' | 'loading' | 'empty' | 'error';
 
@@ -100,35 +101,18 @@ export function useProducts() {
         const resJson: unknown = await res.json();
         const rawList = parseProductsResponse(resJson);
 
-        const mappedProducts: Product[] = rawList.map((item: BackendProduct, index: number) => {
+        const mappedProducts: Product[] = rawList.map((item: BackendProduct) => {
           const { category, categoryName } = detectCategory(item.name);
-          const hasValidImage =
-            typeof item.imageUrl === 'string' &&
-            (item.imageUrl.startsWith('http://') ||
-              item.imageUrl.startsWith('https://') ||
-              item.imageUrl.startsWith('/'));
-
-          const safeImageUrl = hasValidImage
-            ? item.imageUrl
-            : category === 'tea'
-              ? '/images/products/tra-dao.svg'
-              : category === 'espresso'
-                ? '/images/products/americano.svg'
-                : '/images/products/ca-phe-sua.svg';
-
           return {
             id: String(item.id),
             name: item.name,
             description: item.description,
             price: Number(item.price) || 0,
-            imageUrl: safeImageUrl,
+            imageUrl: resolveProductImage(item.imageUrl, item.id),
             category,
             categoryName,
             isAvailable: typeof item.stock === 'number' ? item.stock > 0 : true,
             stock: item.stock,
-            rating: 4.8,
-            prepTimeMinutes: 3,
-            badge: index === 0 ? 'Bán chạy nhất' : undefined,
           };
         });
 

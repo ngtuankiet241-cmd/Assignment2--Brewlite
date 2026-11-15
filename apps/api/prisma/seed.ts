@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { DiscountType, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -47,6 +47,25 @@ const products = [
   },
 ];
 
+const promotions = [
+  { code: 'BREW10', description: 'Giảm 10%, tối đa 20.000đ, cho đơn từ 50.000đ',
+    discountType: DiscountType.PERCENTAGE, discountValue: 10, minOrderValue: 50000, maxDiscount: 20000 },
+  { code: 'BREW20K', description: 'Giảm 20.000đ cho đơn từ 100.000đ',
+    discountType: DiscountType.FIXED_AMOUNT, discountValue: 20000, minOrderValue: 100000 },
+];
+
+const drinkSizes = [
+  { id: 'S', label: 'Nhỏ', priceAdjustment: -5000, sortOrder: 0 },
+  { id: 'M', label: 'Vừa', priceAdjustment: 0, sortOrder: 1 },
+  { id: 'L', label: 'Lớn', priceAdjustment: 5000, sortOrder: 2 },
+];
+
+const toppings = [
+  { id: 'pearls', name: 'Trân châu đen', unitPrice: 7000, sortOrder: 0 },
+  { id: 'peach-jelly', name: 'Thạch đào', unitPrice: 8000, sortOrder: 1 },
+  { id: 'cheese-foam', name: 'Kem cheese', unitPrice: 10000, sortOrder: 2 },
+];
+
 async function main() {
   for (const product of products) {
     const existingProduct = await prisma.product.findFirst({
@@ -56,7 +75,7 @@ async function main() {
     if (existingProduct) {
       await prisma.product.update({
         where: { id: existingProduct.id },
-        data: product,
+        data: { ...product, version: { increment: 1 } },
       });
     } else {
       await prisma.product.create({
@@ -65,12 +84,37 @@ async function main() {
     }
   }
 
-  console.log(`Seeded ${products.length} products successfully.`);
+  for (const promotion of promotions) {
+    await prisma.promotion.upsert({
+      where: { code: promotion.code },
+      // Preserve any operator changes to validity, caps or activation on reruns.
+      update: {},
+      create: promotion,
+    });
+  }
+
+  for (const size of drinkSizes) {
+    await prisma.drinkSizeOption.upsert({
+      where: { id: size.id },
+      update: {},
+      create: size,
+    });
+  }
+
+  for (const topping of toppings) {
+    await prisma.toppingOption.upsert({
+      where: { id: topping.id },
+      update: {},
+      create: topping,
+    });
+  }
+
+  console.log(`Seeded ${products.length} products, ${promotions.length} promotions, and catalog options successfully.`);
 }
 
 main()
   .catch((error) => {
-    console.error('Failed to seed products:', error);
+    console.error('Failed to seed data:', error);
     process.exit(1);
   })
   .finally(async () => {

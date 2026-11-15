@@ -139,7 +139,7 @@ Tất cả các yêu cầu được phân loại mức độ ưu tiên theo phư
 | **Trigger** | Khách hàng nhấn nút "Thanh toán" hoặc "Xác nhận đặt hàng" từ màn hình giỏ hàng |
 | **Mã yêu cầu** | FR-04, FR-05, FR-07 (Giỏ hàng); FR-08, FR-09, FR-10 (Tạo đơn); FR-17 (JWT); FR-18..21 (Thanh toán) |
 | **Tiền điều kiện** | 1. Đã đăng nhập (có JWT hợp lệ).<br/>2. Giỏ hàng có ít nhất 01 sản phẩm.<br/>3. Dịch vụ thanh toán đang hoạt động. |
-| **Hậu điều kiện** | - Thành công: Đơn hàng ở trạng thái PAID, trừ tồn kho, giỏ hàng được làm sạch, chuyển sang màn hình theo dõi.<br/>- Thất bại: Đơn hàng PAYMENT_FAILED, giỏ hàng giữ nguyên, báo lỗi; có thể thử lại về PENDING hoặc hủy sang CANCELLED. |
+| **Hậu điều kiện** | - Thành công: Đơn hàng ở trạng thái PAID, chốt tồn kho đã giữ, giỏ hàng được làm sạch, chuyển sang màn hình theo dõi.<br/>- Thất bại: Đơn hàng PAYMENT_FAILED, giỏ hàng giữ nguyên, báo lỗi; có thể thử lại về PENDING trong TTL hoặc hủy sang CANCELLED. Hết TTL tự hủy và hoàn kho. |
 
 ### Luồng sự kiện chính (Main Flow):
 1. Khách hàng kiểm tra giỏ hàng trên Next.js UI (món, size, topping, tổng tiền).
@@ -147,19 +147,20 @@ Tất cả các yêu cầu được phân loại mức độ ưu tiên theo phư
 3. UI hiển thị màn hình xác nhận thông tin và chọn phương thức thanh toán (Ví/Thẻ).
 4. Khách hàng chọn phương thức thanh toán và nhấn "Xác nhận đặt hàng".
 5. Next.js gửi `POST /orders` kèm Bearer JWT và `Idempotency-Key` tới NestJS API.
-6. NestJS xác thực JWT, validate payload, kiểm tra tồn kho trong PostgreSQL.
-7. NestJS khởi tạo đơn hàng tạm thời (`PENDING`) và gọi SePay Payment Gateway.
+6. NestJS xác thực JWT, validate payload, cộng số lượng theo sản phẩm và kiểm tra tồn kho trong PostgreSQL.
+7. NestJS giữ/trừ tồn khả dụng bằng optimistic locking (`version`) và tạo đơn `PENDING` trong cùng transaction, sau đó gọi SePay Payment Gateway. Reservation có TTL mặc định 15 phút, cấu hình được; xung đột được retry có giới hạn.
 8. SePay xử lý giao dịch thành công và trả về Transaction ID.
-9. NestJS cập nhật đơn hàng thành `PAID`, trừ số lượng tồn kho sản phẩm trong một Database Transaction duy nhất.
+9. NestJS cập nhật đơn hàng thành `PAID`, chốt reservation thành `CONSUMED` và cập nhật Payment trong một Database Transaction duy nhất; không trừ tồn kho lần hai.
 10. NestJS trả về phản hồi HTTP 201 Created.
 11. Next.js xóa giỏ hàng local và chuyển hướng khách hàng sang màn hình Theo dõi đơn hàng.
 
 ### Luồng thay thế & ngoại lệ:
 - **AF-01 (Mã giảm giá):** Tại bước 3, áp dụng voucher hợp lệ -> tính lại tổng tiền.
 - **EF-01 (Token hết hạn - 401):** Yêu cầu khách hàng đăng nhập lại.
-- **EF-02 (Hết hàng - 400):** Tồn kho không đủ tại bước 6 -> hủy tạo đơn, yêu cầu cập nhật giỏ.
-- **EF-03 (Thanh toán thất bại):** Cổng thanh toán trả về lỗi -> cập nhật đơn PAYMENT_FAILED, giữ giỏ hàng; thử lại về PENDING hoặc hủy sang CANCELLED.
+- **EF-02 (Hết hàng - 409):** Tồn kho không đủ hoặc hết lượt retry do tranh chấp -> rollback toàn bộ tạo đơn/giữ hàng, yêu cầu cập nhật giỏ hoặc thử lại.
+- **EF-03 (Thanh toán thất bại):** Cổng thanh toán trả về lỗi -> cập nhật đơn PAYMENT_FAILED, giữ giỏ hàng và reservation đến hạn chót cũ; thử lại về PENDING trong TTL hoặc hủy sang CANCELLED.
 - **EF-04 (Trùng Idempotency-Key):** Nhận lại key đã xử lý -> trả về kết quả cũ mà không trừ tồn kho lần 2.
+- **EF-05 (Hết TTL giữ hàng):** Đơn PENDING/PAYMENT_FAILED hết hạn -> chuyển CANCELLED, hoàn kho đúng một lần trong transaction; checkout/IPN đến muộn bị từ chối với 409.
 
 ---
 

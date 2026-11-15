@@ -3,6 +3,8 @@ import { OrdersService } from './orders.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { OrderStatus } from '@prisma/client';
+import { InventoryService } from '../inventory/inventory.service';
+import { PromotionsService } from '../promotions/promotions.service';
 
 describe('OrdersService', () => {
   let service: OrdersService;
@@ -17,16 +19,42 @@ describe('OrdersService', () => {
       findMany: jest.fn(),
       update: jest.fn(),
     },
+    product: { findMany: jest.fn(), updateMany: jest.fn() },
+    drinkSizeOption: {
+      findMany: jest.fn().mockResolvedValue([
+        { id: 'S', label: 'Nhỏ', priceAdjustment: -5000 },
+        { id: 'M', label: 'Vừa', priceAdjustment: 0 },
+        { id: 'L', label: 'Lớn', priceAdjustment: 5000 },
+      ]),
+    },
+    toppingOption: {
+      findMany: jest.fn().mockResolvedValue([
+        { id: 'pearls', name: 'Trân châu đen', unitPrice: 7000 },
+        { id: 'peach-jelly', name: 'Thạch đào', unitPrice: 8000 },
+        { id: 'cheese-foam', name: 'Kem cheese', unitPrice: 10000 },
+      ]),
+    },
   };
 
   beforeEach(async () => {
     jest.clearAllMocks();
     mockPrisma.$transaction.mockImplementation((work) => work(mockPrisma));
+    mockPrisma.product.findMany.mockResolvedValue([{ id: 'p1', name: 'Coffee', price: 35000, stock: 10, version: 0 }]);
+    mockPrisma.product.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.$queryRaw.mockResolvedValue([{ id: 'ord-123', status: OrderStatus.PENDING }]);
     mockPrisma.order.update.mockImplementation(({ where, data }) => Promise.resolve({ id: where.id, ...data }));
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrdersService,
+        { provide: PromotionsService, useValue: { validate: jest.fn() } },
+        {
+          provide: InventoryService,
+          useValue: {
+            reservationTtlMs: 900000,
+            expireReservations: jest.fn().mockResolvedValue(0),
+            withStockRetry: (work) => mockPrisma.$transaction(work),
+          },
+        },
         {
           provide: PrismaService,
           useValue: mockPrisma,
@@ -62,7 +90,7 @@ describe('OrdersService', () => {
       const createdOrder = { id: 'ord-123', totalAmount: 70000, ...dto };
       mockPrisma.order.create.mockResolvedValue(createdOrder);
 
-      const result = await service.create(dto);
+      const result = await service.create(dto, 'test-user-id');
       expect(result).toEqual(createdOrder);
       expect(mockPrisma.order.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -80,8 +108,8 @@ describe('OrdersService', () => {
           customerName: 'Kiệt',
           customerPhone: '0901234567',
           items: [],
-        }),
-      ).rejects.toThrow('Order must contain at least one item');
+        },'test-user-id'),
+      ).rejects.toThrow('Đơn hàng phải có ít nhất một sản phẩm.');
     });
   });
 

@@ -1,10 +1,21 @@
 
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
+
 import { OrderStatus } from '@prisma/client';
 
 const transitions: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
-  PENDING: [OrderStatus.PAID, OrderStatus.PAYMENT_FAILED, OrderStatus.CANCELLED],
-  PAYMENT_FAILED: [OrderStatus.PENDING, OrderStatus.CANCELLED],
+  PENDING: [
+    OrderStatus.PAID,
+    OrderStatus.PAYMENT_FAILED,
+    OrderStatus.CANCELLED,
+  ],
+  PAYMENT_FAILED: [
+    OrderStatus.PENDING,
+    OrderStatus.CANCELLED,
+  ],
   PAID: [OrderStatus.CONFIRMED],
   CONFIRMED: [OrderStatus.PREPARING],
   PREPARING: [OrderStatus.READY],
@@ -13,12 +24,16 @@ const transitions: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
   CANCELLED: [],
 };
 
-export function assertOrderStatus(value: unknown): asserts value is OrderStatus {
+export function assertOrderStatus(
+  value: unknown,
+): asserts value is OrderStatus {
   if (
     typeof value !== 'string' ||
     !Object.values(OrderStatus).includes(value as OrderStatus)
   ) {
-    throw new BadRequestException('Trạng thái đơn hàng không hợp lệ.');
+    throw new BadRequestException(
+      'Trạng thái đơn hàng không hợp lệ.',
+    );
   }
 }
 

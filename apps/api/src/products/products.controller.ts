@@ -20,6 +20,17 @@ export class ProductsController {
     };
   }
 
+  @Get('configuration')
+  async findConfiguration() {
+    const configuration = await this.productsService.findConfiguration();
+
+    return {
+      success: true,
+      message: 'Lấy cấu hình sản phẩm thành công',
+      data: configuration,
+    };
+  }
+
   @Get(':id')
   async findOne(
     @Param('id') id: string,
