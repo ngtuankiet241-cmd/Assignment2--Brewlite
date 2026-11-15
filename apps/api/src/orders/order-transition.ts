@@ -19,6 +19,7 @@ import {
   assertReservationActive,
   releaseStock,
 } from '../inventory/stock-reservation';
+import { awardPaidOrderPoints } from '../loyalty/loyalty-points';
 
 // Khóa đơn hàng để tránh cập nhật đồng thời.
 // Mọi thao tác chuyển trạng thái phải dùng cùng cơ chế khóa.
@@ -93,10 +94,14 @@ export async function changeOrderStatus(
     }
   }
 
-  return tx.order.update({
+  const updatedOrder = await tx.order.update({
     where: { id },
     data,
   });
+  if (status === OrderStatus.PAID) {
+    await awardPaidOrderPoints(tx, updatedOrder);
+  }
+  return updatedOrder;
 }
 
 // Hoàn tất hủy đơn sau khi có xác nhận hoàn tiền thật từ SePay.

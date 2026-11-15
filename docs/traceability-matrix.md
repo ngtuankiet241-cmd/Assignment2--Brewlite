@@ -67,6 +67,8 @@ Bảng ma trận truy vết tuân thủ định dạng chuẩn 5 cột theo quy 
 
 ## Ghi chú truy vết
 
+- **Mở rộng loyalty (2026-11-15):** Tích điểm sau `PAID`, 1 điểm / 1.000đ sau giảm giá; yêu cầu bổ sung của chủ dự án. Triển khai tại `orders/order-transition.ts`, `loyalty/loyalty-points.ts`, `GET /loyalty/me` và khối điểm thưởng trong trang Đơn của tôi. Kiểm chứng bằng [unit test](../apps/api/src/loyalty/loyalty-points.spec.ts), [INT-LOYAL-01..12](../apps/api/test/loyalty.e2e-spec.ts), [test frontend](../apps/web/test/loyalty.test.mjs).
+
 - FR-12 gồm [quy tắc chuyển trạng thái](../apps/api/src/orders/order-state-machine.ts) và [kiểm thử tính nguyên tử](../apps/api/test/order-state-machine.e2e-spec.ts); API nhân viên và phân quyền `BARISTA`/`ADMIN` được mô tả và kiểm chứng tại [staff-api.md](./staff-api.md).
 
 - US-07 bao gồm cả nhập thông tin và xem lại đơn (FR-08, FR-09); FR-07 là điều kiện để bắt đầu UC-01, không có User Story riêng.

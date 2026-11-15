@@ -2,6 +2,7 @@
 
 import { clearAuthSession } from '@/lib/auth';
 import PayPendingOrderButton from '@/components/payment/PayPendingOrderButton';
+import LoyaltyPanel from '@/components/loyalty/LoyaltyPanel';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
@@ -282,6 +283,8 @@ export default function OrdersPageClient() {
         <h1 className="text-2xl font-black text-coffee-950 sm:text-3xl">Lịch sử & Trạng thái Đơn hàng</h1>
         <p className="mt-1 text-sm text-coffee-600">Theo dõi tiến độ pha chế và toàn bộ đơn đã đặt.</p>
       </div>
+
+      <LoyaltyPanel apiUrl={apiUrl} />
 
       {orders.length === 0 ? (
         <div className="rounded-3xl border border-coffee-200 bg-white p-12 text-center shadow-sm">

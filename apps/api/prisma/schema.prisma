@@ -214,6 +214,9 @@ model LoyaltyTransaction {
   type        LoyaltyType @default(EARN)
   description String?
   createdAt   DateTime    @default(now())
+
+  // One EARN per order is enforced by a partial unique index in the migration.
+  @@index([userId, createdAt])
 }
 
 
