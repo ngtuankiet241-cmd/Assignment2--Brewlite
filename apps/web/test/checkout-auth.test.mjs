@@ -123,6 +123,7 @@ test('checkout sends selected points and retries the same request after points w
   };
   await view.submit();
   view.loyalty.account.loyaltyPoints = 0;
+  assert.equal(find(view.render(), (node) => node.type === 'button' && node.props.type === 'submit').props.disabled, false);
   await view.submit();
   assert.equal(requests.length, 2);
   assert.equal(JSON.parse(requests[0].body).redeemedPoints, 46);
@@ -135,6 +136,7 @@ test('checkout rejects a new request with more points than the balance or payabl
   values.set('token', token());
   const view = checkout();
   view.usePoints(47);
+  assert.equal(find(view.render(), (node) => node.type === 'button' && node.props.type === 'submit').props.disabled, true);
   let requests = 0;
   globalThis.fetch = async () => { requests++; throw new Error('Unexpected request'); };
   await view.submit();

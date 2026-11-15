@@ -63,6 +63,7 @@ export default function CheckoutPageClient() {
   const promotionRequest = useRef<AbortController | null>(null);
   const promotionRequestId = useRef(0);
   const checkoutAttempt = useRef<CheckoutAttempt | null>(null);
+  const [hasCheckoutAttempt, setHasCheckoutAttempt] = useState(false);
 
   // Immutable cart arrays bind each quote to exactly the cart that was checked.
   const currentPromotion = promotionFeedback?.items === items ? promotionFeedback : null;
@@ -422,6 +423,7 @@ export default function CheckoutPageClient() {
         throw new Error('Số điểm sử dụng vượt số dư hoặc giá trị đơn. Vui lòng cập nhật điểm và thử lại.');
       }
       checkoutAttempt.current = getCheckoutAttempt(orderBody, checkoutAttempt.current);
+      setHasCheckoutAttempt(true);
       const orderHeaders: HeadersInit = {
         'Content-Type': 'application/json',
         'Idempotency-Key': checkoutAttempt.current.key,
@@ -726,7 +728,7 @@ export default function CheckoutPageClient() {
           <button
             className="mt-4 flex min-h-12 w-full items-center justify-center rounded-full bg-coffee-800 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-coffee-700 active:scale-[0.98] disabled:opacity-50"
             disabled={submitting || applyingPromotion || unavailableItems.length > 0 ||
-              (pointsToUse > 0 && (!loyalty.account || pointsToUse > maxPoints) && !checkoutAttempt.current)}
+              (pointsToUse > 0 && (!loyalty.account || pointsToUse > maxPoints) && !hasCheckoutAttempt)}
             type="submit"
           >
             {submitting ? 'Đang khởi tạo đơn hàng...' : 'Xác nhận đặt hàng →'}
