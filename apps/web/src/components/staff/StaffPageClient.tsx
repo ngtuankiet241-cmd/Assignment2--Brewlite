@@ -19,7 +19,7 @@ const serverReady = () => false;
 function StaffDashboard({ user, onLogout }: { user: AuthUser; onLogout: () => void }) {
   const { orders, visibleOrders: filtered, selectedId, detail, status, error, refreshedAt,
     pagination, filter, page, search, changeFilter, changePage, changeSearch,
-    selectOrder: chooseOrder, resetFilters, refresh, retryDetail, updating, updateError, updateSelectedOrder } = useStaffOrders();
+    selectOrder: chooseOrder, resetFilters, refresh, retryDetail, statusUpdatesEnabled, updating, updateError, updateSelectedOrder } = useStaffOrders();
   const selectOrder = (id: string) => {
     chooseOrder(id);
     if (typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches) {
@@ -73,7 +73,7 @@ function StaffDashboard({ user, onLogout }: { user: AuthUser; onLogout: () => vo
           <div id="staff-order-detail" tabIndex={-1} aria-label="Chi tiết đơn hàng" aria-busy={detail.status === 'loading'} className="min-w-0 scroll-mt-6 focus-visible:outline-2 focus-visible:outline-coffee-500 lg:sticky lg:top-6">
             {status === 'ready' && detail.status === 'loading' ? <StaffLoadingState variant="detail" />
               : status === 'ready' && detail.status === 'error' ? <StaffDetailErrorState message={detail.error?.message ?? 'Không thể tải chi tiết đơn.'} notFound={detail.error?.code === 'NOT_FOUND'} onRetry={retryDetail} onRefresh={refresh} />
-              : status === 'ready' && detail.data ? <StaffOrderDetail order={detail.data} updating={updating} onStatusChange={(nextStatus) => void updateSelectedOrder(nextStatus)} />
+              : status === 'ready' && detail.data ? <StaffOrderDetail order={detail.data} updating={updating} updatesEnabled={statusUpdatesEnabled} onStatusChange={(nextStatus) => void updateSelectedOrder(nextStatus)} />
               : <div className="hidden min-h-72 items-center justify-center rounded-3xl border border-dashed border-coffee-200 p-6 text-center text-sm text-coffee-500 lg:flex">Chọn một đơn trong danh sách để xem chi tiết.</div>}
           </div>
         </div>

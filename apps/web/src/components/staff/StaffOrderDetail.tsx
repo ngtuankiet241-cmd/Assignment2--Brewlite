@@ -1,10 +1,11 @@
 import { formatStaffMoney, formatStaffTime, STAFF_NEXT_ACTION, type StaffOrder, type StaffUpdateStatusInput } from '@/types/staff';
 import StaffOrderStatus from './StaffOrderStatus';
 
-export default function StaffOrderDetail({ order, onStatusChange, updating = false }: {
+export default function StaffOrderDetail({ order, onStatusChange, updating = false, updatesEnabled = true }: {
   order: StaffOrder;
   onStatusChange?: (status: StaffUpdateStatusInput['status']) => void;
   updating?: boolean;
+  updatesEnabled?: boolean;
 }) {
   const action = STAFF_NEXT_ACTION[order.status];
   const canCancel = ['PENDING', 'PAYMENT_FAILED', 'PAID', 'CONFIRMED'].includes(order.status);
@@ -27,9 +28,10 @@ export default function StaffOrderDetail({ order, onStatusChange, updating = fal
         <dl className="mt-5 space-y-3 text-sm"><div className="flex flex-wrap justify-between gap-2"><dt className="text-coffee-600">Thanh toán</dt><dd className="font-semibold text-coffee-900">{paymentLabel}</dd></div><div className="flex justify-between gap-2"><dt className="text-coffee-600">Phương thức</dt><dd>{order.payment ? order.payment.method === 'SEPAY_QR' ? 'SePay QR' : order.payment.method === 'LOYALTY' ? 'Điểm thưởng / ưu đãi' : 'Tiền mặt' : '—'}</dd></div><div className="flex justify-between gap-2 border-t border-coffee-200 pt-4"><dt className="font-bold text-coffee-950">Tổng tiền</dt><dd className="text-xl font-black text-coffee-900">{formatStaffMoney(order.totalAmount)}</dd></div></dl>
         <div className="mt-6 border-t border-coffee-100 pt-5">
           <p className="text-xs font-semibold leading-relaxed text-coffee-600 [overflow-wrap:anywhere]">PAID → PREPARING → READY → COMPLETED</p>
-          {action ? <button type="button" disabled={!onStatusChange || updating} onClick={() => onStatusChange?.(action.status)} aria-busy={updating} aria-describedby="staff-action-notice" className="mt-3 min-h-12 w-full rounded-full bg-coffee-800 px-4 text-sm font-bold text-white hover:bg-coffee-700 disabled:cursor-not-allowed disabled:opacity-50">{updating ? 'Đang cập nhật...' : action.label}</button> : <p className="mt-3 text-sm text-coffee-600">{order.status === 'CANCELLED' || order.status === 'COMPLETED' ? 'Đơn đã kết thúc.' : 'Chưa đủ điều kiện chuẩn bị đơn.'}</p>}
+          {action ? <button type="button" disabled={!onStatusChange || updating || !updatesEnabled} onClick={() => onStatusChange?.(action.status)} aria-busy={updating} aria-describedby="staff-action-notice" className="mt-3 min-h-12 w-full rounded-full bg-coffee-800 px-4 text-sm font-bold text-white hover:bg-coffee-700 disabled:cursor-not-allowed disabled:opacity-50">{updating ? 'Đang cập nhật...' : action.label}</button> : <p className="mt-3 text-sm text-coffee-600">{order.status === 'CANCELLED' || order.status === 'COMPLETED' ? 'Đơn đã kết thúc.' : 'Chưa đủ điều kiện chuẩn bị đơn.'}</p>}
           {action && <p id="staff-action-notice" className="mt-3 text-xs leading-relaxed text-coffee-600">Chọn bước tiếp theo khi quầy đã xử lý xong bước hiện tại.</p>}
-          {canCancel && onStatusChange && <button type="button" disabled={updating} onClick={() => onStatusChange('CANCELLED')} className="mt-3 min-h-11 w-full rounded-full border border-red-300 px-4 text-sm font-bold text-red-700 disabled:opacity-50">{order.status === 'PAID' || order.status === 'CONFIRMED' ? 'Hủy đơn và yêu cầu hoàn tiền' : 'Hủy đơn'}</button>}
+          {canCancel && onStatusChange && <button type="button" disabled={updating || !updatesEnabled} onClick={() => onStatusChange('CANCELLED')} className="mt-3 min-h-11 w-full rounded-full border border-red-300 px-4 text-sm font-bold text-red-700 disabled:opacity-50">{order.status === 'PAID' || order.status === 'CONFIRMED' ? 'Hủy đơn và yêu cầu hoàn tiền' : 'Hủy đơn'}</button>}
+          {!updatesEnabled && <p className="mt-3 text-xs text-coffee-600">Cập nhật trạng thái đang khóa theo cấu hình triển khai.</p>}
         </div>
       </div>
     </section>

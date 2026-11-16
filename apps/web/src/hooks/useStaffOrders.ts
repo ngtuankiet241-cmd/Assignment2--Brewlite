@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { clearAuthSession } from '@/lib/auth';
+import { STAFF_STATUS_UPDATES_ENABLED } from '@/lib/staffFeatures';
 import { createStaffApiClient, StaffApiError } from '@/services/staffApiClient';
 import { filterStaffOrders, selectStaffOrder, STAFF_NEXT_ACTION, type StaffOrderDetails, type StaffOrderFilter, type StaffOrdersPage, type StaffUpdateStatusInput } from '@/types/staff';
 
@@ -13,7 +14,7 @@ function client() {
     getAccessToken: () => {
       try { return window.localStorage.getItem('token'); } catch { return null; }
     },
-    allowStatusUpdates: true,
+    allowStatusUpdates: STAFF_STATUS_UPDATES_ENABLED,
   });
 }
 
@@ -60,7 +61,11 @@ export function useStaffOrders() {
   const [accessError, setAccessError] = useState<StaffApiError | null>(null);
   const [mutation, setMutation] = useState<{ pending: boolean; error: string } | null>(null);
   const pendingUpdate = useRef<AbortController | null>(null);
-  useEffect(() => () => pendingUpdate.current?.abort(), []);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; pendingUpdate.current?.abort(); };
+  }, []);
   const onAccessError = useCallback((error: StaffApiError) => {
     setAccessError(error);
     if (error.code === 'UNAUTHENTICATED') clearAuthSession();
@@ -82,7 +87,12 @@ export function useStaffOrders() {
   );
 
   async function updateSelectedOrder(nextStatus: StaffUpdateStatusInput['status']) {
-    if (pendingUpdate.current || accessError || !selectedId || detail.status !== 'ready' ||
+    if (!mounted.current || pendingUpdate.current || accessError) return;
+    if (!STAFF_STATUS_UPDATES_ENABLED) {
+      setMutation({ pending: false, error: 'Cập nhật trạng thái đang khóa theo cấu hình triển khai.' });
+      return;
+    }
+    if (!selectedId || list.status !== 'ready' || detail.status !== 'ready' ||
         detail.data?.id !== selectedId) return;
     const canCancel = nextStatus === 'CANCELLED' && ['PENDING', 'PAYMENT_FAILED', 'PAID', 'CONFIRMED'].includes(detail.data.status);
     if (!canCancel && STAFF_NEXT_ACTION[detail.data.status]?.status !== nextStatus) return;
@@ -91,16 +101,17 @@ export function useStaffOrders() {
     setMutation({ pending: true, error: '' });
     try {
       await client().updateOrderStatus(selectedId, { status: nextStatus }, { signal: controller.signal });
-      if (!controller.signal.aborted) {
+      if (mounted.current && !controller.signal.aborted) {
         setMutation({ pending: false, error: '' });
         setRevision((value) => value + 1);
       }
     } catch (cause) {
-      if (controller.signal.aborted) return;
+      if (!mounted.current || controller.signal.aborted) return;
       const error = cause instanceof StaffApiError ? cause : new StaffApiError('NETWORK', 'Không thể cập nhật đơn hàng. Vui lòng thử lại.');
       setMutation({ pending: false, error: error.message });
       if (error.code === 'UNAUTHENTICATED' || error.code === 'FORBIDDEN') onAccessError(error);
-      else if (error.code === 'CONFLICT' || error.code === 'NOT_FOUND') setRevision((value) => value + 1);
+      // A failed response may arrive after the server committed. Read back, never retry the write.
+      else setRevision((value) => value + 1);
     } finally {
       if (pendingUpdate.current === controller) pendingUpdate.current = null;
     }
@@ -108,6 +119,7 @@ export function useStaffOrders() {
 
   return {
     orders, visibleOrders, selectedId, detail,
+    statusUpdatesEnabled: STAFF_STATUS_UPDATES_ENABLED,
     updating: mutation?.pending ?? false,
     updateError: mutation?.error ?? '',
     updateSelectedOrder,

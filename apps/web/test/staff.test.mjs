@@ -125,6 +125,15 @@ test('staff states provide loading announcement, distinct empty messages, error 
   assert.match(render(StaffErrorState, { message: 'Demo error', onRetry() {} }), /role="alert"/);
 });
 
+test('deployment flag disables preparation and cancellation buttons together', () => {
+  const Detail = load('src/components/staff/StaffOrderDetail.tsx').default;
+  const html = render(Detail, { order: { ...STAFF_DEMO_ORDERS[0], status: 'PAID' }, updatesEnabled: false, onStatusChange() {} });
+  const buttons = [...html.matchAll(/<button\b[^>]*>/g)];
+  assert.equal(buttons.length, 2);
+  for (const [button] of buttons) assert.match(button, /disabled=""/);
+  assert.match(html, /đang khóa theo cấu hình/);
+});
+
 function staffView(overrides = {}) {
   return { orders: STAFF_DEMO_ORDERS, visibleOrders: STAFF_DEMO_ORDERS, selectedId: 'DEMO-001',
     detail: { status: 'ready', data: STAFF_DEMO_ORDERS[0] }, status: 'ready', error: '',
@@ -471,7 +480,7 @@ test('staff client distinguishes network, timeout, caller abort and abort during
 });
 
 // Exercise the actual hook + API client + parsers. Only HTTP and the existing session are simulated.
-function apiHook(fetcher, { baseUrl = 'https://staff.example.test', token = 'session-token' } = {}) {
+function apiHook(fetcher, { baseUrl = 'https://staff.example.test', token = 'session-token', updatesFlag } = {}) {
   const slots = []; let cursor = 0; let pending = []; let cleared = 0;
   const changed = (previous, next) => !previous || next.some((value, index) => !Object.is(value, previous[index]));
   const react = {
@@ -496,7 +505,7 @@ function apiHook(fetcher, { baseUrl = 'https://staff.example.test', token = 'ses
       }
     },
   };
-  const hook = loader({ react, process: { env: { NEXT_PUBLIC_API_URL: baseUrl } },
+  const hook = loader({ react, process: { env: { NEXT_PUBLIC_API_URL: baseUrl, NEXT_PUBLIC_STAFF_STATUS_UPDATES_ENABLED: updatesFlag } },
     window: { localStorage: { getItem: (key) => { assert.equal(key, 'token'); return token; } } },
     '@/lib/auth': { clearAuthSession: () => { cleared++; } },
   }, fetcher)('src/hooks/useStaffOrders.ts').useStaffOrders;
@@ -702,10 +711,13 @@ test('staff hook keeps the known status after server failure and aborts a pendin
   try {
     host.render(); await host.settle(); let view = await host.settle();
     await view.updateSelectedOrder('PREPARING'); view = host.render();
+    assert.equal(view.status, 'loading');
+    await host.settle(); view = await host.settle();
     assert.equal(view.detail.data.status, 'PAID'); assert.ok(view.updateError); assert.equal(view.updating, false);
     fail = false; const save = view.updateSelectedOrder('PREPARING');
     host.unmount(); assert.equal(pendingSignal.aborted, true);
     complete(jsonResponse({ ...backendScalar, status: 'PREPARING' })); await save;
+    await view.updateSelectedOrder('PREPARING');
     assert.equal(host.render().detail.data.status, 'PAID'); assert.equal(writes, 2);
   } finally { host.unmount(); }
 });
@@ -723,4 +735,41 @@ test('staff hook can cancel pending, failed and paid orders but cannot cancel pr
       assert.equal(writes, ['PENDING', 'PAYMENT_FAILED', 'PAID'].includes(from) ? 1 : 0);
     } finally { host.unmount(); }
   }
+});
+
+for (const updatesFlag of ['false', '', '1', 'TRUE']) {
+  test(`configured deployment flag ${JSON.stringify(updatesFlag)} blocks status and cancellation requests`, async () => {
+    const calls = [];
+    const host = apiHook(async (url, init) => {
+      calls.push(init.method);
+      return jsonResponse(new URL(url).pathname === '/staff/orders' ? backendPage() : backendOrder);
+    }, { updatesFlag });
+    try {
+      host.render(); await host.settle(); let view = await host.settle();
+      assert.equal(view.statusUpdatesEnabled, false);
+      await view.updateSelectedOrder('PREPARING'); await view.updateSelectedOrder('CANCELLED');
+      view = host.render(); assert.match(view.updateError, /đang khóa/);
+      assert.deepEqual(calls, ['GET', 'GET']);
+    } finally { host.unmount(); }
+  });
+}
+
+test('ambiguous network failure reads back committed state without retrying the status request', async () => {
+  let stored = backendOrder; const calls = [];
+  const host = apiHook(async (url, init) => {
+    calls.push(init.method);
+    if (init.method === 'PATCH') {
+      stored = { ...stored, status: 'PREPARING' };
+      throw new TypeError('connection lost after server commit');
+    }
+    return jsonResponse(new URL(url).pathname === '/staff/orders' ? backendPage([stored]) : stored);
+  }, { updatesFlag: 'true' });
+  try {
+    host.render(); await host.settle(); let view = await host.settle();
+    assert.equal(view.statusUpdatesEnabled, true);
+    await view.updateSelectedOrder('PREPARING'); host.render();
+    await host.settle(); view = await host.settle();
+    assert.ok(view.updateError); assert.equal(view.detail.data.status, 'PREPARING');
+    assert.deepEqual(calls, ['GET', 'GET', 'PATCH', 'GET', 'GET']);
+  } finally { host.unmount(); }
 });

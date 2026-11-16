@@ -9,7 +9,9 @@
 Dashboard `/staff` dùng `useStaffOrders` để gọi API thật qua `staffApiClient`.
 Luồng mặc định không import `useStaffDemoOrders` hoặc `staffDemoOrders.ts`.
 Hai file demo được giữ riêng cho kiểm thử, không làm fallback khi API rỗng/lỗi.
-Nút cập nhật tiếp tục disabled; hook chỉ gọi hai phương thức GET.
+Nút cập nhật gọi PATCH thật theo luồng PAID → PREPARING → READY → COMPLETED.
+Nút Hủy hoạt động ở PENDING, PAYMENT_FAILED và PAID. Đơn CONFIRMED cũ vẫn có thể
+tiếp tục chuẩn bị hoặc hủy; luồng mới không tạo trạng thái CONFIRMED.
 
 - Danh sách gọi GET `/staff/orders` với `page`, `limit: 10` và status khi chọn bộ lọc.
   Đổi bộ lọc trở về trang 1. Nút trước/sau dùng pagination Backend trả về.
@@ -38,7 +40,17 @@ Có AbortSignal và timeout mặc định 10 giây, bao gồm đọc JSON; khôn
 Client không log token hoặc nội dung lỗi Backend.
 
 `allowStatusUpdates` vẫn mặc định `false`: cập nhật trả `WRITES_DISABLED` trước khi gửi request.
-Dashboard/hook không bật tùy chọn này. Unit test chỉ opt-in với fake fetch để kiểm tra parser PATCH.
+Hook truyền `STAFF_STATUS_UPDATES_ENABLED` từ `src/lib/staffFeatures.ts` vào tùy chọn này.
+Mặc định cho phép cập nhật khi không cấu hình biến, giữ hành vi của luồng Staff đã sửa.
+Nếu cấu hình biến, chỉ `NEXT_PUBLIC_STAFF_STATUS_UPDATES_ENABLED=true` bật cập nhật;
+`false` hoặc giá trị khác khóa cả chuyển trạng thái và hủy đơn. Không đổi `.env` khi gộp nhánh.
+Biến NEXT_PUBLIC được nhúng lúc build: cần build/deploy lại khi đổi flag.
+
+Hai endpoint trạng thái dùng chung state machine, transaction và khóa dòng Order.
+PAID → PREPARING bị chặn khi có yêu cầu hoàn tiền đang xử lý hoặc đã thành công.
+Hủy đơn giải phóng tồn kho và hoàn điểm đã dùng một lần; hủy đơn đã thanh toán có giao dịch
+hợp lệ tạo yêu cầu hoàn tiền REQUESTED riêng, không đánh dấu tiền đã được hoàn thành công.
+UI không gửi các trạng thái thanh toán PAID, PAYMENT_FAILED hoặc PENDING.
 
 ## Endpoint và query
 
@@ -46,7 +58,7 @@ Dashboard/hook không bật tùy chọn này. Unit test chỉ opt-in với fake 
 | --- | --- | --- |
 | `listOrders` | GET `/staff/orders` | `status?`, `page?`, `limit?` |
 | `getOrder` | GET `/staff/orders/:id` | ID được encode thành một đoạn đường dẫn |
-| `updateOrderStatus` | PATCH `/staff/orders/:id/status` | `{ "status": "PREPARING" }`, hoặc READY/COMPLETED |
+| `updateOrderStatus` | PATCH `/staff/orders/:id/status` | `{ "status": "PREPARING" }`, hoặc READY/COMPLETED/CANCELLED |
 
 Backend còn có GET `/staff` làm alias danh sách. Không hỗ trợ `search`;
 `StaffOrdersQuery` không có trường này và client không gửi nó.
@@ -86,7 +98,7 @@ không giả lập relations hoặc coi kết quả PATCH là chi tiết đầy 
   Topping là `string | null`, ví dụ `Trân châu đen x2, Thạch đào`; không phải mảng object.
 - `payment`: null hoặc chỉ id, amount, method, status, paidAt.
   Không yêu cầu hoặc bổ sung `payment.orderId`.
-- Payment method: `SEPAY_QR | CASH`; Payment status: `PENDING | SUCCESS | FAILED`.
+- Payment method: `SEPAY_QR | CASH | LOYALTY`; Payment status: `PENDING | SUCCESS | FAILED`.
   PaymentStatus và OrderStatus là hai khái niệm riêng.
 - Tiền là JSON number từ Prisma Int; ngày giờ là string, nullable khi schema cho phép.
 - `StaffOrder` tiếp tục là projection cho UI/demo; API dùng các kiểu chặt hơn phía trên.
@@ -114,10 +126,10 @@ không hiển thị nguyên văn lỗi server. Global filter không giữ allowe
 
 ## Giới hạn và kiểm thử tích hợp
 
-Backend dùng state machine chung, transaction và khóa dòng. UI chỉ chuẩn bị ba bước
-`PAID → PREPARING → READY → COMPLETED`; server quyết định và trả 409 khi chuyển sai.
-Backend hiện cho staff dùng cả nhánh thanh toán/hủy/thử lại của state machine chung;
-cần nhóm Backend chốt phạm vi quyền trước khi cho phép cập nhật thật.
+Backend dùng state machine chung, transaction và khóa dòng. UI chuẩn bị ba bước
+`PAID → PREPARING → READY → COMPLETED` và hủy từ PENDING, PAYMENT_FAILED, PAID;
+server quyết định và trả 409 khi chuyển sai. API trạng thái chung vẫn hỗ trợ nhánh thanh toán;
+UI giới hạn mục tiêu gửi thành PREPARING, READY, COMPLETED và CANCELLED.
 
 GET list/detail gọi `expireReservations()`, có thể hủy đơn hết TTL và hoàn stock.
 Không coi GET này trên database thật là kiểm tra hoàn toàn không ghi dữ liệu.
@@ -127,7 +139,13 @@ kể cả fake fetch không tuân theo AbortSignal. Dữ liệu được gắn v
 ngay trong render khi đổi trang/bộ lọc, trước khi effect cleanup chạy.
 Dashboard remount theo user ID và role; đăng xuất hoặc mất quyền sẽ unmount và hủy request.
 Lỗi 401/403 từ bất kỳ request nào cũng chặn hiển thị dữ liệu cả hai phần.
-Khi cho phép PATCH ở giai đoạn sau cần tải lại chi tiết/danh sách sau thành công hoặc 409.
+PATCH có khóa đồng bộ chống double click, loading, tải lại sau thành công và thông báo lỗi.
+Sau thành công hoặc lỗi không phải 401/403, hook tải lại danh sách và chi tiết đang chọn
+nếu đơn còn trong kết quả; bộ lọc/trang/tìm kiếm được giữ nguyên. Nếu đơn rời bộ lọc,
+chọn đơn còn lại theo cơ chế sẵn có. Không ghép scalar PATCH thành chi tiết giả.
+401 xóa session; 403 chặn dữ liệu; 404/409 thông báo và đồng bộ lại từ Backend.
+Không tự retry PATCH, kể cả khi lỗi mạng/timeout có thể đã ghi thành công ở server.
+Unmount/đổi tài khoản hủy request và bỏ kết quả cũ; abort không bảo đảm server rollback.
 Tìm kiếm toàn bộ dữ liệu và thống kê theo ca/toàn hệ thống chưa có API Staff tương ứng;
 lọc hoặc đếm trên một trang không đại diện toàn bộ đơn.
 
