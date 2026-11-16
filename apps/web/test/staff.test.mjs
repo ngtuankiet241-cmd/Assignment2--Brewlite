@@ -51,7 +51,7 @@ test('staff permissions allow only BARISTA and ADMIN; customer and unknown roles
 
 test('staff demo fixtures cover all seven AS2 statuses and have internally consistent totals', () => {
   assert.equal(STAFF_DEMO_ORDERS.length, 7);
-  assert.deepEqual(new Set(STAFF_DEMO_ORDERS.map((order) => order.status)), new Set(Object.keys(STAFF_STATUSES)));
+  assert.deepEqual(new Set(STAFF_DEMO_ORDERS.map((order) => order.status)), new Set(Object.keys(STAFF_STATUSES).filter((status) => status !== 'CONFIRMED')));
   for (const order of STAFF_DEMO_ORDERS) {
     assert.match(order.id, /^DEMO-/);
     assert.equal(order.totalAmount, order.items.reduce((sum, item) => sum + item.itemTotal, 0));
@@ -62,7 +62,7 @@ test('staff demo fixtures cover all seven AS2 statuses and have internally consi
 
 test('staff summary and all status filters use actual demo data without altering the source', () => {
   assert.deepEqual(getStaffSummary(STAFF_DEMO_ORDERS), { total: 7, waiting: 1, preparing: 2, completed: 1 });
-  for (const status of Object.keys(STAFF_STATUSES)) {
+  for (const status of Object.keys(STAFF_STATUSES).filter((status) => status !== 'CONFIRMED')) {
     const result = filterStaffOrders(STAFF_DEMO_ORDERS, status);
     assert.equal(result.length, 1); assert.equal(result[0].status, status);
   }
@@ -78,13 +78,12 @@ test('demo source supports empty/error and returns isolated copies without calli
   assert.notEqual(STAFF_DEMO_ORDERS[0].items[0].quantity, 99);
 });
 
-test('each permitted UI transition is disabled and no cancel/payment retry actions are created', () => {
-  assert.deepEqual(Object.keys(STAFF_NEXT_ACTION), ['PAID', 'PREPARING', 'READY']);
-  assert.deepEqual(Object.values(STAFF_NEXT_ACTION).map((action) => action.status), ['PREPARING', 'READY', 'COMPLETED']);
+test('status buttons require a connected handler and follow the backend preparation sequence', () => {
+  assert.deepEqual(Object.keys(STAFF_NEXT_ACTION), ['PAID', 'CONFIRMED', 'PREPARING', 'READY']);
+  assert.deepEqual(Object.values(STAFF_NEXT_ACTION).map((action) => action.status), ['PREPARING', 'PREPARING', 'READY', 'COMPLETED']);
   const Detail = load('src/components/staff/StaffOrderDetail.tsx').default;
   for (const order of STAFF_DEMO_ORDERS) {
     const html = render(Detail, { order });
-    assert.match(html, /chờ xác minh quy tắc thanh toán/);
     assert.doesNotMatch(html, /Chi tiết đơn · Demo/);
     if (STAFF_NEXT_ACTION[order.status]) {
       assert.match(html, /<button[^>]*disabled=""/);
@@ -99,6 +98,25 @@ test('each permitted UI transition is disabled and no cancel/payment retry actio
   assert.match(detailed, /SePay QR/);
 });
 
+test('connected detail enables each next step, blocks actions while saving and has no action after completion', () => {
+  const Detail = load('src/components/staff/StaffOrderDetail.tsx').default;
+  const calls = [];
+  for (const [from, to] of [['PAID', 'PREPARING'], ['CONFIRMED', 'PREPARING'], ['PREPARING', 'READY'], ['READY', 'COMPLETED']]) {
+    const props = { order: { ...STAFF_DEMO_ORDERS[0], status: from }, onStatusChange: (status) => calls.push(status) };
+    assert.doesNotMatch(render(Detail, props), /<button[^>]*\sdisabled=""/);
+    const nodes = [];
+    function visit(value) { React.Children.forEach(value, (node) => { if (React.isValidElement(node)) { nodes.push(node); visit(node.props.children); } }); }
+    visit(Detail(props));
+    nodes.find((node) => node.type === 'button').props.onClick();
+    assert.equal(calls.at(-1), to);
+    const busy = render(Detail, { ...props, updating: true });
+    assert.match(busy, /<button[^>]*\sdisabled=""/);
+    assert.match(busy, /Đang cập nhật/);
+  }
+  assert.deepEqual(calls, ['PREPARING', 'PREPARING', 'READY', 'COMPLETED']);
+  assert.doesNotMatch(render(Detail, { order: { ...STAFF_DEMO_ORDERS[0], status: 'COMPLETED' }, onStatusChange() {} }), /<button/);
+});
+
 test('staff states provide loading announcement, distinct empty messages, error and retry', () => {
   const { StaffLoadingState, StaffEmptyState, StaffErrorState } = load('src/components/staff/StaffStates.tsx');
   assert.match(render(StaffLoadingState, {}), /aria-busy="true"/);
@@ -111,7 +129,8 @@ function staffView(overrides = {}) {
   return { orders: STAFF_DEMO_ORDERS, visibleOrders: STAFF_DEMO_ORDERS, selectedId: 'DEMO-001',
     detail: { status: 'ready', data: STAFF_DEMO_ORDERS[0] }, status: 'ready', error: '',
     pagination: { page: 1, limit: 10, total: 17, totalPages: 2 }, page: 1, filter: 'ALL', search: '',
-    changeFilter() {}, changePage() {}, changeSearch() {}, selectOrder() {}, resetFilters() {}, refresh() {}, retryDetail() {}, ...overrides };
+    changeFilter() {}, changePage() {}, changeSearch() {}, selectOrder() {}, resetFilters() {}, refresh() {}, retryDetail() {},
+    updating: false, updateError: '', updateSelectedOrder() {}, ...overrides };
 }
 
 for (const [role, allowed] of [['BARISTA', true], ['ADMIN', true], ['CUSTOMER', false], [undefined, false]]) {
@@ -130,9 +149,10 @@ for (const [role, allowed] of [['BARISTA', true], ['ADMIN', true], ['CUSTOMER', 
     if (allowed) {
       assert.doesNotMatch(html, /Thông tin quầy nhân viên|Chỉ xem đơn hàng|Thống kê đơn trong trang hiện tại/);
       assert.doesNotMatch(html, /Đơn trong trang|Chờ pha chế|Đang thực hiện/);
-      for (const status of Object.keys(STAFF_STATUSES)) {
+      for (const status of Object.keys(STAFF_STATUSES).filter((status) => status !== 'CONFIRMED')) {
         assert.ok(html.includes(`<option value="${status}">${status}</option>`));
       }
+      assert.doesNotMatch(html, /<option value="CONFIRMED">/);
       assert.match(html, /trong trang hiện tại/);
       assert.match(html, /Làm mới/);
       assert.doesNotMatch(html, /Kiểm tra giao diện demo/);
@@ -221,7 +241,8 @@ test('dashboard renders API loading, empty, errors, pagination and detail indepe
     pagination: { page: 1, limit: 10, total: 0, totalPages: 0 } });
   html = render(Page, {}); assert.match(html, /Chưa có đơn hàng/); assert.doesNotMatch(html, /DEMO-001/);
   state = staffView({ changePage: (value) => calls.push(['page', value]), changeFilter: (value) => calls.push(['filter', value]),
-    changeSearch: (value) => calls.push(['search', value]), selectOrder: (value) => calls.push(['select', value]), refresh: () => calls.push(['refresh']) });
+    changeSearch: (value) => calls.push(['search', value]), selectOrder: (value) => calls.push(['select', value]), refresh: () => calls.push(['refresh']),
+    updateSelectedOrder: (value) => calls.push(['update', value]) });
   const dashboard = Page(); const output = [];
   function visit(value) { React.Children.forEach(value, (node) => { if (React.isValidElement(node)) { output.push(node); visit(node.props.children); } }); }
   visit(dashboard.type(dashboard.props));
@@ -230,7 +251,8 @@ test('dashboard renders API loading, empty, errors, pagination and detail indepe
   output.find((node) => node.type === 'input').props.onChange({ target: { value: 'ban 2' } });
   output.find((node) => node.type.name === 'StaffOrderList').props.onSelect('DEMO-002');
   output.find((node) => node.type === 'select').props.onChange({ target: { value: 'PAID' } });
-  assert.deepEqual(calls, [['page', 2], ['filter', 'READY'], ['search', 'ban 2'], ['select', 'DEMO-002'], ['filter', 'PAID']]);
+  output.find((node) => node.type.name === 'StaffOrderDetail').props.onStatusChange('PREPARING');
+  assert.deepEqual(calls, [['page', 2], ['filter', 'READY'], ['search', 'ban 2'], ['select', 'DEMO-002'], ['filter', 'PAID'], ['update', 'PREPARING']]);
 });
 
 test('floating cart and its spacer/notification are hidden only on Staff and existing cart exclusions', () => {
@@ -299,6 +321,23 @@ const backendOrder = {
 };
 const backendPage = (data = [backendOrder], pagination = { page: 1, limit: 20, total: data.length, totalPages: data.length ? 1 : 0 }) => ({ data, pagination });
 
+test('staff client accepts CONFIRMED orders from the backend in lists, details and filters', async () => {
+  const confirmed = { ...backendOrder, id: 'confirmed-order', status: 'CONFIRMED',
+    items: backendOrder.items.map((item) => ({ ...item, orderId: 'confirmed-order' })) };
+  const page = backendPage([backendOrder, confirmed]);
+  const client = createStaffApiClient({ ...apiOptions, fetcher: async () => jsonResponse(page) });
+  assert.deepEqual(await client.listOrders(), page);
+  const detail = createStaffApiClient({ ...apiOptions, fetcher: async () => jsonResponse(confirmed) });
+  assert.deepEqual(await detail.getOrder(confirmed.id), confirmed);
+  const filtered = createStaffApiClient({ ...apiOptions, fetcher: async (url) => {
+    assert.equal(new URL(url).searchParams.get('status'), 'CONFIRMED');
+    return jsonResponse(backendPage([confirmed]));
+  } });
+  assert.equal((await filtered.listOrders({ status: 'CONFIRMED' })).data[0].status, 'CONFIRMED');
+  assert.deepEqual(filterStaffOrders([confirmed], 'CONFIRMED'), [confirmed]);
+  assert.match(render(load('src/components/staff/StaffOrderStatus.tsx').default, { status: 'CONFIRMED' }), /CONFIRMED/);
+});
+
 test('staff client is inert until called, uses fresh JWT, GET query encoding and no-store', async () => {
   const calls = []; let token = 'account-a';
   const client = createStaffApiClient({ ...apiOptions, getAccessToken: () => token, fetcher: async (...args) => {
@@ -347,7 +386,7 @@ test('staff PATCH stays disabled by default; explicit opt-in only sends requeste
   assert.equal('items' in result, false); assert.equal('payment' in result, false);
   assert.equal(calls.length, 1); assert.ok(calls[0][0].endsWith('/staff/orders/DEMO-001/status'));
   assert.equal(calls[0][1].method, 'PATCH'); assert.deepEqual(JSON.parse(calls[0][1].body), { status: 'PREPARING' });
-  await assert.rejects(enabled.updateOrderStatus('DEMO-001', { status: 'CANCELLED' }), errorCode('CONFIGURATION'));
+  await assert.rejects(enabled.updateOrderStatus('DEMO-001', { status: 'PAID' }), errorCode('CONFIGURATION'));
   assert.equal(calls.length, 1);
 });
 
@@ -436,6 +475,10 @@ function apiHook(fetcher, { baseUrl = 'https://staff.example.test', token = 'ses
   const slots = []; let cursor = 0; let pending = []; let cleared = 0;
   const changed = (previous, next) => !previous || next.some((value, index) => !Object.is(value, previous[index]));
   const react = {
+    useRef(initial) {
+      const index = cursor++;
+      return slots[index] ??= { current: initial };
+    },
     useState(initial) {
       const index = cursor++; const slot = slots[index] ??= { value: initial };
       return [slot.value, (next) => { slot.value = typeof next === 'function' ? next(slot.value) : next; }];
@@ -558,7 +601,7 @@ test('API hook reports missing API configuration/token and never falls back to m
     finally { host.unmount(); }
   }
   for (const file of ['src/components/staff/StaffPageClient.tsx', 'src/hooks/useStaffOrders.ts']) {
-    assert.doesNotMatch(readFileSync(resolve(root, file), 'utf8'), /useStaffDemoOrders|staffDemoOrders|allowStatusUpdates:\s*true/);
+    assert.doesNotMatch(readFileSync(resolve(root, file), 'utf8'), /useStaffDemoOrders|staffDemoOrders/);
   }
 });
 
@@ -579,4 +622,105 @@ test('reselecting the active order or filter does not refetch; explicit refresh 
     view.refresh(); host.render(); await host.settle(); await host.settle();
     assert.equal(requests.length, 4, 'explicit refresh reloads the list and selected detail');
   } finally { host.unmount(); }
+});
+
+test('staff hook moves PAID directly through PREPARING, READY and COMPLETED and refreshes server data', async () => {
+  let stored = { ...backendOrder };
+  const writes = [];
+  const host = apiHook(async (url, init) => {
+    if (init.method === 'PATCH') {
+      const next = JSON.parse(init.body).status;
+      writes.push({ url, init }); stored = { ...stored, status: next };
+      return jsonResponse({ ...backendScalar, status: next });
+    }
+    return jsonResponse(new URL(url).pathname === '/staff/orders' ? backendPage([stored]) : stored);
+  });
+  try {
+    host.render(); await host.settle(); let view = await host.settle();
+    for (const next of ['PREPARING', 'READY', 'COMPLETED']) {
+      assert.equal(view.detail.status, 'ready');
+      const save = view.updateSelectedOrder(next);
+      assert.equal(host.render().updating, true);
+      await view.updateSelectedOrder(next); await save;
+      assert.equal(host.render().status, 'loading');
+      await host.settle(); view = await host.settle();
+      assert.equal(view.detail.data.status, next); assert.equal(view.orders[0].status, next);
+      assert.equal(view.updating, false); assert.equal(view.updateError, '');
+    }
+    assert.deepEqual(writes.map(({ init }) => JSON.parse(init.body)), [{ status: 'PREPARING' }, { status: 'READY' }, { status: 'COMPLETED' }]);
+    for (const { url, init } of writes) {
+      assert.ok(url.endsWith(`/staff/orders/${backendOrder.id}/status`));
+      assert.equal(init.headers.Authorization, 'Bearer session-token');
+    }
+    await view.updateSelectedOrder('COMPLETED'); assert.equal(writes.length, 3);
+  } finally { host.unmount(); }
+});
+
+test('staff hook rejects skipped steps and reloads a conflict without pretending a write succeeded', async () => {
+  let stored = { ...backendOrder }, writes = 0;
+  const host = apiHook(async (url, init) => {
+    if (init.method === 'PATCH') {
+      writes++; stored = { ...stored, status: 'PREPARING' };
+      return new Response('private server conflict', { status: 409 });
+    }
+    return jsonResponse(new URL(url).pathname === '/staff/orders' ? backendPage([stored]) : stored);
+  });
+  try {
+    host.render(); await host.settle(); let view = await host.settle();
+    await view.updateSelectedOrder('READY'); assert.equal(writes, 0);
+    await view.updateSelectedOrder('PREPARING'); assert.equal(writes, 1);
+    view = host.render(); assert.match(view.updateError, /Đơn hàng đã thay đổi/);
+    await host.settle(); view = await host.settle();
+    assert.equal(view.detail.data.status, 'PREPARING'); assert.equal(writes, 1);
+  } finally { host.unmount(); }
+});
+
+for (const status of [401, 403]) {
+  test(`staff hook clears private data when a status update returns ${status}`, async () => {
+    const host = apiHook(async (url, init) => init.method === 'PATCH' ? new Response('', { status })
+      : jsonResponse(new URL(url).pathname === '/staff/orders' ? backendPage() : backendOrder));
+    try {
+      host.render(); await host.settle(); const view = await host.settle();
+      await view.updateSelectedOrder('PREPARING'); const denied = host.render();
+      assert.equal(denied.status, 'error'); assert.deepEqual(denied.orders, []);
+      assert.equal(denied.detail.data, undefined); assert.equal(denied.updating, false);
+      assert.equal(host.cleared, status === 401 ? 1 : 0);
+    } finally { host.unmount(); }
+  });
+}
+
+test('staff hook keeps the known status after server failure and aborts a pending update on unmount', async () => {
+  let fail = true, complete, pendingSignal, writes = 0;
+  const host = apiHook(async (url, init) => {
+    if (init.method === 'PATCH') {
+      writes++;
+      if (fail) return new Response('', { status: 500 });
+      pendingSignal = init.signal; return new Promise((resolve) => { complete = resolve; });
+    }
+    return jsonResponse(new URL(url).pathname === '/staff/orders' ? backendPage() : backendOrder);
+  });
+  try {
+    host.render(); await host.settle(); let view = await host.settle();
+    await view.updateSelectedOrder('PREPARING'); view = host.render();
+    assert.equal(view.detail.data.status, 'PAID'); assert.ok(view.updateError); assert.equal(view.updating, false);
+    fail = false; const save = view.updateSelectedOrder('PREPARING');
+    host.unmount(); assert.equal(pendingSignal.aborted, true);
+    complete(jsonResponse({ ...backendScalar, status: 'PREPARING' })); await save;
+    assert.equal(host.render().detail.data.status, 'PAID'); assert.equal(writes, 2);
+  } finally { host.unmount(); }
+});
+
+test('staff hook can cancel pending, failed and paid orders but cannot cancel preparation or terminal orders', async () => {
+  for (const from of ['PENDING', 'PAYMENT_FAILED', 'PAID', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED']) {
+    let stored = { ...backendOrder, status: from }, writes = 0;
+    const host = apiHook(async (url, init) => {
+      if (init.method === 'PATCH') { writes++; stored = { ...stored, status: 'CANCELLED' }; return jsonResponse({ ...backendScalar, status: 'CANCELLED' }); }
+      return jsonResponse(new URL(url).pathname === '/staff/orders' ? backendPage([stored]) : stored);
+    });
+    try {
+      host.render(); await host.settle(); const view = await host.settle();
+      await view.updateSelectedOrder('CANCELLED');
+      assert.equal(writes, ['PENDING', 'PAYMENT_FAILED', 'PAID'].includes(from) ? 1 : 0);
+    } finally { host.unmount(); }
+  }
 });

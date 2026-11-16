@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { clearAuthSession } from '@/lib/auth';
 import { createStaffApiClient, StaffApiError } from '@/services/staffApiClient';
-import { filterStaffOrders, selectStaffOrder, type StaffOrderDetails, type StaffOrderFilter, type StaffOrdersPage } from '@/types/staff';
+import { filterStaffOrders, selectStaffOrder, STAFF_NEXT_ACTION, type StaffOrderDetails, type StaffOrderFilter, type StaffOrdersPage, type StaffUpdateStatusInput } from '@/types/staff';
 
 const PAGE_SIZE = 10;
 
@@ -13,7 +13,7 @@ function client() {
     getAccessToken: () => {
       try { return window.localStorage.getItem('token'); } catch { return null; }
     },
-    // Status updates remain disabled. This hook only calls GET methods.
+    allowStatusUpdates: true,
   });
 }
 
@@ -58,6 +58,9 @@ export function useStaffOrders() {
   const [revision, setRevision] = useState(0);
   const [detailRevision, setDetailRevision] = useState(0);
   const [accessError, setAccessError] = useState<StaffApiError | null>(null);
+  const [mutation, setMutation] = useState<{ pending: boolean; error: string } | null>(null);
+  const pendingUpdate = useRef<AbortController | null>(null);
+  useEffect(() => () => pendingUpdate.current?.abort(), []);
   const onAccessError = useCallback((error: StaffApiError) => {
     setAccessError(error);
     if (error.code === 'UNAUTHENTICATED') clearAuthSession();
@@ -78,8 +81,36 @@ export function useStaffOrders() {
     readDetail, onAccessError,
   );
 
+  async function updateSelectedOrder(nextStatus: StaffUpdateStatusInput['status']) {
+    if (pendingUpdate.current || accessError || !selectedId || detail.status !== 'ready' ||
+        detail.data?.id !== selectedId) return;
+    const canCancel = nextStatus === 'CANCELLED' && ['PENDING', 'PAYMENT_FAILED', 'PAID', 'CONFIRMED'].includes(detail.data.status);
+    if (!canCancel && STAFF_NEXT_ACTION[detail.data.status]?.status !== nextStatus) return;
+    const controller = new AbortController();
+    pendingUpdate.current = controller;
+    setMutation({ pending: true, error: '' });
+    try {
+      await client().updateOrderStatus(selectedId, { status: nextStatus }, { signal: controller.signal });
+      if (!controller.signal.aborted) {
+        setMutation({ pending: false, error: '' });
+        setRevision((value) => value + 1);
+      }
+    } catch (cause) {
+      if (controller.signal.aborted) return;
+      const error = cause instanceof StaffApiError ? cause : new StaffApiError('NETWORK', 'Không thể cập nhật đơn hàng. Vui lòng thử lại.');
+      setMutation({ pending: false, error: error.message });
+      if (error.code === 'UNAUTHENTICATED' || error.code === 'FORBIDDEN') onAccessError(error);
+      else if (error.code === 'CONFLICT' || error.code === 'NOT_FOUND') setRevision((value) => value + 1);
+    } finally {
+      if (pendingUpdate.current === controller) pendingUpdate.current = null;
+    }
+  }
+
   return {
     orders, visibleOrders, selectedId, detail,
+    updating: mutation?.pending ?? false,
+    updateError: mutation?.error ?? '',
+    updateSelectedOrder,
     status: accessError ? 'error' as const : list.status,
     error: accessError?.message ?? list.error?.message ?? '',
     errorCode: accessError?.code ?? list.error?.code,

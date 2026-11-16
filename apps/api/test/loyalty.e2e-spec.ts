@@ -93,7 +93,7 @@ describe('Loyalty after PAID (HTTP + PostgreSQL integration)', () => {
     expect(responses.map((response) => response.status)).toEqual([200, 200]);
     const entry = await context.prisma.loyaltyTransaction.findFirstOrThrow();
     await checkout(order.body.id).expect(201);
-    for (const status of ['CONFIRMED', 'PREPARING', 'READY', 'COMPLETED']) {
+    for (const status of ['PREPARING', 'READY', 'COMPLETED']) {
       await patch(order.body.id, status).expect(200);
     }
     await ipn(order.body.id).expect(200);

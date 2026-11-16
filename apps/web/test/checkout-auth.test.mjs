@@ -88,7 +88,11 @@ function checkout() {
   for (const [id, value] of [['customerName', 'Test Customer'], ['customerPhone', '0901234567']]) {
     find(render(), (node) => node.props.id === id).props.onChange({ target: { value } });
   }
-  return { cart, loyalty, render,
+  const redemption = () => {
+    const field = find(render(), (node) => typeof node.props.onChange === 'function' && 'maxPoints' in node.props);
+    return field.type(field.props);
+  };
+  return { cart, loyalty, render, redemption,
     usePoints: (points) => find(render(), (node) => typeof node.props.onChange === 'function' && 'maxPoints' in node.props).props.onChange(points),
     submit: () => find(render(), (node) => node.type === 'form').props.onSubmit({ preventDefault() {} }) };
 }
@@ -130,6 +134,37 @@ test('checkout sends selected points and retries the same request after points w
   assert.equal(requests[0].body, requests[1].body);
   assert.equal(requests[0].headers['Idempotency-Key'], requests[1].headers['Idempotency-Key']);
   assert.equal(clearedCart, false);
+});
+
+test('accepted maximum points do not become an over-limit warning after the balance refreshes', async () => {
+  values.set('token', token());
+  const view = checkout();
+  find(view.redemption(), (node) => node.type === 'button' && node.props.children === 'Dùng tối đa').props.onClick();
+  globalThis.fetch = async (url) => url.endsWith('/orders')
+    ? Response.json({ id: 'redeemed-order', status: 'PENDING', totalAmount: 25400, redeemedPoints: 46, loyaltyDiscountAmount: 4600 })
+    : new Response('', { status: 503 });
+  await view.submit();
+  view.loyalty.account.loyaltyPoints = 0;
+  assert.equal(find(view.redemption(), (node) => node.props.role === 'alert'), undefined);
+  assert.equal(find(view.redemption(), (node) => node.type === 'strong').props.children.join(''), '46 điểm');
+  assert.equal(find(view.render(), (node) => node.props.type === 'submit').props.disabled, false);
+  view.loyalty.account = null;
+  assert.equal(find(view.redemption(), (node) => node.props.role === 'alert'), undefined);
+  assert.ok(find(view.redemption(), (node) => node.props.role === 'status'));
+});
+
+test('editing an accepted order does not reuse its point allowance for a new request', async () => {
+  values.set('token', token());
+  const view = checkout();
+  view.usePoints(46);
+  globalThis.fetch = async (url) => url.endsWith('/orders')
+    ? Response.json({ id: 'redeemed-order', status: 'PENDING', totalAmount: 25400, redeemedPoints: 46, loyaltyDiscountAmount: 4600 })
+    : new Response('', { status: 503 });
+  await view.submit();
+  view.loyalty.account.loyaltyPoints = 0;
+  find(view.render(), (node) => node.props.id === 'customerName').props.onChange({ target: { value: 'Changed customer' } });
+  assert.ok(find(view.redemption(), (node) => node.props.role === 'alert'));
+  assert.equal(find(view.render(), (node) => node.props.type === 'submit').props.disabled, true);
 });
 
 test('checkout rejects a new request with more points than the balance or payable total', async () => {

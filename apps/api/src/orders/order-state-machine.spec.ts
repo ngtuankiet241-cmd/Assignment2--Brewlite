@@ -15,8 +15,10 @@ const allowed: [OrderStatus, OrderStatus][] = [
   ['PAYMENT_FAILED', 'PENDING'],
   ['PAYMENT_FAILED', 'CANCELLED'],
 
-  ['PAID', 'CONFIRMED'],
+  ['PAID', 'PREPARING'],
+  ['PAID', 'CANCELLED'],
   ['CONFIRMED', 'PREPARING'],
+  ['CONFIRMED', 'CANCELLED'],
   ['PREPARING', 'READY'],
   ['READY', 'COMPLETED'],
 ];

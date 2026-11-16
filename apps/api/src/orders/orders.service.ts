@@ -181,7 +181,7 @@ export class OrdersService {
   async confirmOrder(id: string) {
     await this.inventory.expireReservations(id);
     return this.prisma.$transaction((tx) =>
-      changeOrderStatus(tx, id, OrderStatus.CONFIRMED),
+      changeOrderStatus(tx, id, OrderStatus.PREPARING),
     );
   }
 

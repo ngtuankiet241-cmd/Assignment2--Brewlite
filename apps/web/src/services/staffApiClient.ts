@@ -17,7 +17,7 @@ interface StaffApiOptions {
   getAccessToken: () => string | null;
   fetcher?: typeof fetch;
   timeoutMs?: number;
-  /** Future integration must explicitly opt in. The demo dashboard never uses this client. */
+  /** Only a caller that explicitly opts in can update an order. */
   allowStatusUpdates?: boolean;
 }
 
@@ -175,7 +175,7 @@ export function createStaffApiClient(options: StaffApiOptions) {
     },
     async updateOrderStatus(id: string, input: StaffUpdateStatusInput, requestOptions: RequestOptions = {}): Promise<StaffOrderScalar> {
       if (!options.allowStatusUpdates) throw new StaffApiError('WRITES_DISABLED', 'Cập nhật đơn đang khóa cho đến khi có API Staff an toàn.');
-      if (!['PREPARING', 'READY', 'COMPLETED'].includes(input.status)) throw new StaffApiError('CONFIGURATION', 'Trạng thái đích không hợp lệ.');
+      if (!['PREPARING', 'READY', 'COMPLETED', 'CANCELLED'].includes(input.status)) throw new StaffApiError('CONFIGURATION', 'Trạng thái đích không hợp lệ.');
       return parseStatusResult(await request(`${orderPath(id)}/status`, requestOptions, { status: input.status }));
     },
   };

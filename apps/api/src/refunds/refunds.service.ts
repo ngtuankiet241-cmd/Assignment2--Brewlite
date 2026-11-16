@@ -14,7 +14,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { lockOrder } from '../orders/order-transition';
+import { changeOrderStatus, lockOrder } from '../orders/order-transition';
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -92,9 +92,9 @@ export class RefundsService {
       };
     },
   ) {
-    if (order.status !== OrderStatus.PAID) {
+    if (order.status !== OrderStatus.PAID && order.status !== OrderStatus.CANCELLED) {
       throw new ConflictException(
-        'Đơn hàng không còn ở trạng thái PAID.',
+        'Chỉ có thể hoàn tiền cho đơn đã thanh toán hoặc đã hủy.',
       );
     }
 
@@ -308,7 +308,7 @@ export class RefundsService {
         );
       }
 
-      // Chỉ giao dịch thật đã xác minh mới được cập nhật CANCELLED.
+      // Chỉ giao dịch thật đã xác minh mới được ghi nhận hoàn tiền thành công.
       const updatedRefund = await tx.refund.update({
         where: { id: refundId },
         data: {
@@ -319,10 +319,9 @@ export class RefundsService {
         },
       });
 
-      await tx.order.update({
-        where: { id: order.id },
-        data: { status: OrderStatus.CANCELLED },
-      });
+      if (order.status !== OrderStatus.CANCELLED) {
+        await changeOrderStatus(tx, order.id, OrderStatus.CANCELLED);
+      }
 
       return {
         message: 'Đã xác minh hoàn tiền thủ công và hủy đơn hàng.',

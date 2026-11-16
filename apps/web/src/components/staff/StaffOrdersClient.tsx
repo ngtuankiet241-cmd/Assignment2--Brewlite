@@ -42,7 +42,7 @@ const API_URL =
 const statusLabels: Record<OrderStatus, string> = {
   PENDING: 'Chờ thanh toán',
   PAYMENT_FAILED: 'Thanh toán thất bại',
-  PAID: 'Chờ xác nhận',
+  PAID: 'Đã thanh toán',
   CONFIRMED: 'Đã xác nhận',
   PREPARING: 'Đang pha chế',
   READY: 'Sẵn sàng giao',
@@ -381,7 +381,7 @@ export default function StaffOrdersClient() {
                       onClick={() => updateOrder(order, 'confirm')}
                       className="rounded-xl bg-green-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
                     >
-                      Xác nhận đơn
+                      Bắt đầu pha chế
                     </button>
                   )}
 

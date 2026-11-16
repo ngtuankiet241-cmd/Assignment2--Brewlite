@@ -40,6 +40,7 @@ describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
     });
   });
   beforeEach(async () => {
+    await context.prisma.refund.deleteMany();
     await context.prisma.order.deleteMany();
     await context.prisma.product.deleteMany();
   });
@@ -240,7 +241,7 @@ describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
     expect(await stock(p.id)).toEqual(restored);
   });
 
-  it('INT-INV-12B: PAID orders cannot be cancelled directly or restocked without a refund', async () => {
+  it('INT-INV-12B: cancelling a PAID order releases stock once and requests a refund', async () => {
     const p = await product(3);
     const placed = await place([item(p.id, 2)]).expect(201);
     await checkout(placed.body.id, 20000).expect(201);
@@ -250,10 +251,13 @@ describe('Inventory reservations (HTTP + PostgreSQL integration)', () => {
     });
     const afterPayment = await stock(p.id);
     expect(afterPayment).toMatchObject({ stock: 1, version: 1 });
-    await patch(placed.body.id, 'CANCELLED').expect(409);
+    await patch(placed.body.id, 'CANCELLED').expect(200);
     await inventory.expireReservations();
-    expect(await stock(p.id)).toEqual(afterPayment);
-    expect(await order(placed.body.id)).toMatchObject({ status: 'PAID' });
+    expect(await stock(p.id)).toMatchObject({ stock: 3, version: 2 });
+    expect(await order(placed.body.id)).toMatchObject({ status: 'CANCELLED', reservationStatus: 'RELEASED' });
+    expect(await context.prisma.refund.findFirst({ where: { orderId: placed.body.id } })).toMatchObject({ status: 'REQUESTED', amount: 20000 });
+    await patch(placed.body.id, 'CANCELLED').expect(409);
+    expect(await stock(p.id)).toMatchObject({ stock: 3, version: 2 });
   });
 
   it('INT-INV-13: PostgreSQL permits only one conditional update using the same stock version', async () => {
