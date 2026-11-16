@@ -1,5 +1,5 @@
 // Staff API contract verified against the controller, service and Prisma schema.
-export type StaffOrderStatus = 'PENDING' | 'PAYMENT_FAILED' | 'PAID' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
+export type StaffOrderStatus = 'PENDING' | 'PAYMENT_FAILED' | 'PAID' | 'CONFIRMED' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
 export type StaffOrderFilter = 'ALL' | StaffOrderStatus;
 export type StaffDemoMode = 'normal' | 'loading' | 'empty' | 'error';
 
@@ -15,7 +15,7 @@ export interface StaffOrdersPage {
 }
 
 export interface StaffUpdateStatusInput {
-  status: 'PREPARING' | 'READY' | 'COMPLETED';
+  status: 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED';
 }
 
 export interface StaffOrderItem {
@@ -72,6 +72,7 @@ export const STAFF_STATUSES: Record<StaffOrderStatus, { label: string; color: st
   PENDING: { label: 'PENDING', color: 'border-stone-200 bg-stone-100 text-stone-700' },
   PAYMENT_FAILED: { label: 'PAYMENT_FAILED', color: 'border-red-200 bg-red-50 text-red-800' },
   PAID: { label: 'PAID', color: 'border-amber-200 bg-amber-50 text-amber-900' },
+  CONFIRMED: { label: 'CONFIRMED', color: 'border-indigo-200 bg-indigo-50 text-indigo-900' },
   PREPARING: { label: 'PREPARING', color: 'border-orange-200 bg-orange-50 text-orange-900' },
   READY: { label: 'READY', color: 'border-sky-200 bg-sky-50 text-sky-900' },
   COMPLETED: { label: 'COMPLETED', color: 'border-emerald-200 bg-emerald-50 text-emerald-800' },
@@ -79,10 +80,11 @@ export const STAFF_STATUSES: Record<StaffOrderStatus, { label: string; color: st
 };
 
 // UI affordances only; the backend must enforce transitions and authorization.
-export const STAFF_NEXT_ACTION: Partial<Record<StaffOrderStatus, StaffUpdateStatusInput & { label: string }>> = {
-  PAID: { status: 'PREPARING', label: 'Bắt đầu pha chế' },
-  PREPARING: { status: 'READY', label: 'Sẵn sàng nhận' },
-  READY: { status: 'COMPLETED', label: 'Hoàn thành' },
+export const STAFF_NEXT_ACTION: Partial<Record<StaffOrderStatus, { status: StaffUpdateStatusInput['status']; label: string }>> = {
+  PAID: { status: 'PREPARING', label: 'Nhận đơn & chuẩn bị' },
+  CONFIRMED: { status: 'PREPARING', label: 'Bắt đầu pha chế' },
+  PREPARING: { status: 'READY', label: 'Đánh dấu sẵn sàng' },
+  READY: { status: 'COMPLETED', label: 'Hoàn thành đơn' },
 };
 
 export function canAccessStaff(role?: string): boolean {

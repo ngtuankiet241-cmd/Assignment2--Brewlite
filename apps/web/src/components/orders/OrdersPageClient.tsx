@@ -39,7 +39,7 @@ interface Order {
   items: OrderItem[];
 }
 
-const STATUS_STEPS = ['PENDING', 'PAID', 'CONFIRMED', 'PREPARING', 'READY', 'COMPLETED'];
+const STATUS_STEPS = ['PENDING', 'PAID', 'PREPARING', 'READY', 'COMPLETED'];
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'Chờ thanh toán',
@@ -83,7 +83,7 @@ function OrderStatusBar({ status }: { status: string }) {
       ? 'Thanh toán chưa thành công. Bạn có thể thử lại hoặc hủy đơn.'
       : 'Đơn hàng đã kết thúc và không thể tiếp tục xử lý.'}</p>;
   }
-  const currentIndex = STATUS_STEPS.indexOf(status);
+  const currentIndex = STATUS_STEPS.indexOf(status === 'CONFIRMED' ? 'PAID' : status);
   return (
     <div className="mt-3">
       <div className="flex items-center gap-0">

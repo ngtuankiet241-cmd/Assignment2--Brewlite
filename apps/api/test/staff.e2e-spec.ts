@@ -22,6 +22,7 @@ describe('Staff API (HTTP + PostgreSQL integration)', () => {
     }
   });
   beforeEach(async () => {
+    await context.prisma.refund.deleteMany();
     await context.prisma.order.deleteMany();
     await context.prisma.product.deleteMany();
   });
@@ -72,7 +73,7 @@ describe('Staff API (HTTP + PostgreSQL integration)', () => {
     const list = await get('/staff/orders', role).expect(200);
     expect(list.body.data.map((entry) => entry.id)).toEqual([order.id]);
     await get(`/staff/orders/${order.id}`, role).expect(200);
-    for (const status of ['CONFIRMED', 'PREPARING', 'READY', 'COMPLETED']) {
+    for (const status of ['PREPARING', 'READY', 'COMPLETED']) {
       const response = await patch(order.id, status, role).expect(200);
       expect(response.body.status).toBe(status);
     }
@@ -145,6 +146,46 @@ describe('Staff API (HTTP + PostgreSQL integration)', () => {
     await patch('not-found', 'PREPARING').expect(404);
   });
 
+  it('staff cannot start preparing a paid order that already has a refund request', async () => {
+    const order = await createOrder();
+    const payment = await context.prisma.payment.create({ data: {
+      orderId: order.id, amount: 30000, status: 'SUCCESS', transactionRef: 'refund-pending-reference', paidAt: new Date(),
+    } });
+    await context.prisma.refund.create({ data: {
+      orderId: order.id, paymentId: payment.id, amount: 30000, status: 'REQUESTED',
+      originalTxnRef: 'refund-pending-reference', idempotencyKey: `refund_${payment.id}`,
+    } });
+    await patch(order.id, 'PREPARING').expect(409);
+    expect((await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('PAID');
+  });
+
+  it('staff cancellation creates one refund request for a paid order and does not claim a refund succeeded', async () => {
+    const order = await createOrder();
+    await context.prisma.payment.create({ data: {
+      orderId: order.id, amount: 30000, status: 'SUCCESS', transactionRef: 'paid-cancellation-reference', paidAt: new Date(),
+    } });
+    await patch(order.id, 'CANCELLED').expect(200);
+    await patch(order.id, 'CANCELLED').expect(409);
+    const refunds = await context.prisma.refund.findMany({ where: { orderId: order.id } });
+    expect(refunds).toHaveLength(1);
+    expect(refunds[0]).toMatchObject({ status: 'REQUESTED', amount: 30000 });
+    expect((await context.prisma.payment.findUniqueOrThrow({ where: { orderId: order.id } })).status).toBe('SUCCESS');
+
+    const refundPath = `/refunds/${refunds[0].id}`;
+    const refundPatch = (action: string, role: Role, body = {}) => request(context.app.getHttpServer())
+      .patch(`${refundPath}/${action}`).auth(tokens[role], { type: 'bearer' }).send(body);
+    await refundPatch('approve', Role.BARISTA).expect(200);
+    await refundPatch('verify', Role.ADMIN, { confirmed: true }).expect(409);
+    await refundPatch('transfer', Role.BARISTA, {
+      bankTransactionRef: 'manual-refund-transfer', evidenceUrl: 'https://example.test/refund-evidence',
+    }).expect(200);
+    await refundPatch('verify', Role.BARISTA, { confirmed: true }).expect(403);
+    const completed = await refundPatch('verify', Role.ADMIN, { confirmed: true }).expect(200);
+    expect(completed.body.refund.status).toBe('SUCCEEDED');
+    expect((await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('CANCELLED');
+    await refundPatch('verify', Role.ADMIN, { confirmed: true }).expect(409);
+  });
+
   it.each([undefined, null, '', 'SHIPPED', 123, {}, ['READY']])
     ('INT-STAFF-10: malformed status (%#) cannot change an order', async (status) => {
       const order = await createOrder();
@@ -159,12 +200,12 @@ describe('Staff API (HTTP + PostgreSQL integration)', () => {
       expect(await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).toEqual(order);
     });
 
-  it('INT-STAFF-12: concurrent payment and cancellation cannot both succeed', async () => {
+  it('INT-STAFF-12: concurrent payment and cancellation serialize to terminal cancellation', async () => {
     const order = await createOrder(OrderStatus.PENDING);
     const responses = await Promise.all([patch(order.id, 'PAID'), patch(order.id, 'CANCELLED')]);
-    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
-    const winner = responses.find((response) => response.status === 200);
-    expect((await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe(winner.body.status);
+    expect([200, 409]).toContain(responses[0].status);
+    expect(responses[1].status).toBe(200);
+    expect((await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('CANCELLED');
   });
 
   async function placeReservedOrder() {

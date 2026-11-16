@@ -16,8 +16,9 @@ const transitions: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
     OrderStatus.PENDING,
     OrderStatus.CANCELLED,
   ],
-  PAID: [OrderStatus.CONFIRMED],
-  CONFIRMED: [OrderStatus.PREPARING],
+  PAID: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
+  // Legacy stored orders may continue, but no new transition enters CONFIRMED.
+  CONFIRMED: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
   PREPARING: [OrderStatus.READY],
   READY: [OrderStatus.COMPLETED],
   COMPLETED: [],

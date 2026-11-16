@@ -50,10 +50,10 @@ export async function changeOrderStatus(
   const order = await lockOrder(tx, id);
   assertTransition(order.status, status);
 
-  // Không cho xác nhận đơn đang có yêu cầu hoàn tiền.
+  // Không cho chuẩn bị đơn đang có yêu cầu hoàn tiền.
   if (
-    order.status === OrderStatus.PAID &&
-    status === OrderStatus.CONFIRMED
+    (order.status === OrderStatus.PAID || order.status === OrderStatus.CONFIRMED) &&
+    status === OrderStatus.PREPARING
   ) {
     const refund = await tx.refund.findFirst({
       where: {
@@ -74,6 +74,27 @@ export async function changeOrderStatus(
   const data: Prisma.OrderUpdateInput = {
     status,
   };
+
+  if (
+    (order.status === OrderStatus.PAID || order.status === OrderStatus.CONFIRMED) &&
+    status === OrderStatus.CANCELLED
+  ) {
+    const payment = await tx.payment.findUnique({ where: { orderId: id } });
+    if (payment?.status === 'SUCCESS' && payment.amount > 0 && payment.transactionRef) {
+      await tx.refund.upsert({
+        where: { idempotencyKey: `refund_${payment.id}` },
+        update: {},
+        create: {
+          orderId: id,
+          paymentId: payment.id,
+          amount: payment.amount,
+          status: 'REQUESTED',
+          originalTxnRef: payment.transactionRef,
+          idempotencyKey: `refund_${payment.id}`,
+        },
+      });
+    }
+  }
 
   // Khi hủy đơn, giải phóng tồn kho theo logic của main.
   if (status === OrderStatus.CANCELLED && order.reservationStatus) {

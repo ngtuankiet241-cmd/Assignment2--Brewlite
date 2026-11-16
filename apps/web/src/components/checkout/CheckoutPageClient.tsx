@@ -63,7 +63,8 @@ export default function CheckoutPageClient() {
   const promotionRequest = useRef<AbortController | null>(null);
   const promotionRequestId = useRef(0);
   const checkoutAttempt = useRef<CheckoutAttempt | null>(null);
-  const [hasCheckoutAttempt, setHasCheckoutAttempt] = useState(false);
+  const [checkoutAttemptSnapshot, setCheckoutAttemptSnapshot] = useState<string | null>(null);
+  const [appliedRedemption, setAppliedRedemption] = useState<{ checkout: string; points: number } | null>(null);
 
   // Immutable cart arrays bind each quote to exactly the cart that was checked.
   const currentPromotion = promotionFeedback?.items === items ? promotionFeedback : null;
@@ -76,6 +77,12 @@ export default function CheckoutPageClient() {
   const loyaltyDiscountAmount = pointsToUse * redemptionRate;
   const totalAmount = Math.max(0, amountAfterPromotion - loyaltyDiscountAmount);
   const unavailableItems = items.filter((item) => unavailableProductIds.includes(item.productId));
+  const checkoutSnapshot = JSON.stringify({ items, customerName: customerName.trim(), customerPhone: customerPhone.trim(),
+    tableNumber, notes: notes.trim(), promotionCode: appliedPromotion?.code, redeemedPoints: pointsToUse,
+    paymentMethod, userId: loyalty.userId });
+  const sameCheckoutAttempt = checkoutAttemptSnapshot === checkoutSnapshot;
+  const appliedPoints = appliedRedemption?.checkout === checkoutSnapshot && appliedRedemption.points > 0
+    ? appliedRedemption.points : undefined;
 
   useEffect(() => () => {
     promotionRequestId.current += 1;
@@ -423,7 +430,7 @@ export default function CheckoutPageClient() {
         throw new Error('Số điểm sử dụng vượt số dư hoặc giá trị đơn. Vui lòng cập nhật điểm và thử lại.');
       }
       checkoutAttempt.current = getCheckoutAttempt(orderBody, checkoutAttempt.current);
-      setHasCheckoutAttempt(true);
+      setCheckoutAttemptSnapshot(checkoutSnapshot);
       const orderHeaders: HeadersInit = {
         'Content-Type': 'application/json',
         'Idempotency-Key': checkoutAttempt.current.key,
@@ -466,6 +473,7 @@ export default function CheckoutPageClient() {
       }
 
       const orderData: CreatedOrder = await orderRes.json();
+      setAppliedRedemption({ checkout: checkoutSnapshot, points: orderData.redeemedPoints });
       setCreatedOrder(orderData);
       notifyLoyaltyChanged();
 
@@ -699,7 +707,7 @@ export default function CheckoutPageClient() {
           />
 
           <LoyaltyRedemptionField loyalty={loyalty} points={pointsToUse} maxPoints={maxPoints}
-            onChange={setPointsToUse} disabled={submitting || applyingPromotion} />
+            onChange={setPointsToUse} appliedPoints={appliedPoints} disabled={submitting || applyingPromotion} />
 
           <div className="border-t border-coffee-200/70 pt-3">
             <div className="flex justify-between text-sm text-coffee-600">
@@ -728,7 +736,7 @@ export default function CheckoutPageClient() {
           <button
             className="mt-4 flex min-h-12 w-full items-center justify-center rounded-full bg-coffee-800 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-coffee-700 active:scale-[0.98] disabled:opacity-50"
             disabled={submitting || applyingPromotion || unavailableItems.length > 0 ||
-              (pointsToUse > 0 && (!loyalty.account || pointsToUse > maxPoints) && !hasCheckoutAttempt)}
+              (pointsToUse > 0 && (!loyalty.account || pointsToUse > maxPoints) && !sameCheckoutAttempt)}
             type="submit"
           >
             {submitting ? 'Đang khởi tạo đơn hàng...' : 'Xác nhận đặt hàng →'}

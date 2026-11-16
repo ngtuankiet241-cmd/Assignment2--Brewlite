@@ -1,15 +1,20 @@
 import Link from 'next/link';
 import type { useLoyaltyAccount } from '@/hooks/useLoyaltyAccount';
 
-export default function LoyaltyRedemptionField({ loyalty, points, maxPoints, onChange, disabled }: {
+export default function LoyaltyRedemptionField({ loyalty, points, maxPoints, onChange, appliedPoints, disabled }: {
   loyalty: ReturnType<typeof useLoyaltyAccount>; points: number; maxPoints: number;
   onChange: (points: number) => void; disabled: boolean;
+  appliedPoints?: number;
 }) {
   const number = new Intl.NumberFormat('vi-VN');
   return (
     <fieldset className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4" disabled={disabled}>
       <legend className="px-1 text-sm font-bold text-coffee-950">✦ Sử dụng điểm thưởng</legend>
-      {!loyalty.userId ? (
+      {appliedPoints !== undefined ? (
+        <p role="status" className="text-xs leading-relaxed text-coffee-700">
+          Đã áp dụng <strong>{number.format(appliedPoints)} điểm</strong> vào đơn hàng. Bạn có thể tiếp tục thanh toán; thử lại sẽ không trừ thêm điểm.
+        </p>
+      ) : !loyalty.userId ? (
         <p className="text-xs text-coffee-700"><Link href="/login" className="font-bold underline">Đăng nhập</Link> để sử dụng điểm khi đặt hàng.</p>
       ) : loyalty.account ? (
         <>

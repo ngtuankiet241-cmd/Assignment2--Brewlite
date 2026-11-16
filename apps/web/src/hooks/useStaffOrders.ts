@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { clearAuthSession } from '@/lib/auth';
 import { STAFF_STATUS_UPDATES_ENABLED } from '@/lib/staffFeatures';
 import { createStaffApiClient, StaffApiError } from '@/services/staffApiClient';
-import { STAFF_NEXT_ACTION, filterStaffOrders, selectStaffOrder, type StaffOrderDetails, type StaffOrderFilter, type StaffOrdersPage } from '@/types/staff';
+import { filterStaffOrders, selectStaffOrder, STAFF_NEXT_ACTION, type StaffOrderDetails, type StaffOrderFilter, type StaffOrdersPage, type StaffUpdateStatusInput } from '@/types/staff';
 
 const PAGE_SIZE = 10;
 
@@ -59,13 +59,12 @@ export function useStaffOrders() {
   const [revision, setRevision] = useState(0);
   const [detailRevision, setDetailRevision] = useState(0);
   const [accessError, setAccessError] = useState<StaffApiError | null>(null);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [notice, setNotice] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
-  const mutation = useRef<AbortController | null>(null);
+  const [mutation, setMutation] = useState<{ pending: boolean; error: string } | null>(null);
+  const pendingUpdate = useRef<AbortController | null>(null);
   const mounted = useRef(false);
   useEffect(() => {
     mounted.current = true;
-    return () => { mounted.current = false; mutation.current?.abort(); };
+    return () => { mounted.current = false; pendingUpdate.current?.abort(); };
   }, []);
   const onAccessError = useCallback((error: StaffApiError) => {
     setAccessError(error);
@@ -87,42 +86,43 @@ export function useStaffOrders() {
     readDetail, onAccessError,
   );
 
-  async function updateSelectedOrder() {
-    // The synchronous lock prevents repeated clicks before React can render loading.
-    if (mutation.current || accessError || !mounted.current) return;
+  async function updateSelectedOrder(nextStatus: StaffUpdateStatusInput['status']) {
+    if (!mounted.current || pendingUpdate.current || accessError) return;
     if (!STAFF_STATUS_UPDATES_ENABLED) {
-      setNotice({ kind: 'error', message: 'Cập nhật trạng thái đang khóa, chờ xác minh quy tắc thanh toán.' });
+      setMutation({ pending: false, error: 'Cập nhật trạng thái đang khóa theo cấu hình triển khai.' });
       return;
     }
-    const order = detail.data;
-    const action = order && STAFF_NEXT_ACTION[order.status];
-    if (!order || !action || detail.status !== 'ready' || list.status !== 'ready') return;
+    if (!selectedId || list.status !== 'ready' || detail.status !== 'ready' ||
+        detail.data?.id !== selectedId) return;
+    const canCancel = nextStatus === 'CANCELLED' && ['PENDING', 'PAYMENT_FAILED', 'PAID', 'CONFIRMED'].includes(detail.data.status);
+    if (!canCancel && STAFF_NEXT_ACTION[detail.data.status]?.status !== nextStatus) return;
     const controller = new AbortController();
-    mutation.current = controller;
-    setUpdatingId(order.id);
-    setNotice(null);
+    pendingUpdate.current = controller;
+    setMutation({ pending: true, error: '' });
     try {
-      await client().updateOrderStatus(order.id, { status: action.status }, { signal: controller.signal });
-      if (!mounted.current || controller.signal.aborted) return;
-      setNotice({ kind: 'success', message: `Đơn #${order.id}: ${action.label} thành công.` });
-      // Refresh authoritative list and detail; PATCH returns scalars only.
-      setRevision((value) => value + 1);
+      await client().updateOrderStatus(selectedId, { status: nextStatus }, { signal: controller.signal });
+      if (mounted.current && !controller.signal.aborted) {
+        setMutation({ pending: false, error: '' });
+        setRevision((value) => value + 1);
+      }
     } catch (cause) {
       if (!mounted.current || controller.signal.aborted) return;
-      const error = cause instanceof StaffApiError ? cause : new StaffApiError('NETWORK', 'Không thể cập nhật đơn hàng. Vui lòng tải lại để kiểm tra trạng thái.');
-      setNotice({ kind: 'error', message: error.message });
+      const error = cause instanceof StaffApiError ? cause : new StaffApiError('NETWORK', 'Không thể cập nhật đơn hàng. Vui lòng thử lại.');
+      setMutation({ pending: false, error: error.message });
       if (error.code === 'UNAUTHENTICATED' || error.code === 'FORBIDDEN') onAccessError(error);
-      // Also reconcile ambiguous network/response failures; never retry a PATCH automatically.
-      setRevision((value) => value + 1);
+      // A failed response may arrive after the server committed. Read back, never retry the write.
+      else setRevision((value) => value + 1);
     } finally {
-      mutation.current = null;
-      if (mounted.current) setUpdatingId(null);
+      if (pendingUpdate.current === controller) pendingUpdate.current = null;
     }
   }
 
   return {
-    statusUpdatesEnabled: STAFF_STATUS_UPDATES_ENABLED, updatingId, notice, updateSelectedOrder,
     orders, visibleOrders, selectedId, detail,
+    statusUpdatesEnabled: STAFF_STATUS_UPDATES_ENABLED,
+    updating: mutation?.pending ?? false,
+    updateError: mutation?.error ?? '',
+    updateSelectedOrder,
     status: accessError ? 'error' as const : list.status,
     error: accessError?.message ?? list.error?.message ?? '',
     errorCode: accessError?.code ?? list.error?.code,

@@ -7,7 +7,8 @@ import { createTestApplication, TestApplication } from './helpers/test-app';
 const allowed: [OrderStatus, OrderStatus][] = [
   ['PENDING', 'PAID'], ['PENDING', 'PAYMENT_FAILED'], ['PENDING', 'CANCELLED'],
   ['PAYMENT_FAILED', 'PENDING'], ['PAYMENT_FAILED', 'CANCELLED'],
-  ['PAID', 'CONFIRMED'], ['CONFIRMED', 'PREPARING'],
+  ['PAID', 'PREPARING'], ['PAID', 'CANCELLED'],
+  ['CONFIRMED', 'PREPARING'], ['CONFIRMED', 'CANCELLED'],
   ['PREPARING', 'READY'], ['READY', 'COMPLETED'],
 ];
 const forbidden = Object.values(OrderStatus).flatMap((from) =>
@@ -96,7 +97,7 @@ describe('Order State Machine (HTTP + PostgreSQL integration)', () => {
     const order = await createOrder();
     await checkout(order.id, 'normal-attempt').expect(201);
     await ipn(order.id, 'SUCCESS', 'normal-success').expect(200);
-    for (const status of ['CONFIRMED', 'PREPARING', 'READY', 'COMPLETED']) {
+    for (const status of ['PREPARING', 'READY', 'COMPLETED']) {
       await patch(order.id, status).expect(200);
     }
     expect((await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } })).status).toBe('COMPLETED');
@@ -146,7 +147,7 @@ describe('Order State Machine (HTTP + PostgreSQL integration)', () => {
     const order = await createOrder();
     await checkout(order.id, 'replay-attempt').expect(201);
     await ipn(order.id, 'SUCCESS', 'paid-event').expect(200);
-    for (const status of ['CONFIRMED', 'PREPARING', 'READY', 'COMPLETED']) await patch(order.id, status).expect(200);
+    for (const status of ['PREPARING', 'READY', 'COMPLETED']) await patch(order.id, status).expect(200);
     const before = await context.prisma.order.findUniqueOrThrow({ where: { id: order.id } });
     const payment = await context.prisma.payment.findUniqueOrThrow({ where: { orderId: order.id } });
     await ipn(order.id, 'SUCCESS', 'paid-event').expect(200);
