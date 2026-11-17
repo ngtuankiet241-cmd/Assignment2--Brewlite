@@ -1,43 +1,36 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
-// Helper mirror for category detection logic
-function detectCategory(name) {
-  const lower = (name || '').toLowerCase();
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const require = createRequire(import.meta.url);
+const cache = new Map();
 
-  if (lower.includes('trà') || lower.includes('tea')) {
-    return {
-      category: 'tea',
-      categoryName: 'Trà trái cây',
-    };
-  }
-
-  if (
-    lower.includes('espresso') ||
-    lower.includes('latte') ||
-    lower.includes('cappuccino') ||
-    lower.includes('americano')
-  ) {
-    return {
-      category: 'espresso',
-      categoryName: 'Cà phê pha máy',
-    };
-  }
-
-  return {
-    category: 'traditional',
-    categoryName: 'Cà phê truyền thống',
-  };
+// Exercise exported production helpers, including useProducts' actual category rules.
+function load(filename) {
+  if (cache.has(filename)) return cache.get(filename).exports;
+  const loaded = { exports: {} };
+  cache.set(filename, loaded);
+  const code = ts.transpileModule(readFileSync(filename, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  new Function('require', 'module', 'exports', code)((name) => {
+    if (name.startsWith('@/') || name.startsWith('.')) {
+      const base = name.startsWith('@/') ? resolve(root, 'src', name.slice(2)) : resolve(dirname(filename), name);
+      return load([base, `${base}.ts`].find(existsSync));
+    }
+    return require(name);
+  }, loaded, loaded.exports);
+  return loaded.exports;
 }
 
-// Currency format helper
-function formatCurrencyVND(amount) {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
+const { detectCategory } = load(resolve(root, 'src/hooks/useProducts.ts'));
+const { formatCurrencyVND } = load(resolve(root, 'src/lib/formatCurrency.ts'));
+const { parseProductsResponse } = load(resolve(root, 'src/lib/productResponse.ts'));
 
 describe('Menu UX & Helper Specifications (Sprint 1 MVP)', () => {
   describe('detectCategory()', () => {
@@ -64,6 +57,13 @@ describe('Menu UX & Helper Specifications (Sprint 1 MVP)', () => {
       const bacXiu = detectCategory('Bạc xỉu 3 tầng');
       assert.equal(bacXiu.category, 'traditional');
     });
+
+    it('UT-WEB-01: keeps milk tea, blended drinks and matcha in their specific categories', () => {
+      assert.equal(detectCategory('Trà sữa trân châu').category, 'milk-tea');
+      assert.equal(detectCategory('Milk Tea').category, 'milk-tea');
+      assert.equal(detectCategory('Matcha Latte').category, 'specialty');
+      assert.equal(detectCategory('Matcha đá xay').category, 'blended');
+    });
   });
 
   describe('formatCurrencyVND()', () => {
@@ -79,16 +79,16 @@ describe('Menu UX & Helper Specifications (Sprint 1 MVP)', () => {
       const sampleItem = {
         id: 'p-1',
         name: 'Cà phê sữa',
+        description: 'Cà phê phin với sữa',
         price: 29000,
         stock: 50,
         imageUrl: '/images/products/ca-phe-sua.svg',
       };
 
-      assert.ok(sampleItem.id);
-      assert.ok(sampleItem.name);
-      assert.ok(sampleItem.price > 0);
-      assert.ok(sampleItem.stock > 0);
-      assert.ok(sampleItem.imageUrl);
+      assert.deepEqual(parseProductsResponse({ success: true, data: [sampleItem] }), [sampleItem]);
+      for (const invalid of [{ id: '' }, { name: '' }, { price: -1 }, { stock: 1.5 }, { imageUrl: null }]) {
+        assert.throws(() => parseProductsResponse({ success: true, data: [{ ...sampleItem, ...invalid }] }), /không hợp lệ/);
+      }
     });
   });
 });

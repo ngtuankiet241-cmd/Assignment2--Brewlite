@@ -103,6 +103,98 @@ function find(tree, predicate) {
   return predicate(tree) ? tree : find(tree.props.children, predicate);
 }
 
+function textContent(tree) {
+  if (Array.isArray(tree)) return tree.map(textContent).join('');
+  if (typeof tree === 'string' || typeof tree === 'number') return String(tree);
+  return tree?.props ? textContent(tree.props.children) : '';
+}
+
+test('UT-CART-04: an empty cart offers the menu without an order form (FR-07)', () => {
+  const host = checkout();
+  host.cart.items = [];
+  host.cart.itemCount = 0;
+  host.cart.subtotal = 0;
+  const view = host.render();
+  assert.match(textContent(view), /Giỏ hàng của bạn đang trống/);
+  assert.equal(find(view, (node) => node.type === 'form'), undefined);
+  assert.ok(find(view, (node) => node.props.href === '/menu'));
+  assert.equal(clearedCart, false);
+});
+
+for (const [id, value] of [['customerName', ''], ['customerName', '   '], ['customerPhone', ''], ['customerPhone', '   ']]) {
+  test(`UT-CART-04: missing contact field ${id}=${JSON.stringify(value)} blocks requests (FR-08)`, async () => {
+    values.set('token', token());
+    const host = checkout();
+    const input = find(host.render(), (node) => node.props.id === id);
+    assert.equal(input.props.required, true);
+    input.props.onChange({ target: { value } });
+    let requests = 0;
+    globalThis.fetch = async () => { requests++; throw new Error('Unexpected order request'); };
+    await host.submit();
+    assert.equal(requests, 0);
+    assert.match(textContent(find(host.render(), (node) => node.props.role === 'alert')), /nhập đầy đủ họ tên và số điện thoại/);
+    assert.equal(clearedCart, false);
+  });
+}
+
+test('UT-CART-04: checkout review and request preserve size, topping quantities, contact data and totals (FR-08/09)', async () => {
+  values.set('token', token());
+  const host = checkout();
+  host.cart.items = [{ ...host.cart.items[0], size: 'L', sizePriceAdjustment: 5000, quantity: 2,
+    toppings: [{ id: 'pearls', name: 'Trân châu đen', unitPrice: 7000, quantity: 2 }] }];
+  host.cart.itemCount = 2;
+  host.cart.subtotal = 98000;
+  for (const [id, value] of [['customerName', '  Test Customer  '], ['customerPhone', ' 0901234567 '],
+    ['tableNumber', '5'], ['notes', '  Less ice  ']]) {
+    find(host.render(), (node) => node.props.id === id).props.onChange({ target: { value } });
+  }
+  const summary = textContent(host.render());
+  assert.match(summary, /2x Coffee \(Size L\)/);
+  assert.match(summary, /Trân châu đen/);
+  assert.match(summary, /98\.000/);
+  let requests = 0;
+  globalThis.fetch = async (url, options) => {
+    requests++;
+    assert.ok(url.endsWith('/orders'));
+    assert.deepEqual(JSON.parse(options.body), {
+      customerName: 'Test Customer', customerPhone: '0901234567', tableNumber: 5, notes: 'Less ice', redeemedPoints: 0,
+      items: [{ productId: 'product-1', productName: 'Coffee', unitPrice: 49000,
+        quantity: 2, size: 'L', toppings: 'Trân châu đen x2', itemTotal: 98000 }],
+    });
+    return Response.json({ message: 'Temporary failure' }, { status: 503 });
+  };
+  await host.submit();
+  assert.equal(requests, 1);
+  assert.equal(clearedCart, false);
+});
+
+test('UT-WEB-PAY-01: payment selection controls the SePay checkout request for the created order (FR-18)', async () => {
+  values.set('token', token());
+  const host = checkout();
+  const radio = (value) => find(host.render(), (node) => node.props.name === 'paymentMethod' && node.props.value === value);
+  assert.equal(radio('SEPAY_QR').props.checked, true);
+  assert.equal(radio('CASH').props.checked, false);
+  radio('CASH').props.onChange();
+  assert.equal(radio('CASH').props.checked, true);
+  assert.equal(radio('SEPAY_QR').props.checked, false);
+  radio('SEPAY_QR').props.onChange();
+  const requests = [];
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, options });
+    return requests.length === 1
+      ? Response.json({ id: 'server-order', status: 'PENDING', totalAmount: 30000 }, { status: 201 })
+      : Response.json({ message: 'Gateway unavailable' }, { status: 503 });
+  };
+  await host.submit();
+  assert.equal(requests.length, 2);
+  assert.ok(requests[1].url.endsWith('/payments/sepay/checkout-form'));
+  assert.equal(requests[1].options.method, 'POST');
+  assert.equal(requests[1].options.headers['Idempotency-Key'], 'payment-server-order');
+  assert.deepEqual(JSON.parse(requests[1].options.body), { orderId: 'server-order' });
+  assert.match(textContent(find(host.render(), (node) => node.props.role === 'alert')), /Gateway unavailable/);
+  assert.equal(clearedCart, false);
+});
+
 function assertSignInRequired(view) {
   assert.match(find(view, (node) => node.props.role === 'alert').props.children[0], /đăng nhập lại/);
   assert.ok(find(view, (node) => node.props.href === '/login'));

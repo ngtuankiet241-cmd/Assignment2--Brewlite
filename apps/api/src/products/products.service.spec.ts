@@ -23,7 +23,7 @@ describe('ProductsService', () => {
     );
   });
 
-  it('should return available products', async () => {
+  it('UT-PROD-01: returns available products in menu order (FR-01)', async () => {
     const products = [
       {
         id: 'p1',
@@ -46,7 +46,7 @@ describe('ProductsService', () => {
     });
   });
 
-  it('should return a product by id', async () => {
+  it('UT-PROD-02: returns product details by id (FR-02)', async () => {
     const product = {
       id: 'p1',
       name: 'Coffee',
