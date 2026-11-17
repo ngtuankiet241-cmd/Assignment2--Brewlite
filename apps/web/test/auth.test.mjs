@@ -66,7 +66,7 @@ describe('Browser authentication session', () => {
     assert.equal(getAuthToken(), current);
   });
 
-  it('logs out without deleting the cart and notifies mounted consumers', () => {
+  it('UT-WEB-AUTH-01: logs out without deleting the cart and notifies mounted consumers (FR-16)', () => {
     saveAuthSession({ accessToken: token(), user });
     values.set('cart', 'preserve-this-cart');
     let snapshot = getAuthSnapshot();
