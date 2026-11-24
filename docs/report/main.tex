@@ -28,11 +28,11 @@
 \usepackage{multicol}
 \usepackage{rotating}
 \usepackage{tikz}
-\usetikzlibrary{arrows,snakes,backgrounds}
+\usetikzlibrary{arrows,positioning,backgrounds}
 
 % ==================== THUẬT TOÁN VÀ MÃ NGUỒN ====================
 \IfFileExists{algorithm2e.sty}{\usepackage[lined,boxed,commentsnumbered]{algorithm2e}}{}
-\usepackage{enumerate}
+\usepackage{enumitem}
 \usepackage{xcolor}
 \usepackage[framemethod=tikz]{mdframed}
 \usepackage{listings}
@@ -1969,7 +1969,8 @@ Buổi họp Retrospective được chủ trì bởi Kiệt (Scrum Master / Team
 
 Nhằm đáp ứng yêu cầu nghiêm ngặt tại **Mục 8.1 của đề bài**, nhóm đã xây dựng bảng Ma trận truy vết yêu cầu phần mềm (\textit{Traceability Matrix}) hoàn chỉnh. Ma trận này thiết lập sự liên kết hai chiều, xuyên suốt từ Yêu cầu chức năng (Task 1) $\longrightarrow$ Sơ đồ thiết kế kiến trúc (Task 2 \& 3) $\longrightarrow$ Cấu trúc mã nguồn / API (Task 4 \& 5) $\longrightarrow$ Các ca kiểm thử tương ứng.
 
-\begin{longtable}{|c|c|c|m{4.6cm}|m{2.8cm}|}
+\setlength{\tabcolsep}{3pt}
+\begin{longtable}{|>{\centering\arraybackslash}p{0.07\textwidth}|>{\centering\arraybackslash}p{0.20\textwidth}|>{\centering\arraybackslash}p{0.14\textwidth}|p{0.31\textwidth}|p{0.20\textwidth}|}
 \caption{Bảng Ma trận truy vết yêu cầu phần mềm chuẩn 5 cột (Traceability Matrix)} \label{tab:traceability-full} \\
 \hline
 \textbf{Mã YC} & \textbf{User Story / Use-case} & \textbf{Thiết kế / Sơ đồ} & \textbf{Mã nguồn / API (Code)} & \textbf{Ca kiểm thử (Test ID)} \\
@@ -2031,6 +2032,7 @@ Nhằm đáp ứng yêu cầu nghiêm ngặt tại **Mục 8.1 của đề bài*
 \textbf{NFR-01} & Giám sát sức khỏe hệ thống & DD-01 & \texttt{GET /health}\newline\texttt{HealthController.ts} & \texttt{E2E-HEALTH-01}\newline\texttt{UT-HEALTH-01} \\
 \hline
 \end{longtable}
+\setlength{\tabcolsep}{6pt}
 
 \section{Cấu trúc repository}
 

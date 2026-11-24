@@ -1,0 +1,2 @@
+-- This migration is intentionally empty.
+-- Simulated payment attempts tracking is handled at the application layer.

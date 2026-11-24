@@ -1,0 +1,26 @@
+name: BrewLite Local
+values:
+  - key: base_url
+    value: 'http://localhost:3001'
+    enabled: true
+  - key: access_token
+    value: ''
+    enabled: true
+  - key: customer_email
+    value: 'customer@test.com'
+    enabled: true
+  - key: customer_password
+    value: 'Test@1234'
+    enabled: true
+  - key: barista_email
+    value: 'barista@test.com'
+    enabled: true
+  - key: barista_password
+    value: 'Test@1234'
+    enabled: true
+  - key: order_id
+    value: ''
+    enabled: true
+  - key: product_id
+    value: ''
+    enabled: true
