@@ -1,0 +1,2 @@
+-- This migration is intentionally empty.
+-- Refund logic for stock reservations is handled at the application layer.
